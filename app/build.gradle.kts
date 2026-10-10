@@ -31,21 +31,21 @@ android {
     if (localSigningFile.isFile) {
         localSigningFile.inputStream().use(localSigningProperties::load)
     }
-    val storePassword = System.getenv("STORE_PASSWORD")?.takeIf { it.isNotBlank() }
+    val signingStorePassword = System.getenv("STORE_PASSWORD")?.takeIf { it.isNotBlank() }
         ?: localSigningProperties.getProperty("storePassword")?.takeIf { it.isNotBlank() }
-    val keyPassword = System.getenv("KEY_PASSWORD")?.takeIf { it.isNotBlank() }
+    val signingKeyPassword = System.getenv("KEY_PASSWORD")?.takeIf { it.isNotBlank() }
         ?: localSigningProperties.getProperty("keyPassword")?.takeIf { it.isNotBlank() }
-    val keyAlias = System.getenv("KEY_ALIAS")?.takeIf { it.isNotBlank() }
+    val signingKeyAlias = System.getenv("KEY_ALIAS")?.takeIf { it.isNotBlank() }
         ?: "XiaoXiao"
     val keystorePath = System.getenv("KEYSTORE_PATH")?.takeIf { it.isNotBlank() } ?: "../apk-key/key.jks"
-    val hasLocalSigning = storePassword != null && keyPassword != null && rootProject.file(keystorePath).isFile
+    val hasLocalSigning = signingStorePassword != null && signingKeyPassword != null && rootProject.file(keystorePath).isFile
     signingConfigs {
         if (hasLocalSigning) {
             create("official") {
                 storeFile = rootProject.file(keystorePath)
-                storePassword = storePassword
-                keyAlias = keyAlias
-                keyPassword = keyPassword
+                storePassword = signingStorePassword
+                keyAlias = signingKeyAlias
+                keyPassword = signingKeyPassword
             }
         }
     }
