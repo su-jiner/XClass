@@ -9,6 +9,7 @@ import {
   CourseSchedule, MeetingTime, WeekRule, SimpleDate,
   inferFromCourses, defaultForToday, normalizeToWeekStart,
   decodeBackup, encodeBackup, backupToCourse, courseToBackup, BackupProfile,
+  SectionTimeProfile, DEFAULT_PROFILE_ID, defaultTimeProfile, decodeBackupEnvelope,
 } from './Core.ets';
 
 const DEFAULT_PROFILE_NAME = '默认课表';
@@ -155,6 +156,7 @@ export class ProfileStore {
         endSection: m.endSection,
         weekRules: m.weekRules.map((r) => ({ startWeek: r.startWeek, endWeek: r.endWeek, parity: r.parity })),
         location: m.location,
+        campusId: m.campusId ?? null,
       })),
     };
   }
@@ -175,6 +177,7 @@ export class ProfileStore {
           parity: r.parity,
         })),
         location: m.location,
+        campusId: m.campusId ?? null,
       })),
     };
   }
@@ -409,12 +412,23 @@ export class ProfileStore {
       semesterStartDate: p.semesterStartDate ?? null,
       courses: this.readCoursesFile(p.coursesFile).map((c) => courseToBackup(c)),
     }));
-    return encodeBackup(new Date().toISOString(), profiles);
+    const timeProfiles = this.loadTimeProfiles()
+      .filter((profile) => profile.id !== DEFAULT_PROFILE_ID)
+      .map((profile) => ({ id: profile.id, name: profile.name, blocks: profile.blocks }));
+    return encodeBackup(new Date().toISOString(), profiles, timeProfiles, this.loadCampusMap(), this.loadDefaultProfileId());
   }
 
   importBackup(content: string): number {
-    const backupProfiles = decodeBackup(content);
-    if (backupProfiles === null) fail('备份文件格式不正确');
+    const envelope = decodeBackupEnvelope(content);
+    if (envelope === null) fail('备份文件格式不正确');
+    const backupProfiles = envelope.profiles;
+    if (envelope.timeProfiles && envelope.timeProfiles.length > 0) {
+      this.saveTimeProfiles(
+        envelope.timeProfiles.map((p) => ({ id: p.id, name: p.name, blocks: p.blocks })),
+        envelope.campusMap ?? {},
+        envelope.defaultProfileId ?? null
+      );
+    }
     const names = fs.listFileSync(this.dir);
     for (const name of names) {
       if (name.startsWith('courses_') && name.endsWith('.json')) {
@@ -510,6 +524,84 @@ export class ProfileStore {
     const pad = (n: number): string => String(n).padStart(2, '0');
     return `${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}`;
   }
+
+  // MARK: 多校区节次时间表（对齐 Android TimeProfileStore）
+
+  private timeProfilesPath(): string {
+    return `${this.dir}/time_profiles.json`;
+  }
+
+  /** 默认 12 节表 + 用户维护的校区/楼栋时间表 */
+  loadTimeProfiles(): SectionTimeProfile[] {
+    const stored = this.readTimeProfileFile();
+    const custom: SectionTimeProfile[] = (stored.profiles ?? [])
+      .filter((p) => (p.blocks ?? []).length > 0 && p.id !== DEFAULT_PROFILE_ID)
+      .map((p) => ({
+        id: p.id,
+        name: p.name,
+        blocks: (p.blocks ?? []).map((b) => ({
+          startSection: b.startSection, endSection: b.endSection, startTime: b.startTime, endTime: b.endTime,
+        })),
+      }));
+    return [defaultTimeProfile()].concat(custom);
+  }
+
+  loadCampusMap(): Record<string, string> {
+    return this.readTimeProfileFile().campusMap ?? {};
+  }
+
+  loadDefaultProfileId(): string | null {
+    return this.readTimeProfileFile().defaultProfileId ?? null;
+  }
+
+  saveTimeProfiles(profiles: SectionTimeProfile[], campusMap: Record<string, string>, defaultProfileId: string | null): void {
+    const payload: PersistedTimeProfileJSON = {
+      version: 1,
+      defaultProfileId,
+      profiles: profiles
+        .filter((profile) => profile.id !== DEFAULT_PROFILE_ID)
+        .map((profile) => ({
+          id: profile.id,
+          name: profile.name,
+          blocks: profile.blocks.map((b) => ({
+            startSection: b.startSection, endSection: b.endSection, startTime: b.startTime, endTime: b.endTime,
+          })),
+        })),
+      campusMap,
+    };
+    this.writeTextAtomic(this.timeProfilesPath(), JSON.stringify(payload, null, 2));
+  }
+
+  /** 导入解析结果入库：保存识别出的时间表并建立「校区简称 → 时间表」映射 */
+  saveParsedTimeTables(timeTables: SectionTimeProfile[], campusAliases: string[]): Record<string, string> {
+    const existing = this.loadTimeProfiles().filter((p) => p.id !== DEFAULT_PROFILE_ID);
+    timeTables.forEach((profile) => {
+      const index = existing.findIndex((item) => item.id === profile.id || item.name === profile.name);
+      if (index >= 0) existing[index] = profile; else existing.push(profile);
+    });
+    const campusMap = this.loadCampusMap();
+    campusAliases.forEach((alias) => {
+      const matched = timeTables.find((profile) => profile.name.indexOf(alias) >= 0);
+      if (matched) campusMap[alias] = matched.id;
+    });
+    this.saveTimeProfiles(existing, campusMap, this.loadDefaultProfileId());
+    return campusMap;
+  }
+
+  private readTimeProfileFile(): PersistedTimeProfileJSON {
+    try {
+      const text = fs.readTextSync(this.timeProfilesPath());
+      const parsed = JSON.parse(text) as PersistedTimeProfileJSON;
+      return {
+        version: parsed.version ?? 1,
+        defaultProfileId: parsed.defaultProfileId ?? null,
+        profiles: parsed.profiles ?? [],
+        campusMap: parsed.campusMap ?? {},
+      };
+    } catch {
+      return { version: 1, defaultProfileId: null, profiles: [], campusMap: {} };
+    }
+  }
 }
 
 interface CourseScheduleMeetingPair {
@@ -529,6 +621,28 @@ interface PersistedMeetingJSON {
   endSection: number;
   weekRules: PersistedWeekRuleJSON[];
   location: string;
+  /** 校区/楼栋时间表 ID（v2 起） */
+  campusId?: string | null;
+}
+
+interface PersistedTimeProfileJSON {
+  version: number;
+  defaultProfileId: string | null;
+  profiles: SectionTimeProfileJSON[];
+  campusMap: Record<string, string>;
+}
+
+interface SectionTimeProfileJSON {
+  id: string;
+  name: string;
+  blocks: SectionBlockJSON[];
+}
+
+interface SectionBlockJSON {
+  startSection: number;
+  endSection: number;
+  startTime: string;
+  endTime: string;
 }
 
 interface PersistedCourseJSON {
