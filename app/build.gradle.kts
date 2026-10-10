@@ -24,20 +24,28 @@ android {
         }
     }
 
+    // 签名凭据来源（按优先级）：CI 环境变量（GitHub Actions Secrets → env）> 本地 local-signing.properties（已废弃，将删除）
+    // 仓库不再提交任何密码文件；CI 通过 ANDROID_KEYSTORE_BASE64/STORE_PASSWORD/KEY_PASSWORD/KEY_ALIAS Secret 注入。
     val localSigningFile = rootProject.file("local-signing.properties")
     val localSigningProperties = Properties()
     if (localSigningFile.isFile) {
         localSigningFile.inputStream().use(localSigningProperties::load)
     }
-    val hasLocalSigning = localSigningProperties.getProperty("storePassword")?.isNotBlank() == true &&
-        localSigningProperties.getProperty("keyPassword")?.isNotBlank() == true
+    val storePassword = System.getenv("STORE_PASSWORD")?.takeIf { it.isNotBlank() }
+        ?: localSigningProperties.getProperty("storePassword")?.takeIf { it.isNotBlank() }
+    val keyPassword = System.getenv("KEY_PASSWORD")?.takeIf { it.isNotBlank() }
+        ?: localSigningProperties.getProperty("keyPassword")?.takeIf { it.isNotBlank() }
+    val keyAlias = System.getenv("KEY_ALIAS")?.takeIf { it.isNotBlank() }
+        ?: "XiaoXiao"
+    val keystorePath = System.getenv("KEYSTORE_PATH")?.takeIf { it.isNotBlank() } ?: "../apk-key/key.jks"
+    val hasLocalSigning = storePassword != null && keyPassword != null && rootProject.file(keystorePath).isFile
     signingConfigs {
         if (hasLocalSigning) {
             create("official") {
-                storeFile = rootProject.file("../apk-key/key.jks")
-                storePassword = localSigningProperties.getProperty("storePassword")
-                keyAlias = "XiaoXiao"
-                keyPassword = localSigningProperties.getProperty("keyPassword")
+                storeFile = rootProject.file(keystorePath)
+                storePassword = storePassword
+                keyAlias = keyAlias
+                keyPassword = keyPassword
             }
         }
     }

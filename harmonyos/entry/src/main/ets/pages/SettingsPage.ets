@@ -10,6 +10,9 @@ import { ReminderService } from '../model/ReminderService.ets';
 import { documentViewPicker } from '@kit.CoreFileKit';
 import { fs } from '@kit.CoreFileKit';
 import { util } from '@kit.ArkTS';
+import { bundleManager } from '@kit.AbilityKit';
+import { common } from '@kit.AbilityKit';
+import { photoAccessHelper } from '@kit.MediaLibraryKit';
 import { router } from '@kit.ArkUI';
 
 @Component
@@ -39,6 +42,15 @@ export struct SettingsPage {
     customStyle: false,
   });
   renameTargetId: string = '';
+  /** 从安装包元数据读取版本号，避免页脚硬编码漂移。 */
+  private appVersion: string = (() => {
+    try {
+      const info = bundleManager.getBundleInfoForSelf(bundleManager.BundleFlag.GET_BUNDLE_INFO_DEFAULT);
+      return info.versionName;
+    } catch (error) {
+      return '1.0.0-Beta';
+    }
+  })();
   private themeOptions: string[] = ['暖色', '海蓝', '薄荷'];
   private themeValues: string[] = ['warm', 'ocean', 'mint'];
   private appearanceOptions: string[] = ['跟随系统', '浅色', '深色'];
@@ -83,6 +95,37 @@ export struct SettingsPage {
 
   bumpTheme(): void {
     AppStorage.setOrCreate('themeVersion', Date.now());
+  }
+
+  /** 从相册选一张图作为课表背景，拷贝到应用沙箱并记录路径。 */
+  pickBackground(): void {
+    const picker = new photoAccessHelper.PhotoViewPicker();
+    picker.select({
+      MIMEType: photoAccessHelper.PhotoViewMIMETypes.IMAGE_TYPE,
+      maxSelectNumber: 1,
+    }).then((result: photoAccessHelper.PhotoSelectResult) => {
+      const uri = result.photoUris.length > 0 ? result.photoUris[0] : '';
+      if (uri.length === 0) return;
+      try {
+        const src = fs.openSync(uri, fs.OpenMode.READ_ONLY);
+        const stat = fs.statSync(uri);
+        const buf = new ArrayBuffer(stat.size);
+        fs.readSync(src.fd, buf);
+        fs.closeSync(src);
+        const context = getContext(this) as common.UIAbilityContext;
+        const dest = context.filesDir + '/custom_background.jpg';
+        const out = fs.openSync(dest, fs.OpenMode.READ_WRITE | fs.OpenMode.CREATE | fs.OpenMode.TRUNC);
+        fs.writeSync(out.fd, buf);
+        fs.closeSync(out);
+        Prefs.setCustomBackgroundPath(dest);
+        this.bumpTheme();
+        this.toast = '已设置课表背景';
+      } catch (error) {
+        this.toast = '图片读取失败，请重试';
+      }
+    }).catch(() => {
+      this.toast = '未选择图片';
+    });
   }
 
   build() {
@@ -241,6 +284,49 @@ export struct SettingsPage {
         }
         .width('100%')
 
+        this.sectionLabel('默认打开页')
+        Row({ space: 8 }) {
+          ForEach(['课表', '日程'], (label: string, index: number) => {
+            Button(label)
+              .layoutWeight(1)
+              .fontSize(13)
+              .backgroundColor((index === 0 ? Prefs.defaultPage() === 'timetable' : Prefs.defaultPage() === 'today')
+                ? this.palette().buttonBg : this.palette().panelAlt)
+              .fontColor((index === 0 ? Prefs.defaultPage() === 'timetable' : Prefs.defaultPage() === 'today')
+                ? this.palette().buttonText : this.palette().textSecondary)
+              .onClick(() => {
+                Prefs.setDefaultPage(index === 0 ? 'timetable' : 'today');
+                this.bumpTheme();
+              })
+          }, (label: string) => label)
+        }
+        .width('100%')
+
+        this.sectionLabel('自定义背景')
+        Row() {
+          Text(Prefs.customBackgroundPath().length > 0 ? '已设置背景（课表页生效）' : '未设置背景')
+            .fontSize(13)
+            .fontColor(this.palette().textPrimary)
+            .layoutWeight(1)
+          Button('选择图片')
+            .backgroundColor(this.palette().buttonBg)
+            .fontColor(this.palette().buttonText)
+            .onClick(() => {
+              this.pickBackground();
+            })
+          if (Prefs.customBackgroundPath().length > 0) {
+            Button('清除')
+              .backgroundColor(this.palette().panelAlt)
+              .fontColor(this.palette().textSecondary)
+              .margin({ left: 8 })
+              .onClick(() => {
+                Prefs.setCustomBackgroundPath('');
+                this.bumpTheme();
+              })
+          }
+        }
+        .width('100%')
+
         this.sectionLabel('课表字号')
         Row({ space: 8 }) {
           ForEach(this.fontOptions, (label: string, index: number) => {
@@ -347,7 +433,7 @@ export struct SettingsPage {
         .width('100%')
         .margin({ top: 8 })
 
-        Text('吉林大学课表应用 · 鸿蒙版 1.0.0-Beta')
+        Text(`XClass · 鸿蒙版 ${this.appVersion}`)
           .fontSize(11)
           .fontColor(this.palette().textSecondary)
           .width('100%')

@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 
 struct SettingsPage: View {
     let palette: ThemePalette
@@ -13,6 +14,7 @@ struct SettingsPage: View {
     @State private var toast: String?
     @State private var shareURL: URL?
     @State private var showRestorePicker = false
+    @State private var backgroundPickerItem: PhotosPickerItem?
 
     var body: some View {
         NavigationStack {
@@ -22,6 +24,7 @@ struct SettingsPage: View {
                 semesterSection
                 themeSection
                 appearanceSection
+                backgroundSection
                 fontSection
                 displaySection
                 reminderSection
@@ -156,8 +159,66 @@ struct SettingsPage: View {
 
     private var defaultPageSection: some View {
         Section("启动默认页面") {
-            // iOS 版本从课表页启动；此处保留说明
-            Text("iOS 版默认打开课表页").foregroundColor(palette.textSecondary)
+            Picker("默认打开", selection: Binding(
+                get: { AppPreferences.defaultPage },
+                set: { AppPreferences.defaultPage = $0; reload() }
+            )) {
+                Text("课表").tag("timetable")
+                Text("日程").tag("today")
+            }
+            .pickerStyle(.segmented)
+            Text("下次启动生效").font(.caption).foregroundColor(palette.textSecondary)
+        }
+    }
+
+    private var backgroundSection: some View {
+        Section("自定义背景") {
+            PhotosPicker(selection: $backgroundPickerItem, matching: .images) {
+                HStack {
+                    Text(AppPreferences.customBackgroundPath.isEmpty ? "选择背景图片（课表页生效）" : "更换背景图片")
+                        .foregroundColor(palette.textPrimary)
+                    Spacer()
+                    if !AppPreferences.customBackgroundPath.isEmpty {
+                        Text("已设置").font(.caption).foregroundColor(palette.textSecondary)
+                    }
+                }
+            }
+            .onChange(of: backgroundPickerItem) { item in
+                guard let item else { return }
+                Task {
+                    if let data = try? await item.loadTransferable(type: Data.self),
+                       let url = persistBackgroundImage(data) {
+                        AppPreferences.customBackgroundPath = url.path
+                        reload()
+                        toast = "已设置课表背景"
+                    } else {
+                        toast = "图片读取失败"
+                    }
+                }
+            }
+            if !AppPreferences.customBackgroundPath.isEmpty {
+                Button("清除背景", role: .destructive) {
+                    if let path = AppPreferences.customBackgroundPath as String?,
+                       let url = URL(string: path) {
+                        try? FileManager.default.removeItem(at: url)
+                    }
+                    AppPreferences.customBackgroundPath = ""
+                    reload()
+                }
+            }
+        }
+    }
+
+    /// 把选中的背景图写入应用沙箱，返回可长期使用的文件路径
+    private func persistBackgroundImage(_ data: Data) -> URL? {
+        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory
+        let url = dir.appendingPathComponent("custom_background.jpg")
+        do {
+            try data.write(to: url, options: .atomic)
+            return url
+        } catch {
+            return nil
         }
     }
 
@@ -282,10 +343,18 @@ struct SettingsPage: View {
 
     private var aboutSection: some View {
         Section {
-            LabeledContent("版本", value: "1.0.0-Beta")
+            LabeledContent("版本", value: appVersion)
         } footer: {
-            Text("吉林大学课表应用 · iOS 版，与 Android 版功能对齐")
+            Text("XClass · iOS 版，与 Android / 鸿蒙 / 微信小程序功能对齐")
         }
+    }
+
+    /// 从 Info.plist 读取版本号（MARKETING_VERSION + CURRENT_PROJECT_VERSION），避免页脚硬编码漂移。
+    private var appVersion: String {
+        let info = Bundle.main.infoDictionary
+        let short = info?["CFBundleShortVersionString"] as? String ?? "1.0.0-Beta"
+        let build = info?["CFBundleVersion"] as? String
+        return build.map { "\(short) (\($0))" } ?? short
     }
 
     // MARK: - 行为

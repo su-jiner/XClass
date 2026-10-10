@@ -355,6 +355,7 @@
             </LinearLayout>
 
             <LinearLayout
+                android:id="@+id/rowVersion"
                 style="@style/SettingsRow">
                 <TextView
                     style="@style/SettingsRowLabel"

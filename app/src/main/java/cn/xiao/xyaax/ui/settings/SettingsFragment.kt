@@ -40,6 +40,9 @@ import cn.xiao.xyaax.domain.SectionTimes
 import cn.xiao.xyaax.ui.theme.ThemePalette
 import cn.xiao.xyaax.ui.theme.ThemePaletteProvider
 import cn.xiao.xyaax.ui.theme.UiFeedback
+import cn.xiao.xyaax.update.model.UpdateCheckResult
+import cn.xiao.xyaax.update.repository.UpdateRepository
+import cn.xiao.xyaax.update.ui.UpdateDialogHelper
 import com.yalantis.ucrop.UCrop
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -191,12 +194,13 @@ class SettingsFragment : Fragment() {
             restoreLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
         }
 
-        // 版本信息（更新源暂未启用，仅展示当前版本）
+        // 版本信息：点击行检查更新（更新链路已启用；Debug 构建也允许手动检查，便于联调）
         val currentVersionName = runCatching {
             requireContext().packageManager.getPackageInfo(requireContext().packageName, 0).versionName
         }.getOrNull() ?: "未知版本"
         view.findViewById<TextView>(R.id.updateVersionText).text = "v$currentVersionName"
         view.findViewById<TextView>(R.id.settingsFooterVersion).text = "XClass $currentVersionName"
+        view.findViewById<View>(R.id.rowVersion)?.setOnClickListener { checkUpdate() }
 
         // 分段选择器
         bindSegment(
@@ -324,6 +328,29 @@ class SettingsFragment : Fragment() {
     }
 
     private fun paletteForFeedback(): ThemePalette = ThemePaletteProvider.fromContext(requireContext())
+
+    /** 手动检查更新：走完整验签链路（更新清单 RSA 验签 + APK 哈希/证书校验），有更新则弹下载对话框。 */
+    private fun checkUpdate() {
+        val host = activity ?: return
+        val anchor = view ?: return
+        val palette = paletteForFeedback()
+        lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                UpdateRepository().checkUpdate(requireContext(), force = true, allowInDebug = true)
+            }
+            when (result) {
+                is UpdateCheckResult.UpdateAvailable -> UpdateDialogHelper.showUpdateDialog(
+                    host, result.payload, result.preferredMirror
+                )
+                is UpdateCheckResult.NoUpdate ->
+                    UiFeedback.showMessage(anchor, result.reason.ifBlank { "当前已是最新版本" }, palette)
+                is UpdateCheckResult.Error ->
+                    UiFeedback.showMessage(anchor, "检查更新失败：${result.message}", palette)
+                is UpdateCheckResult.MirrorMismatch ->
+                    UiFeedback.showMessage(anchor, result.message, palette)
+            }
+        }
+    }
 
     private val timeProfileLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { _ ->

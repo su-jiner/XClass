@@ -44,34 +44,6 @@ class GradeStoreTest {
     }
 
     @Test
-    fun syncKeepsManualEditsAndOlderGradesMissingFromPartialResponse() {
-        val edited = ImportedGrade("CS101", "程序设计", 3.0, "95", "2025-2026-1", isCustom = true)
-        val older = ImportedGrade("MA101", "高等数学", 4.0, "88", "2024-2025-1")
-        val stale = ImportedGrade("EN101", "大学英语", 2.0, "70", "2025-2026-1")
-        val fetched = listOf(
-            ImportedGrade("CS101", "程序设计", 3.0, "90", "2025-2026-1"),
-            ImportedGrade("EN101", "大学英语", 2.0, "86", "2025-2026-1")
-        )
-
-        val merged = GradeStore.mergeSyncedGrades(listOf(edited, older, stale), fetched)
-
-        assertEquals(3, merged.size)
-        assertTrue(edited in merged)
-        assertTrue(older in merged)
-        assertTrue(fetched[1] in merged)
-        assertFalse(stale in merged)
-        assertFalse(fetched[0] in merged)
-    }
-
-    @Test
-    fun sameNameWithDifferentCourseCodesRemainsSeparate() {
-        val existing = ImportedGrade("A100", "专题课", 2.0, "80", "2025-2026-1")
-        val fetched = ImportedGrade("B200", "专题课", 2.0, "90", "2025-2026-1")
-
-        assertEquals(listOf(existing, fetched), GradeStore.mergeSyncedGrades(listOf(existing), listOf(fetched)))
-    }
-
-    @Test
     fun manualGradeMarkerPersistsAcrossReload() {
         val manual = ImportedGrade("CS101", "程序设计", 3.0, "95", "2025-2026-1", isCustom = true)
 

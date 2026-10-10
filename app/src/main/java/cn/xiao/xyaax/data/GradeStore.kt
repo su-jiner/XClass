@@ -97,25 +97,6 @@ object GradeStore {
         }
     }
 
-    /** 教务结果可能只覆盖部分学期；保留未匹配旧记录，并优先保留用户修改。 */
-    fun mergeSyncedGrades(existing: List<ImportedGrade>, fetched: List<ImportedGrade>): List<ImportedGrade> {
-        val kept = existing.filter { old ->
-            old.isCustom || fetched.none { remote -> sameCourse(old, remote) }
-        }
-        val remote = fetched.filterNot { grade ->
-            kept.any { it.isCustom && sameCourse(it, grade) }
-        }
-        return kept + remote
-    }
-
-    private fun sameCourse(a: ImportedGrade, b: ImportedGrade): Boolean {
-        if (!a.semesterCode.trim().equals(b.semesterCode.trim(), ignoreCase = true)) return false
-        if (a.courseCode.isNotBlank() && b.courseCode.isNotBlank()) {
-            return a.courseCode.trim().equals(b.courseCode.trim(), ignoreCase = true)
-        }
-        return a.name.isNotBlank() && a.name.trim().equals(b.name.trim(), ignoreCase = true)
-    }
-
     /** 将 ImportedGrade 同步推入 GpaCourseStore，供绩点计算器共享使用 */
     fun syncToGpaCourses(filesDir: File, grades: List<ImportedGrade>) {
         val imported = GpaCalculator.mergeImported(grades)

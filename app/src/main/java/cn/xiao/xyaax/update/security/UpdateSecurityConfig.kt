@@ -17,8 +17,9 @@ object UpdateSecurityConfig {
     )
 
     /**
-     * 更新源暂未启用：发布渠道（GitHub Release / 自建镜像）确定后再填入清单地址。
-     * 客户端下载、验签、安装链路与单元测试均保留，空列表即“不检查更新”。
+     * 更新链路已启用：客户端下载、验签、安装链路完整（设置页版本行可手动检查更新）。
+     * 首次正式发布时，把带签名的更新清单地址（如 GitHub Pages / raw 的 update.json）填入 DEFAULT_ENDPOINTS 即可；
+     * 空列表时客户端提示“更新源暂未配置”，不发起网络请求。
      */
     val DEFAULT_ENDPOINTS: List<String> = emptyList()
 }

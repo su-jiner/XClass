@@ -8,9 +8,9 @@ XClass 是一个纯本地课表工具：手动录入课表、管理多份课表�
 
 ## 安装包下载
 
-- Android: 从 [GitHub Releases](https://github.com/su-jiner/XClass/releases) 下载正式安装包（发布渠道整理中，当前以源码构建为主）。
-- iOS / 鸿蒙：源码位于 `ios/` 与 `harmonyos/` 目录，需自行用 Xcode / DevEco Studio 构建签名（构建说明见 PORTING.md）
-- iOS 备注: 如果你能帮我搞定`99$/每年`的开发者计划的话，上架 TestFlight 也不是不行😂
+- Android: 从 [GitHub Releases](https://github.com/su-jiner/XClass/releases) 下载正式安装包。打 `v*` tag 时 GitHub Actions 自动用仓库 Secret 中的签名凭据构建签名 APK（本仓库不提交任何密码/密钥文件）。
+- iOS / 鸿蒙：源码位于 `ios/` 与 `harmonyos/` 目录，需自行用 Xcode / DevEco Studio 构建签名（构建说明见 PORTING.md）。
+- 微信小程序：`miniprogram/` 目录，用微信开发者工具导入后预览/上传。
 
 ## 效果截图
 
@@ -26,8 +26,12 @@ XClass 是一个纯本地课表工具：手动录入课表、管理多份课表�
 - 课表导入（离线）
 	- 课表页「+」→ 手动添加 / 导入课表文件 / 粘贴文本导入
 	- Android 支持 PDF（文本层优先，扫描件回退离线 OCR）、图片（ML Kit 中文离线识别）、txt/md/csv/tsv、docx/xlsx
-	- iOS 支持 txt/md/csv/tsv、图片（Vision）、PDF（文本层）；鸿蒙与小程序支持粘贴文本与 txt/md/csv/tsv
+	- iOS 支持 txt/md/csv/tsv、图片（Vision 中文识别）、PDF（文本层）；鸿蒙与小程序支持粘贴文本与 txt/md/csv/tsv
+	- 图片识别内置噪声过滤：教务页面的表头、列头、页脚（如「其他课程：」「注一…」「打印时间…」「XX年第N学期 XX课表」）不会被误识别成课程
 	- 导入结果一律先预览校对（可逐条删除）再选择「覆盖当前课表 / 新建课表」
+- 课表分享（四端互通）
+	- 任意端可导出「XClass 课表分享文本」（`# XClass 课表分享 v1` 开头），粘贴给朋友后在任意端「粘贴文本导入」即可还原课程、节次、周次、地点与校区
+	- 粘贴文本弹窗带「导出」按钮，Android/iOS 走系统分享，鸿蒙/小程序复制到剪贴板
 - 桌面与锁屏组件
 	- Android：今日课程、下一节课、今日时间轴、本周课表微缩（同时声明锁屏组件，Android 15+/16+ 可见）
 	- iOS：同四件套（WidgetKit）+ 锁屏 accessory 组件 + **灵动岛/锁屏实时活动**（课前 15 分钟开始、下课结束），接入步骤见 [ios/WIDGET_SETUP.md](ios/WIDGET_SETUP.md)
@@ -48,17 +52,17 @@ XClass 是一个纯本地课表工具：手动录入课表、管理多份课表�
 - 数据安全
 	- 存储写入原子化 + 并发加锁，元数据损坏自动从课程文件恢复
 	- 课表文本导出 / 全量备份与恢复（JSON）
-- 工具页（底部导航）
+- 工具页（底部导航，Android 与微信小程序已上线；iOS 与鸿蒙在 v1.1.0-Beta 起补齐）
 	- 绩点计算器：手动录入成绩（百分制 / 五级制）；实时估算保研绩点（4.0 制）、加权平均分与算术平均分，逐门可计入/排除，重修同课程号自动取最高分（原生改造自 [DailyPotato/JLU-GPA-Calculator](https://github.com/DailyPotato/JLU-GPA-Calculator) 与 [Coldymemos/JLU-GPA-Calculator-for-Windows-Desktop](https://github.com/Coldymemos/JLU-GPA-Calculator-for-Windows-Desktop)，已获原作者同意）
 	- 成绩查询：手动录入/编辑成绩，按学期汇总，与绩点计算器双向互通
 	- 考试安排：手动添加考试、考场与倒计时
 	- 学业完成：手动编辑培养方案指标，或按本地成绩估算学分达成度
 - 个性化设置
 	- 主题色切换（暖色、海蓝、薄荷），支持深色模式（跟随系统/浅色/深色）
-	- 默认打开页面
+	- 默认打开页面（Android/小程序；iOS 与鸿蒙在 v1.1.0-Beta 起补齐）
 	- 课表字号三档（小号 / 标准 / 大号）
 	- 是否显示非本周课程
-	- 自定义背景（选择与裁剪）
+	- 自定义背景（选择与裁剪；iOS/鸿蒙在 v1.1.0-Beta 起补齐）、置顶封面（Android/小程序；iOS/鸿蒙同步补齐）
 - 课程详情
 	- 上拉浮动卡片展示教师 / 地点 / 周次 / 学期，点击条目一键复制
 
@@ -67,7 +71,7 @@ XClass 是一个纯本地课表工具：手动录入课表、管理多份课表�
 - Android (Kotlin, Material Components)
 - iOS (SwiftUI, UNUserNotification 提醒)
 - 鸿蒙 (ArkUI, reminderAgentManager 提醒)
-- Kotlinx Serialization / Swift Codable / ArkTS（三端统一 v1 备份格式）
+- Kotlinx Serialization / Swift Codable / ArkTS（四端统一备份格式，当前版本 v2，兼容读取 v1）
 - Gradle (KTS) / Xcode / DevEco Studio
 
 ## 项目结构
@@ -82,12 +86,20 @@ XClass 是一个纯本地课表工具：手动录入课表、管理多份课表�
 - `ios/`：iOS 版（SwiftUI，核心逻辑与 Android 逐函数对齐，XCTest 覆盖）
 - `harmonyos/`：鸿蒙版（ArkUI，核心逻辑可用 `node verify/run.mjs` 在任意平台回归）
 - `miniprogram/`：微信小程序版（页面与 Android 对齐，核心逻辑可用 `node miniprogram/verify/run.mjs` 回归）
-- `docs/PORTING.md`：三端同步开发指南与核心逻辑对应表
+- `docs/PORTING.md`：四端同步开发指南与核心逻辑对应表
 - `app/src/main/assets/`
 	- `target.url`：校内导入入口
 	- `VPN.url`：校外导入入口
 
 ## 更新日志
+- v1.1.0-Beta
+	- 图片识别课表全面优化：新增四端一致的噪声过滤（教务表头/列头/页脚「其他课程」「注一」「打印时间」等不再被识别为课程），iOS 图片识别改为按坐标重建表格，与 Android 一致
+	- 新增 XClass 专属课表分享文本（`# XClass 课表分享 v1`）：四端可导出/导入，朋友之间粘贴即可互换课表；粘贴弹窗增加「导出」按钮
+	- 微信小程序课表网格改为与移动端一致的圆角卡片样式
+	- 更新链路启用（设置页可见更新检查；Android 更新源部署页 `deploy/android-update/` 正式启用）
+	- iOS 与鸿蒙补齐工具页（绩点/成绩/考试/学业）与个性化设置（自定义背景/置顶封面/默认打开页）
+	- 许可证改为 MIT；签名密码迁 GitHub Actions Secret，仓库不再包含任何密钥文件；绑定 Git remote `su-jiner/XClass`
+	- 修复 README/PORTING 中的过时描述（备份格式 v1→v2 兼容、四端能力清单、使用说明）
 - v1.0.0-Beta
 	- 全平台更名为 XClass，包标识统一为 `cn.xiao.xyaax` 系列，仓库迁移到 GitHub `su-jiner/XClass`
 	- 移除全部校方/教务联网能力：统一身份认证登录、网页导入、一键导入、教务网页直达、成绩/考试/学业完成的教务同步；课表改为手动添加 + JSON 备份恢复，应用全程离线
@@ -180,11 +192,14 @@ Windows PowerShell：
 
 ## 使用说明
 
-1. 打开课表页，点击导入按钮。
-2. 选择“我在校内”或“我在校外”。
-3. 在网页中进入到课表页面后，点击“从此处导入”。
-4. 选择覆盖当前课表或新建课表导入。
-5. 可在设置页进入“课表管理页”切换或整理课表。
+1. 打开课表页，点击右上角「+」。
+2. 添加课程可任选：手动添加 / 粘贴课表文本 / 导入课表文件（txt/md/csv/tsv、Android 另支持 PDF 与图片、iOS 另支持图片与 PDF）。
+3. 导入结果先预览校对（可逐条删除），再选择「覆盖当前课表 / 新建课表」。
+4. 想和朋友互换课表：在「粘贴文本」弹窗点「导出课表分享文本」，把生成文本发给对方；对方在任意端粘贴该文本导入即可。
+5. 多份课表可在「课表管理页」切换、重命名、删除；JSON 备份在设置页导出与恢复。
+6. 可在设置页进入「课表管理页」切换或整理课表。
+
+> 应用不访问任何外部服务（离线）；首次启动课表为空，用上述任一方式导入即可。
 
 ## 开发说明
 
@@ -197,9 +212,9 @@ Windows PowerShell：
 
 ## 许可证
 
-本项目采用 GNU General Public License v3.0（SPDX：`MIT`），许可证全文见 [LICENSE](LICENSE)。
+本项目采用 MIT License，许可证全文见 [LICENSE](LICENSE)。
 
-Copyright (c) 2026 ZiTao Wang
+Copyright (c) 2026 Xyao (su-jiner)
 
 项目使用的第三方组件保留各自的许可证与版权声明。
 

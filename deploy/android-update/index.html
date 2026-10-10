@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>XClass 下载与更新（暂未启用）</title>
+  <title>XClass 下载与更新</title>
   <style>
     :root { color-scheme: light dark; font-family: system-ui, -apple-system, "Microsoft YaHei", sans-serif; }
     body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #f3f6fb; color: #18243a; }
@@ -23,8 +23,8 @@
   <main>
     <h1>XClass</h1>
     <p class="version">本地课表工具 · Android 8.0 及以上</p>
-    <p>本页面暂时不提供安装包与镜像下载地址。发布渠道确定后，这里只放公开发布的正式签名安装包，并保留签名更新清单。</p>
-    <p class="note">应用内更新源当前为空：设置页只展示版本号，不检查更新；客户端下载、验签与安装链路已保留，配置清单地址后即可启用。</p>
+    <p>应用内更新链路已启用：设置页点击版本号即可手动检查更新，客户端对更新清单做 RSA 验签，并对 APK 校验包名、版本号、哈希与官方签名证书，通过后才下载安装。</p>
+    <p class="note">本页面同时作为更新清单与安装包的分发入口。发布流程：打 <code>v*</code> tag → GitHub Actions 用仓库 Secret 中的签名凭据构建签名 APK → 上传安装包并生成 <code>update.json</code> 更新清单（清单由发布密钥签名）→ 客户端即可检测到新版本。</p>
   </main>
 </body>
 </html>
