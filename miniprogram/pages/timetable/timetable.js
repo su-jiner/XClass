@@ -29,7 +29,8 @@ Page({
     headerDate: '',
     monthLabel: '',
     dayHeaders: [],
-    rows: [],
+    sections: [],
+    columns: [],
     touchStartX: 0,
     rowHeight: 96,
     scale: 1,
@@ -86,7 +87,7 @@ Page({
     start.setDate(start.getDate() + (week - 1) * 7);
     return start;
   },
-  /** 与 Android 版一致：左侧 12 节 + 节次时间，右侧 7 列课程卡片，今天列高亮 */
+  /** 与 Android WeekTimetableRenderer 一致：左侧 12 节时间列 + 右侧 7 个整列长条面板，课程卡在列内绝对定位 */
   renderWeek(week) {
     const dark = this.dark;
     const palette = this.data.palette;
@@ -94,6 +95,7 @@ Page({
     const today = new Date(store.todayIso() + 'T00:00:00');
     const todayIndex = (today.getDay() === 0 ? 7 : today.getDay()) - 1;
     const showToday = week === this.data.currentWeek;
+    const rowHeight = this.data.rowHeight;
 
     const dayHeaders = WEEK_LABELS.map((label, index) => {
       const date = new Date(weekStart);
@@ -107,9 +109,16 @@ Page({
       };
     });
 
-    const cells = [];
-    for (let row = 0; row < 12; row += 1) {
-      cells.push(new Array(7).fill(null));
+    // 7 列长条面板：每列一个整块圆角面板，课程卡绝对定位
+    const columns = [];
+    for (let day = 0; day < 7; day += 1) {
+      const isTodayColumn = showToday && day === todayIndex;
+      columns.push({
+        isTodayColumn: isTodayColumn,
+        panelBg: isTodayColumn ? palette.gridDayToday : palette.gridDay,
+        panelHeight: 12 * rowHeight,
+        courses: [],
+      });
     }
     this.courses.forEach((course, courseIndex) => {
       (course.meetings || []).forEach((meeting) => {
@@ -117,58 +126,45 @@ Page({
         if (weekday < 0) return;
         let active = core.isActiveInWeek(meeting, week);
         let badge = '';
+        let dimmed = false;
         if (!active && this.showNonCurrent && week === this.data.currentWeek) {
           const nextWeek = this.nextActiveWeek(meeting, week);
           if (nextWeek) {
             active = true;
             badge = '非本周·第' + nextWeek + '周';
+            dimmed = true;
           }
         }
         if (!active) return;
-        for (let section = meeting.startSection; section <= meeting.endSection && section <= 12; section += 1) {
-          cells[section - 1][weekday] = {
-            courseIndex: courseIndex,
-            name: course.courseName,
-            location: meeting.location || '',
-            teacher: course.teacher || '',
-            campus: this.campusName(meeting.campusId),
-            isStart: section === meeting.startSection,
-            isEnd: section === meeting.endSection || section === 12,
-            badge: section === meeting.startSection ? badge : '',
-            color: theme.courseColor(courseIndex, dark),
-            textColor: theme.courseTextColor(courseIndex, dark),
-          };
-        }
+        const start = Math.max(1, meeting.startSection);
+        const end = Math.min(12, meeting.endSection);
+        columns[weekday].courses.push({
+          top: (start - 1) * rowHeight + 2,
+          height: (end - start + 1) * rowHeight - 4,
+          startSection: start,
+          courseIndex: courseIndex,
+          name: course.courseName,
+          location: [this.campusName(meeting.campusId), meeting.location || ''].filter(Boolean).join(' '),
+          badge: badge,
+          dimmed: dimmed,
+          color: theme.courseColor(courseIndex, dark),
+          textColor: theme.courseTextColor(courseIndex, dark),
+        });
       });
     });
 
-    // 左侧时间列跟随「当前显示时间表」（设置页可切换）
+    // 左侧时间列（跟随「当前显示时间表」）
     const displayId = wx.getStorageSync('xclass.defaultTimeProfile') || null;
     const displayProfile = core.resolveProfile(this.profiles, displayId);
-    const rows = cells.map((rowCells, rowIndex) => {
-      const range = core.timeRangeOf(displayProfile, rowIndex + 1, rowIndex + 1);
-      const rendered = rowCells.map((cell, columnIndex) => {
-        if (!cell) return { empty: true };
-        const isTodayColumn = showToday && columnIndex === todayIndex;
-        return {
-          empty: false,
-          courseIndex: cell.courseIndex,
-          name: cell.isStart ? cell.name : '',
-          detail: cell.isStart ? [cell.campus, cell.location].filter(Boolean).join(' ') : '',
-          badge: cell.badge,
-          background: cell.color,
-          textColor: cell.textColor,
-          isTodayColumn: isTodayColumn,
-          radius: (cell.isStart ? '12rpx 12rpx ' : '0 0 ') + (cell.isEnd ? '12rpx 12rpx' : '0 0'),
-        };
-      });
-      return {
-        section: rowIndex + 1,
+    const sections = [];
+    for (let i = 0; i < 12; i += 1) {
+      const range = core.timeRangeOf(displayProfile, i + 1, i + 1);
+      sections.push({
+        section: i + 1,
         startTime: range ? range.startTime : '--:--',
         endTime: range ? range.endTime : '--:--',
-        cells: rendered,
-      };
-    });
+      });
+    }
 
     const weekdayLabel = WEEK_LABELS[todayIndex];
     this.setData({
@@ -177,7 +173,8 @@ Page({
       headerDate: store.todayIso().replace(/-/g, '/'),
       monthLabel: (weekStart.getMonth() + 1) + '月',
       dayHeaders: dayHeaders,
-      rows: rows,
+      sections: sections,
+      columns: columns,
     });
   },
   nextActiveWeek(meeting, week) {
@@ -210,18 +207,21 @@ Page({
     if (Math.abs(deltaX) < 60) return;
     if (deltaX < 0) this.goNextWeek(); else this.goPrevWeek();
   },
-  onCellTap(event) {
+  onCardTap(event) {
     const dataset = event.currentTarget.dataset;
-    const row = this.data.rows[dataset.row];
-    const cell = row && row.cells[dataset.column];
-    if (!cell || cell.empty || !cell.name) return;
-    const course = this.courses[cell.courseIndex];
+    const day = dataset.day;
+    const courseIndex = dataset.courseIndex;
+    const column = this.data.columns[day];
+    const card = column && column.courses[courseIndex];
+    if (!card) return;
+    const course = this.courses[card.courseIndex];
+    const range = this.data.sections[card.startSection - 1];
     wx.showModal({
       title: course.courseName,
       content: [
         '教师：' + (course.teacher || '未知'),
-        '地点：' + (cell.detail || '未标注'),
-        '节次：第' + row.section + '节 ' + row.startTime + '-' + row.endTime,
+        '地点：' + (card.location || '未标注'),
+        '节次：第' + card.startSection + '节 ' + (range ? range.startTime + '-' + range.endTime : ''),
         '周次：' + (course.rawWeekText || ''),
       ].join('\n'),
       showCancel: false,

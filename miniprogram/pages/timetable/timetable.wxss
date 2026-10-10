@@ -8,9 +8,14 @@
 
 .header {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  align-items: center;
+  justify-content: flex-start;
   padding: 8rpx 8rpx 12rpx;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
 }
 
 .header-week {
@@ -31,6 +36,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  margin-left: 24rpx;
 }
 
 .grid {
@@ -42,6 +48,8 @@
 
 .grid-head {
   flex: 0 0 auto;
+  display: flex;
+  gap: 8rpx;
 }
 
 .grid-body {
@@ -50,37 +58,27 @@
   height: 100%;
 }
 
-.grid-row {
-  display: flex;
-  gap: 8rpx;
-  margin-bottom: 2rpx;
-}
-
-.grid-head .cell {
+/* 表头：整块圆角（与 Android buildHeader 一致） */
+.head-time {
+  flex: 0 0 104rpx;
   height: 84rpx;
+  border-radius: 10rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22rpx;
+  font-weight: 700;
 }
 
-.cell {
+.head-day {
   flex: 1;
   min-width: 0;
-  padding: 6rpx 4rpx;
-  box-sizing: border-box;
+  height: 84rpx;
+  border-radius: 10rpx;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
-  border-radius: 14rpx;
-}
-
-.cell-time {
-  flex: 0 0 104rpx;
-  border-radius: 14rpx;
-}
-
-.cell-day {
-  border-radius: 14rpx;
-  min-height: 84rpx;
 }
 
 .day-label {
@@ -95,6 +93,30 @@
   line-height: 1.2;
 }
 
+/* 主体：左侧时间列 + 右侧 7 个整列长条面板 */
+.grid-main {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 8rpx;
+  height: 100%;
+}
+
+.time-column {
+  flex: 0 0 104rpx;
+}
+
+.time-cell {
+  border-radius: 8rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  box-sizing: border-box;
+  margin-bottom: 2rpx;
+}
+
 .section-no {
   font-size: 24rpx;
   font-weight: 700;
@@ -106,14 +128,35 @@
   line-height: 1.15;
 }
 
-.cell-course {
-  border-radius: 14rpx;
+/* 列面板：一整条圆角，无横向分隔（Android buildDayColumn） */
+.day-panel {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  border-radius: 10rpx;
+  overflow: hidden;
+}
+
+/* 课程卡：列内绝对定位，浮在长条面板上 */
+.course-card {
+  position: absolute;
+  left: 4rpx;
+  width: calc(100% - 8rpx);
+  box-sizing: border-box;
+  border-radius: 10rpx;
   padding: 6rpx 4rpx;
-  box-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  box-shadow: 0 2rpx 8rpx rgba(60, 40, 20, 0.12);
+}
+
+.course-badge {
+  font-size: 15rpx;
+  opacity: 0.85;
+  line-height: 1.15;
+  margin-bottom: 1rpx;
 }
 
 .course-name {
-  font-size: 20rpx;
   font-weight: 600;
   line-height: 1.15;
   text-align: center;
@@ -131,12 +174,10 @@
   text-align: center;
   word-break: break-all;
   margin-top: 2rpx;
-}
-
-.course-badge {
-  font-size: 16rpx;
-  opacity: 0.8;
-  margin-top: 2rpx;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 
 .week-hint {
