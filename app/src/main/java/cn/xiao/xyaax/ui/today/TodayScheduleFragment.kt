@@ -68,7 +68,16 @@ class TodayScheduleFragment : Fragment() {
         val list = view.findViewById<LinearLayout>(R.id.todayCourseList)
         val root = view.findViewById<LinearLayout>(R.id.todayContainer)
 
-        val periodTimeRanges = SectionTimes.DEFAULT_RANGES
+        // 多校区：按课程所属校区时间表取时间（无校区则回落默认 12 节表）
+        val timeProfiles = cn.xiao.xyaax.data.TimeProfileStore.load(requireContext().filesDir)
+        fun meetingTimes(meeting: cn.xiao.xyaax.model.MeetingTime): Pair<String, String> {
+            val range = cn.xiao.xyaax.domain.TimeProfileResolver.timeRange(timeProfiles, meeting)
+            return (range?.first ?: "--:--") to (range?.second ?: "--:--")
+        }
+        fun campusName(meeting: cn.xiao.xyaax.model.MeetingTime): String {
+            val id = meeting.campusId ?: return ""
+            return timeProfiles.firstOrNull { it.id == id }?.name.orEmpty()
+        }
         val palette = ThemePaletteProvider.fromContext(requireContext())
         val themeColors = ThemeColors(
             card = palette.panelBackground,
@@ -134,23 +143,25 @@ class TodayScheduleFragment : Fragment() {
         }
 
         countChip.text = String.format(Locale.getDefault(), "%d 门课", todayMeetings.size)
-        val firstStart = todayMeetings.minOf { it.meeting.startSection }.coerceIn(1, periodTimeRanges.size)
-        val lastEnd = todayMeetings.maxOf { it.meeting.endSection }.coerceIn(1, periodTimeRanges.size)
+        val earliest = todayMeetings.minByOrNull { it.meeting.startSection }?.meeting
+        val latest = todayMeetings.maxByOrNull { it.meeting.endSection }?.meeting
         firstClass.text = String.format(
             Locale.getDefault(),
             "最早：%s",
-            periodTimeRanges[firstStart - 1].substringBefore('-')
+            earliest?.let { meetingTimes(it).first } ?: "无"
         )
         lastClass.text = String.format(
             Locale.getDefault(),
             "最晚：%s",
-            periodTimeRanges[lastEnd - 1].substringAfter('-')
+            latest?.let { meetingTimes(it).second } ?: "无"
         )
 
         val activeSection = currentSection()
         todayMeetings.forEachIndexed { index, item ->
-            val start = item.meeting.startSection.coerceIn(1, periodTimeRanges.size)
-            val end = item.meeting.endSection.coerceIn(start, periodTimeRanges.size)
+            val times = meetingTimes(item.meeting)
+            val campus = campusName(item.meeting)
+            val start = item.meeting.startSection
+            val end = item.meeting.endSection
             val isActive = activeSection != null && start <= activeSection && activeSection <= end
 
             // 时间列：开始-结束时刻
@@ -161,13 +172,13 @@ class TodayScheduleFragment : Fragment() {
                     topMargin = dp(4)
                 }
                 addView(TextView(ctx).apply {
-                    text = periodTimeRanges[start - 1].substringBefore('-')
+                    text = times.first
                     textSize = 13f
                     setTypeface(typeface, Typeface.BOLD)
                     setTextColor(themeColors.text)
                 })
                 addView(TextView(ctx).apply {
-                    text = periodTimeRanges[end - 1].substringAfter('-')
+                    text = times.second
                     textSize = 10f
                     setTextColor(themeColors.subText)
                     alpha = 0.8f
@@ -219,8 +230,8 @@ class TodayScheduleFragment : Fragment() {
                 }
                 addView(nameRow)
                 addView(TextView(ctx).apply {
-                    text = "第${start}-${end}节  ${periodTimeRanges[start - 1].substringBefore('-')}-" +
-                        periodTimeRanges[end - 1].substringAfter('-')
+                    text = "第${start}-${end}节  ${times.first}-${times.second}" +
+                        if (campus.isBlank()) "" else "  ·  $campus"
                     textSize = 13f
                     setTextColor(themeColors.subText)
                     layoutParams = LinearLayout.LayoutParams(

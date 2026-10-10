@@ -63,6 +63,20 @@
                 style="@style/SettingsDivider" />
 
             <LinearLayout
+                android:id="@+id/rowTimeProfiles"
+                style="@style/SettingsRow">
+                <TextView
+                    style="@style/SettingsRowLabel"
+                    android:text="@string/settings_time_profiles" />
+                <TextView
+                    android:id="@+id/timeProfilesValue"
+                    style="@style/SettingsRowValue" />
+                <ImageView style="@style/SettingsRowChevron" android:contentDescription="@null" />
+            </LinearLayout>
+
+            <View style="@style/SettingsDivider" />
+
+            <LinearLayout
                 android:id="@+id/rowSemesterStart"
                 style="@style/SettingsRow">
                 <TextView

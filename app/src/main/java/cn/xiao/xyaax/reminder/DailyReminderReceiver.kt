@@ -112,12 +112,16 @@ class DailyReminderReceiver : BroadcastReceiver() {
                 Pair(context.getString(R.string.notification_reminder_empty), "")
             } else {
                 val first = meetings.first()
-                val startTime = SectionTimes.DEFAULT_RANGES.getOrNull(first.meeting.startSection - 1)
-                    ?.substringBefore('-') ?: "--:--"
+                // 多校区：按课程所属校区时间表取上课时刻
+                val timeProfiles = cn.xiao.xyaax.data.TimeProfileStore.load(context.filesDir)
+                val startTime = cn.xiao.xyaax.domain.TimeProfileResolver
+                    .timeRange(timeProfiles, first.meeting)?.first ?: "--:--"
                 val headline = context.getString(R.string.notification_reminder_title) +
                     " · ${meetings.size} 门，最早 $startTime ${first.course.courseName}"
                 val detail = meetings.take(5).joinToString("\n") { ref ->
-                    "第${ref.meeting.startSection}-${ref.meeting.endSection}节 ${ref.course.courseName}" +
+                    val range = cn.xiao.xyaax.domain.TimeProfileResolver.timeRange(timeProfiles, ref.meeting)
+                    "第${ref.meeting.startSection}-${ref.meeting.endSection}节 " +
+                        (range?.let { "${it.first}-${it.second} " } ?: "") + ref.course.courseName +
                         if (ref.meeting.location.isBlank()) "" else " ${ref.meeting.location}"
                 }
                 Pair(headline, "\n$detail")

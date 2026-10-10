@@ -172,7 +172,14 @@ object CourseDetailBottomSheet {
             val teacher = view.findViewById<TextView>(R.id.detailTeacher)
             teacher.text = item.course.teacher.ifBlank { "未知" }
             val location = view.findViewById<TextView>(R.id.detailLocation)
-            location.text = meeting.location.ifBlank { "未标注" }
+            // 多校区：地点行同时显示课程所属校区/楼栋时间表名称
+            val campusName = meeting.campusId?.let { id ->
+                cn.xiao.xyaax.data.TimeProfileStore.load(context.filesDir).firstOrNull { it.id == id }?.name
+            }
+            location.text = listOfNotNull(
+                campusName?.takeIf { it.isNotBlank() },
+                meeting.location.takeIf { it.isNotBlank() }
+            ).joinToString(" · ").ifBlank { "未标注" }
             val weeks = view.findViewById<TextView>(R.id.detailWeeks)
             weeks.text = meetingWeekText(item)
             val meta = view.findViewById<TextView>(R.id.detailMeta)

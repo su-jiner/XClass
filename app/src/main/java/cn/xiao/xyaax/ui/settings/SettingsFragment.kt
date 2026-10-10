@@ -34,6 +34,8 @@ import cn.xiao.xyaax.data.AppPreferences
 import cn.xiao.xyaax.data.ImportedScheduleStorage
 import cn.xiao.xyaax.data.ScheduleRepository
 import cn.xiao.xyaax.data.SemesterStartDatePolicy
+import cn.xiao.xyaax.data.TimeProfileStore
+import cn.xiao.xyaax.domain.TimeProfileResolver
 import cn.xiao.xyaax.domain.SectionTimes
 import cn.xiao.xyaax.ui.theme.ThemePalette
 import cn.xiao.xyaax.ui.theme.ThemePaletteProvider
@@ -157,6 +159,12 @@ class SettingsFragment : Fragment() {
 
         view.findViewById<View>(R.id.rowManageTimetable).setOnClickListener {
             manageProfilesLauncher.launch(Intent(requireContext(), TimetableManageActivity::class.java))
+        }
+
+        val timeProfilesValue = view.findViewById<TextView>(R.id.timeProfilesValue)
+        refreshTimeProfilesValue(timeProfilesValue)
+        view.findViewById<View>(R.id.rowTimeProfiles).setOnClickListener {
+            timeProfileLauncher.launch(Intent(requireContext(), TimeProfileActivity::class.java))
         }
 
         view.findViewById<View>(R.id.rowSemesterStart).setOnClickListener {
@@ -317,6 +325,26 @@ class SettingsFragment : Fragment() {
 
     private fun paletteForFeedback(): ThemePalette = ThemePaletteProvider.fromContext(requireContext())
 
+    private val timeProfileLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { _ ->
+            view?.findViewById<TextView>(R.id.timeProfilesValue)?.let { refreshTimeProfilesValue(it) }
+        }
+
+    /** 课表左侧时间列与文本导出使用的「当前显示时间表」 */
+    private fun displaySectionRanges(): List<String> {
+        val files = requireContext().filesDir
+        val profiles = TimeProfileStore.load(files)
+        val profile = TimeProfileResolver.resolve(profiles, TimeProfileStore.loadDefaultProfileId(files))
+        return TimeProfileResolver.sectionRanges(profile)
+    }
+
+    private fun refreshTimeProfilesValue(target: TextView) {
+        val files = requireContext().filesDir
+        val profiles = TimeProfileStore.load(files)
+        val current = TimeProfileResolver.resolve(profiles, TimeProfileStore.loadDefaultProfileId(files))
+        target.text = if (profiles.size <= 1) "仅默认" else "${profiles.size} 套 · ${current.name}"
+    }
+
     private fun bindSegment(
         container: LinearLayout,
         palette: ThemePalette,
@@ -381,7 +409,7 @@ class SettingsFragment : Fragment() {
                     } else {
                         ImportedScheduleStorage.exportActiveTimetableText(
                             requireContext().filesDir,
-                            SectionTimes.DEFAULT_RANGES
+                            displaySectionRanges()
                         )
                     }
                     requireContext().contentResolver.openOutputStream(uri)?.use { stream ->

@@ -136,13 +136,21 @@ class TimetableFragment : Fragment() {
         val hasCustomBackground = !AppPreferences.getCustomBackgroundUri(ctx).isNullOrBlank()
         val showNonCurrent = AppPreferences.isShowNonCurrentCourses(ctx)
 
+        // 左侧时间列与详情时间跟随「当前显示时间表」（多校区）
+        val timeProfiles = cn.xiao.xyaax.data.TimeProfileStore.load(ctx.filesDir)
+        val displayProfile = cn.xiao.xyaax.domain.TimeProfileResolver.resolve(
+            timeProfiles,
+            cn.xiao.xyaax.data.TimeProfileStore.loadDefaultProfileId(ctx.filesDir)
+        )
+        val displayPeriodRanges = cn.xiao.xyaax.domain.TimeProfileResolver.sectionRanges(displayProfile)
+
         currentWeekIndex = data.currentWeek
         val today = LocalDate.now()
-        val currentSection = WeekTimetableRenderer.resolveCurrentSection(SectionTimes.DEFAULT_RANGES)
+        val currentSection = WeekTimetableRenderer.resolveCurrentSection(displayPeriodRanges)
         val adapter = WeekPagerAdapter(
             courses = data.courses,
             totalWeeks = data.totalWeeks,
-            periodRanges = SectionTimes.DEFAULT_RANGES,
+            periodRanges = displayPeriodRanges,
             weekdayLabels = weekdayLabels,
             today = today,
             currentSection = currentSection,
@@ -159,7 +167,7 @@ class TimetableFragment : Fragment() {
                             context = requireContext(),
                             primary = primary,
                             allCourses = allItems,
-                            periodRanges = SectionTimes.DEFAULT_RANGES,
+                            periodRanges = displayPeriodRanges,
                             onCoverPinned = {
                                 currentUiData?.let { renderTimetable(it) }
                             },
