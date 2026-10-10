@@ -52,18 +52,17 @@
 
 .grid-row {
   display: flex;
-  height: 96rpx;
 }
 
 .grid-head .cell {
-  height: 76rpx;
+  height: 84rpx;
 }
 
 .cell {
   flex: 1;
   min-width: 0;
-  margin: 2rpx;
-  padding: 2rpx;
+  margin: 4rpx;
+  padding: 4rpx;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -73,45 +72,45 @@
 }
 
 .cell-time {
-  flex: 0 0 84rpx;
-  border-radius: 10rpx;
+  flex: 0 0 100rpx;
+  border-radius: 16rpx;
 }
 
 .cell-day {
-  border-radius: 10rpx;
-  min-height: 64rpx;
+  border-radius: 16rpx;
+  min-height: 84rpx;
 }
 
 .day-label {
-  font-size: 22rpx;
+  font-size: 24rpx;
   font-weight: 700;
   line-height: 1.1;
 }
 
 .day-date {
-  font-size: 18rpx;
+  font-size: 20rpx;
   opacity: 0.85;
   line-height: 1.2;
 }
 
 .section-no {
-  font-size: 22rpx;
+  font-size: 24rpx;
   font-weight: 700;
   line-height: 1.1;
 }
 
 .section-time {
-  font-size: 15rpx;
+  font-size: 18rpx;
   line-height: 1.15;
 }
 
 .cell-course {
-  border-radius: 10rpx;
-  padding: 2rpx;
+  border-radius: 16rpx;
+  padding: 4rpx;
 }
 
 .course-name {
-  font-size: 18rpx;
+  font-size: 20rpx;
   font-weight: 600;
   line-height: 1.15;
   text-align: center;
@@ -119,7 +118,7 @@
 }
 
 .course-detail {
-  font-size: 15rpx;
+  font-size: 17rpx;
   line-height: 1.1;
   opacity: 0.85;
   text-align: center;
@@ -127,7 +126,7 @@
 }
 
 .course-badge {
-  font-size: 14rpx;
+  font-size: 16rpx;
   opacity: 0.8;
 }
 

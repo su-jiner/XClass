@@ -22,7 +22,14 @@
     </view>
 
     <scroll-view class="grid-body" scroll-y enable-flex>
-      <view class="grid-row" wx:for="{{rows}}" wx:for-item="row" wx:for-index="rowIndex" wx:key="section">
+      <view
+        class="grid-row"
+        wx:for="{{rows}}"
+        wx:for-item="row"
+        wx:for-index="rowIndex"
+        wx:key="section"
+        style="height:{{rowHeight}}rpx"
+      >
         <view class="cell cell-time" style="background:{{palette.gridLeft}}">
           <view class="section-no" style="color:{{palette.textPrimary}}">{{row.section}}</view>
           <view class="section-time" style="color:{{palette.textSecondary}}">{{row.startTime}}</view>

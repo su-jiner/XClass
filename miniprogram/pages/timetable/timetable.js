@@ -31,6 +31,7 @@ Page({
     dayHeaders: [],
     rows: [],
     touchStartX: 0,
+    rowHeight: 96,
   },
   onShow() {
     if (this.getTabBar && this.getTabBar()) this.getTabBar().setData({ selected: 1 });
@@ -59,7 +60,23 @@ Page({
       week: keepWeek,
       profileName: store.activeProfile().name,
     });
+    this.computeRowHeight();
     this.renderWeek(keepWeek);
+  },
+  /**
+   * 与 Android TimetableMetrics 一致：按可用高度算行高，让 12 节全部铺满一屏。
+   * 预留：状态栏 + 标题区 + 表头行 + 周切换提示 + 自定义 tabBar。
+   */
+  computeRowHeight() {
+    const info = wx.getSystemInfoSync ? wx.getSystemInfoSync() : {};
+    const windowWidth = info.windowWidth || 375;
+    const windowHeight = info.windowHeight || 667;
+    const statusBar = info.statusBarHeight || 24;
+    const rpxPerPx = 750 / windowWidth;
+    const reservedPx = statusBar + 8 + 62 + 44 + 46 + 56 + 12;
+    const availablePx = windowHeight - reservedPx;
+    const rowHeight = Math.max(88, Math.min(130, Math.floor((availablePx * rpxPerPx) / 12)));
+    this.setData({ rowHeight: rowHeight });
   },
   weekStartDate(week) {
     const start = new Date(this.semesterStart + 'T00:00:00');
