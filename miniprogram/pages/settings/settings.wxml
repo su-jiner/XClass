@@ -99,7 +99,7 @@
     <view style="font-size:30rpx;font-weight:600">提醒与日历</view>
     <view class="row">
       <view class="row-label">今日课程提醒条</view>
-      <switch checked="{{prefs.reminderEnabled}}" data-field="reminderEnabled" bindchange="toggleNonCurrent" />
+      <switch checked="{{prefs.reminderEnabled}}" data-field="reminderEnabled" bindchange="toggleReminder" />
     </view>
     <view class="button secondary" bindtap="writeCalendar" style="background:{{palette.panelAlt}};color:{{palette.text}}">写入手机日历（本周课程 + 提前 10 分钟提醒）</view>
     <view class="muted">小程序没有桌面/锁屏组件；可点右上角「…」→ 添加到桌面，或使用「我的小程序」置顶。</view>

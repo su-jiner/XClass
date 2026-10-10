@@ -56,6 +56,10 @@ Page({
     store.savePrefs({ showNonCurrent: event.detail.value });
     this.reload();
   },
+  toggleReminder(event) {
+    store.savePrefs({ reminderEnabled: event.detail.value });
+    this.reload();
+  },
   switchProfile(event) {
     store.setActiveProfile(event.currentTarget.dataset.id);
     this.reload();
