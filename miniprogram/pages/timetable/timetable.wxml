@@ -79,6 +79,7 @@
         value="{{pasteText}}" bindinput="onPasteInput" placeholder="在此粘贴课表分享文本…" placeholder-class="manual-ph" />
       <view class="manual-actions">
         <view class="manual-btn" style="background:{{palette.panelAlt}};color:{{palette.textPrimary}}" bindtap="closePaste">取消</view>
+        <view class="manual-btn" style="background:{{palette.panelAlt}};color:{{palette.textPrimary}}" bindtap="exportShareTextFromDialog">导出当前课表</view>
         <view class="manual-btn manual-btn-primary" style="background:{{palette.buttonBackground}};color:{{palette.buttonText}}" bindtap="doPasteParse">解析预览</view>
       </view>
     </view>

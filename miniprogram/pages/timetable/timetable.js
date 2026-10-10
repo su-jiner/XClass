@@ -270,6 +270,36 @@ Page({
     this.setData({ showPaste: false });
     wx.navigateTo({ url: '/pages/import/import?mode=paste&auto=1' });
   },
+  /** 导出当前课表为 XClass 分享文本：复制到剪贴板，朋友粘贴到任意端即可导入。 */
+  exportShareTextFromDialog() {
+    const courses = store.loadCourses();
+    if (!courses.length) {
+      wx.showToast({ title: '当前课表还没有课程', icon: 'none' });
+      return;
+    }
+    const active = store.activeProfile();
+    const campusMap = store.loadCampusMap();
+    const idToAlias = {};
+    Object.keys(campusMap).forEach((alias) => { idToAlias[campusMap[alias]] = alias; });
+    const semester = (courses.find((c) => c.semester && String(c.semester).trim()) || {}).semester || null;
+    let totalWeeks = null;
+    courses.forEach((course) => (course.meetings || []).forEach((meeting) => (meeting.weekRules || []).forEach((rule) => {
+      if (totalWeeks === null || rule.endWeek > totalWeeks) totalWeeks = rule.endWeek;
+    })));
+    const text = core.encodeShareText(
+      courses,
+      active ? active.name : null,
+      semester,
+      store.getActiveSemesterStart(),
+      totalWeeks,
+      idToAlias
+    );
+    wx.setClipboardData({
+      data: text,
+      success: () => wx.showToast({ title: '已复制课表分享文本，可直接粘贴给朋友', icon: 'none' }),
+      fail: () => wx.showToast({ title: '复制失败，请重试', icon: 'none' }),
+    });
+  },
   showManualDialog() {
     this.setData({
       showManual: true,
