@@ -92,7 +92,7 @@
     <string name="action_cancel">取消</string>
     <string name="course_detail_delete">从当前课表删除课程</string>
     <string name="course_detail_delete_title">删除课程</string>
-    <string name="course_detail_delete_message">确定从当前课表删除「%1$s」吗？这会删除该课程的全部上课时间；重新覆盖导入课表时可能再次出现。</string>
+    <string name="course_detail_delete_message">确定从当前课表删除「%1$s」吗？这会删除该课程的全部上课时间；从备份恢复课表时可能再次出现。</string>
     <string name="course_detail_deleted">已从当前课表删除课程</string>
     <string name="course_detail_delete_failed">课程已变化，请重新打开详情后再试</string>
     <string name="action_save">保存</string>
@@ -114,7 +114,7 @@
     <string name="settings_tools">工具</string>
     <string name="nav_tools">工具</string>
     <string name="tools_study_title">学习工具</string>
-    <string name="tools_more_hint">更多教务工具（成绩查询、考试安排等）开发中</string>
+    <string name="tools_more_hint">更多本地学习工具开发中</string>
     <string name="settings_tool_gpa">绩点计算器</string>
     <string name="settings_tool_gpa_hint">按成绩与学分估算保研绩点、加权平均分与算术平均分</string>
     <string name="gpa_title">绩点计算器</string>
@@ -150,11 +150,11 @@
 
     <!-- 成绩查询 -->
     <string name="tools_grade_inquiry_title">成绩查询</string>
-    <string name="tools_grade_inquiry_hint">查看各学期成绩、单科绩点与加权平均分，支持教务一键同步</string>
+    <string name="tools_grade_inquiry_hint">查看各学期成绩、单科绩点与加权平均分，支持手动录入与本地互转</string>
     <string name="grade_inquiry_title">成绩查询</string>
     <string name="grade_semester_all">全部学期</string>
     <string name="grade_summary_format">共 %1$d 门课程 · 累计 %2$.1f 学分 · 均分 %3$.2f</string>
-    <string name="grade_empty_hint">暂无成绩数据，点击下方按钮从教务系统同步</string>
+    <string name="grade_empty_hint">暂无成绩数据，点击下方按钮手动添加，或从绩点计算器导入</string>
     <string name="grade_add_button">手动添加成绩</string>
     <string name="grade_sync_from_gpa">从绩点计算器导入</string>
     <string name="grade_dialog_title">添加成绩</string>
@@ -171,12 +171,12 @@
 
     <!-- 考试查询 -->
     <string name="tools_exam_schedule_title">考试查询</string>
-    <string name="tools_exam_schedule_hint">期末考场日程、考试地点、座位号及倒计时，支持教务同步与自定义</string>
+    <string name="tools_exam_schedule_hint">期末考场日程、考试地点、座位号及倒计时，支持手动添加与自定义</string>
     <string name="exam_schedule_title">考试安排</string>
     <string name="exam_countdown_next">距离下场考试「%1$s」还剩</string>
     <string name="exam_countdown_days">%1$d 天 %2$d 小时</string>
     <string name="exam_countdown_hours">%1$d 小时 %2$d 分钟</string>
-    <string name="exam_empty_hint">暂无考试安排，点击下方同步教务考试或手动添加</string>
+    <string name="exam_empty_hint">暂无考试安排，点击下方按钮手动添加考试</string>
     <string name="exam_add_button">手动添加考试</string>
     <string name="exam_dialog_title">添加考试</string>
     <string name="exam_course_name_hint">课程名称（如：高等数学）</string>
@@ -196,9 +196,9 @@
     <string name="academic_edit_plan_button">手动编辑学业指标</string>
     <string name="academic_add_category_button">＋ 添加自定义模块</string>
     <string name="academic_dialog_auto_sum">按模块自动求和</string>
-    <string name="academic_source_web">来源：教务系统学业完成查询同步</string>
+    <string name="academic_source_web">来源：旧版本同步数据（历史记录）</string>
     <string name="academic_source_manual">来源：手动自定义编辑</string>
-    <string name="academic_source_estimated">来源：本地成绩启发式估算（以教务原系统为准）</string>
+    <string name="academic_source_estimated">来源：本地成绩启发式估算（仅供参考）</string>
     <string name="academic_category_compulsory">学科基础与专业必修</string>
     <string name="academic_category_elective">专业选修课</string>
     <string name="academic_category_general">通识教育选修/核心课</string>
