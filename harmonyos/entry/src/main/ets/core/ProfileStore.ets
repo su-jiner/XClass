@@ -418,6 +418,60 @@ export class ProfileStore {
     return encodeBackup(new Date().toISOString(), profiles, timeProfiles, this.loadCampusMap(), this.loadDefaultProfileId());
   }
 
+  /**
+   * 导入向导入库：覆盖当前课表或新建课表。
+   * campusMap 用于把解析出的校区简称映射为时间表 ID，写入 meeting.campusId。
+   */
+  importCourses(
+    courses: CourseSchedule[],
+    mode: 'overwrite' | 'new',
+    newProfileName: string | null,
+    semesterStartDate: string | null,
+    campusMap: Record<string, string>
+  ): string {
+    const resolved: CourseSchedule[] = courses.map((course) => ({
+      courseName: course.courseName,
+      teacher: course.teacher,
+      semester: course.semester,
+      credit: course.credit,
+      rawWeekText: course.rawWeekText,
+      meetings: course.meetings.map((meeting) => ({
+        weekday: meeting.weekday,
+        startSection: meeting.startSection,
+        endSection: meeting.endSection,
+        weekRules: meeting.weekRules,
+        location: meeting.location,
+        campusId: meeting.campusId ?? null,
+      })),
+    }));
+
+    if (mode === 'new') {
+      const meta = this.ensureInitialized();
+      const id = this.randomUUID();
+      const fileName = `courses_${id}.json`;
+      this.writeCoursesFile(fileName, resolved);
+      const now = Date.now();
+      const name = (newProfileName ?? '').trim().length > 0 ? (newProfileName as string).trim() : `课表${this.timestampLabel()}`;
+      meta.profiles.push({
+        id, name, coursesFile: fileName,
+        createdAt: now, updatedAt: now,
+        semesterStartDate: semesterStartDate ?? undefined,
+      });
+      meta.activeId = id;
+      this.writeMeta(meta);
+      return name;
+    }
+
+    const meta = this.ensureInitialized();
+    const active = meta.profiles.find((p) => p.id === meta.activeId) ?? meta.profiles[0];
+    this.writeCoursesFile(active.coursesFile, resolved);
+    active.updatedAt = Date.now();
+    if (semesterStartDate) active.semesterStartDate = semesterStartDate;
+    meta.activeId = active.id;
+    this.writeMeta(meta);
+    return active.name;
+  }
+
   importBackup(content: string): number {
     const envelope = decodeBackupEnvelope(content);
     if (envelope === null) fail('备份文件格式不正确');

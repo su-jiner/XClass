@@ -10,6 +10,7 @@ import { ReminderService } from '../model/ReminderService.ets';
 import { documentViewPicker } from '@kit.CoreFileKit';
 import { fs } from '@kit.CoreFileKit';
 import { util } from '@kit.ArkTS';
+import { router } from '@kit.ArkUI';
 
 @Component
 export struct SettingsPage {
@@ -93,6 +94,17 @@ export struct SettingsPage {
           .width('100%')
 
         this.sectionLabel('课表管理')
+        Row() {
+          Text('节次时间表').fontSize(14).fontColor(this.palette().textPrimary)
+          Blank()
+          Text('多校区/楼栋时间 · 可识别文本').fontSize(12).fontColor(this.palette().textSecondary)
+          Text('>').fontSize(14).fontColor(this.palette().textSecondary).margin({ left: 6 })
+        }
+        .width('100%')
+        .padding({ top: 10, bottom: 6 })
+        .onClick(() => {
+          router.pushUrl({ url: 'pages/TimeProfilesPage' });
+        })
         ForEach(this.profiles, (profile: ProfileRow) => {
           Column() {
             Row() {

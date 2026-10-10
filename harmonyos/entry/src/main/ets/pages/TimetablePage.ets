@@ -51,6 +51,34 @@ export struct TimetablePage {
     return currentPalette(Prefs.theme(), Prefs.darkMode(), this.systemDark);
   }
 
+  /** 「+」选择面板：手动添加 / 导入课表文件 / 粘贴文本导入（与 Android、小程序一致） */
+  showAddChooser(): void {
+    ActionSheet.show({
+      title: '添加课程',
+      autoCancel: true,
+      sheets: [
+        {
+          title: '手动添加课程',
+          action: (): void => {
+            this.addDialogController.open();
+          },
+        },
+        {
+          title: '导入课表文件（txt/md/csv/tsv）',
+          action: (): void => {
+            router.pushUrl({ url: 'pages/ImportPage', params: { mode: 'file' } });
+          },
+        },
+        {
+          title: '粘贴文本导入',
+          action: (): void => {
+            router.pushUrl({ url: 'pages/ImportPage', params: { mode: 'paste' } });
+          },
+        },
+      ],
+    });
+  }
+
   currentSection(): number | null {
     const now = new Date();
     const pad = (n: number): string => String(n).padStart(2, '0');
@@ -84,7 +112,7 @@ export struct TimetablePage {
           .width(36).height(36)
           .margin({ right: 8 })
           .onClick(() => {
-            this.addDialogController.open();
+            this.showAddChooser();
           })
 
       }
