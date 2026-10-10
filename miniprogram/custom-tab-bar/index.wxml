@@ -1,13 +1,17 @@
-<view class="tabbar" style="background:{{palette.nav}};border-color:{{palette.panelAlt}}">
+<view class="tabbar" style="background:{{palette.nav}}">
   <view
     wx:for="{{list}}"
     wx:key="pagePath"
     class="tabbar-item"
     data-index="{{index}}"
     bindtap="switchTab"
-    style="color:{{index === selected ? palette.icon : palette.textSecondary}}"
   >
-    <view class="tabbar-icon">{{item.icon}}</view>
-    <view class="tabbar-text">{{item.text}}</view>
+    <view
+      class="tabbar-capsule"
+      style="background:{{index === selected ? palette.panelAlt : 'transparent'}}"
+    >
+      <image class="tabbar-icon" src="{{index === selected ? item.iconActive : item.iconNormal}}" mode="aspectFit" />
+      <view class="tabbar-text" style="color:{{index === selected ? palette.iconTint : palette.textSecondary}}">{{item.text}}</view>
+    </view>
   </view>
 </view>

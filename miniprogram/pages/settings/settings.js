@@ -5,6 +5,7 @@ const theme = require('../../utils/theme.js');
 Page({
   data: {
     palette: theme.palette('warm', false),
+    statusBarHeight: 24,
     prefs: {},
     themes: [['warm', '暖色'], ['ocean', '海蓝'], ['mint', '薄荷']],
     darkModes: [['system', '跟随系统'], ['light', '浅色'], ['dark', '深色']],
@@ -15,6 +16,10 @@ Page({
   },
   onShow() {
     if (this.getTabBar && this.getTabBar()) this.getTabBar().setData({ selected: 3 });
+    if (this.data.statusBarHeight === 24) {
+      const info = wx.getSystemInfoSync ? wx.getSystemInfoSync() : {};
+      this.setData({ statusBarHeight: info.statusBarHeight || 24 });
+    }
     this.reload();
   },
   reload() {

@@ -1,39 +1,57 @@
-<view class="page" style="background:{{palette.page}};color:{{palette.text}}">
-  <view class="page-header">
-    <view>
-      <view style="font-size:40rpx;font-weight:700">第{{weekIndex + 1}}周{{weekIndex + 1 === currentWeek ? '（本周）' : '（非本周）'}}</view>
-      <view class="page-subtitle">{{profileName}} · 共{{weeks}}周</view>
+<view class="page" style="background:{{palette.page}};color:{{palette.textPrimary}}">
+  <view class="header" style="padding-top:{{statusBarHeight}}px">
+    <view bindtap="goCurrentWeek">
+      <view class="header-week" style="color:{{palette.textPrimary}}">{{headerWeek}}</view>
+      <view class="header-date" style="color:{{palette.textSecondary}}">{{headerDate}} · {{profileName}}</view>
     </view>
-    <view class="add-button" bindtap="onAddTap" style="background:{{palette.panelAlt}};color:{{palette.icon}}">＋</view>
+    <view class="add-button" bindtap="onAddTap" style="background:{{palette.buttonBackground}};color:{{palette.iconTint}}">＋</view>
   </view>
 
-  <swiper
-    class="week-swiper"
-    current="{{weekIndex}}"
-    bindchange="onWeekChange"
-    duration="280"
-    style="height:calc(100vh - 360rpx)"
-  >
-    <swiper-item wx:for="{{grids}}" wx:key="index">
-      <scroll-view scroll-y style="height:100%">
-        <view class="grid-header" style="background:{{palette.panel}}">
-          <view class="grid-cell grid-time muted">节次</view>
-          <view class="grid-cell muted" wx:for="{{columnLabels}}" wx:for-item="label" wx:key="*this">{{label}}</view>
+  <view class="grid" bindtouchstart="onTouchStart" bindtouchend="onTouchEnd">
+    <view class="grid-row grid-head">
+      <view class="cell cell-time" style="background:{{palette.gridHeader}};color:{{palette.textPrimary}}">{{monthLabel}}</view>
+      <view
+        class="cell cell-day"
+        wx:for="{{dayHeaders}}"
+        wx:key="label"
+        style="background:{{item.background}};color:{{palette.textPrimary}}"
+      >
+        <view class="day-label">{{item.label}}</view>
+        <view class="day-date">{{item.date}}</view>
+      </view>
+    </view>
+
+    <scroll-view class="grid-body" scroll-y enable-flex>
+      <view class="grid-row" wx:for="{{rows}}" wx:for-item="row" wx:for-index="rowIndex" wx:key="section">
+        <view class="cell cell-time" style="background:{{palette.gridLeft}}">
+          <view class="section-no" style="color:{{palette.textPrimary}}">{{row.section}}</view>
+          <view class="section-time" style="color:{{palette.textSecondary}}">{{row.startTime}}</view>
+          <view class="section-time" style="color:{{palette.textSecondary}}">{{row.endTime}}</view>
         </view>
-        <view class="grid-row" wx:for="{{rowLabels}}" wx:for-item="rowLabel" wx:for-index="rowIndex" wx:key="*this">
-          <view class="grid-cell grid-time" style="background:{{palette.panelAlt}}">
-            <view>{{rowLabel}}</view>
-            <view class="muted">{{sectionRanges[rowIndex * 2]}}</view>
-          </view>
-          <view
-            class="grid-cell course-cell"
-            wx:for="{{grids[weekIndex][rowIndex]}}"
-            wx:for-item="cellText"
-            wx:key="index"
-            style="background:{{cellText ? palette.panelAlt : palette.panel}};color:{{palette.text}}"
-          >{{cellText}}</view>
+        <view
+          class="cell cell-course"
+          wx:for="{{row.cells}}"
+          wx:for-item="cell"
+          wx:for-index="columnIndex"
+          wx:key="columnIndex"
+          data-row="{{rowIndex}}"
+          data-column="{{columnIndex}}"
+          bindtap="onCellTap"
+          style="background:{{cell.empty ? (cell.isTodayColumn ? palette.gridDayToday : palette.gridDay) : cell.background}};color:{{cell.empty ? palette.textPrimary : cell.textColor}};border-radius:{{cell.empty ? '10rpx' : cell.radius}}"
+        >
+          <block wx:if="{{!cell.empty && cell.name}}">
+            <view class="course-name">{{cell.name}}</view>
+            <view class="course-detail" wx:if="{{cell.detail}}">{{cell.detail}}</view>
+            <view class="course-badge" wx:if="{{cell.badge}}">{{cell.badge}}</view>
+          </block>
         </view>
-      </scroll-view>
-    </swiper-item>
-  </swiper>
+      </view>
+    </scroll-view>
+  </view>
+
+  <view class="week-hint" style="color:{{palette.textSecondary}}">
+    <text bindtap="goPrevWeek" class="week-arrow">‹ 上一周</text>
+    <text class="week-current">第 {{week}} / {{totalWeeks}} 周（左右滑动切周）</text>
+    <text bindtap="goNextWeek" class="week-arrow">下一周 ›</text>
+  </view>
 </view>

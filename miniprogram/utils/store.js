@@ -10,6 +10,20 @@ const META = `${ROOT}/meta.json`;
 const TIME_PROFILES = `${ROOT}/time_profiles.json`;
 const PREFS_KEY = 'xclass.prefs';
 
+// 轻量内存缓存：避免每次切页/onShow 都做同步文件读取（小程序端明显的卡顿来源）
+let coursesCache = null;
+let timeProfileCache = null;
+let prefsCache = null;
+
+function invalidateCache() {
+  coursesCache = null;
+  timeProfileCache = null;
+}
+
+function clone(value) {
+  return value == null ? value : JSON.parse(JSON.stringify(value));
+}
+
 function ensureRoot() {
   try {
     FS.accessSync(ROOT);
@@ -114,6 +128,7 @@ function createProfile(name) {
   meta.profiles.push(profile);
   meta.activeId = id;
   saveMeta(meta);
+  invalidateCache();
   return profile;
 }
 
@@ -138,6 +153,7 @@ function deleteProfile(id) {
   if (meta.activeId === id) meta.activeId = meta.profiles[0].id;
   saveMeta(meta);
   try { FS.unlinkSync(`${ROOT}/${target.coursesFile}`); } catch (error) { /* 文件可能已不存在 */ }
+  invalidateCache();
   return true;
 }
 
@@ -149,7 +165,12 @@ function loadCourses(profileId) {
     ? meta.profiles.find((item) => item.id === profileId)
     : (meta.profiles.find((item) => item.id === meta.activeId) || meta.profiles[0]);
   if (!profile) return [];
-  return readJson(`${ROOT}/${profile.coursesFile}`, []);
+  if (coursesCache && coursesCache.profileId === profile.id && coursesCache.mtime === profile.updatedAt) {
+    return clone(coursesCache.data);
+  }
+  const data = readJson(`${ROOT}/${profile.coursesFile}`, []);
+  coursesCache = { profileId: profile.id, mtime: profile.updatedAt, data: data };
+  return clone(data);
 }
 
 function saveCourses(courses, profileId) {
@@ -161,6 +182,7 @@ function saveCourses(courses, profileId) {
   profile.updatedAt = Date.now();
   writeJson(`${ROOT}/${profile.coursesFile}`, courses || []);
   saveMeta(meta);
+  coursesCache = { profileId: profile.id, mtime: profile.updatedAt, data: courses || [] };
 }
 
 function getActiveSemesterStart() {
@@ -249,7 +271,12 @@ function importCourses(parsedCourses, mode, newName, semesterStartDate, campusMa
 function loadTimeProfiles() {
   const stored = readJson(TIME_PROFILES, { profiles: [], campusMap: {}, defaultProfileId: null });
   const custom = (stored.profiles || []).filter((profile) => profile.blocks && profile.blocks.length);
-  return [core.defaultTimeProfile()].concat(custom);
+  if (timeProfileCache && timeProfileCache.stamp === JSON.stringify(stored).length) {
+    return clone(timeProfileCache.data);
+  }
+  const data = [core.defaultTimeProfile()].concat(custom);
+  timeProfileCache = { stamp: JSON.stringify(stored).length, data: data };
+  return clone(data);
 }
 
 function loadCampusMap() {
@@ -263,6 +290,7 @@ function saveTimeProfiles(profiles, campusMap, defaultProfileId) {
     profiles: (profiles || []).filter((profile) => profile.id !== core.DEFAULT_PROFILE_ID),
     campusMap: campusMap || {},
   });
+  timeProfileCache = null;
 }
 
 /** 导入时保存识别出的时间表，并建立「校区简称 → 时间表」映射 */
@@ -293,11 +321,13 @@ const DEFAULT_PREFS = {
 };
 
 function loadPrefs() {
-  return Object.assign({}, DEFAULT_PREFS, wx.getStorageSync(PREFS_KEY) || {});
+  if (!prefsCache) prefsCache = Object.assign({}, DEFAULT_PREFS, wx.getStorageSync(PREFS_KEY) || {});
+  return Object.assign({}, prefsCache);
 }
 
 function savePrefs(prefs) {
-  wx.setStorageSync(PREFS_KEY, Object.assign({}, loadPrefs(), prefs));
+  prefsCache = Object.assign({}, loadPrefs(), prefs);
+  wx.setStorageSync(PREFS_KEY, prefsCache);
 }
 
 // ---------------------------------------------------------------- 备份
@@ -333,6 +363,7 @@ function importBackup(content) {
   });
   meta.activeId = meta.profiles[0].id;
   saveMeta(meta);
+  invalidateCache();
   if (decoded.timeProfiles && decoded.timeProfiles.length) {
     saveTimeProfiles(decoded.timeProfiles, decoded.campusMap, decoded.defaultProfileId);
   }
@@ -344,6 +375,7 @@ function readFileText(path) {
 }
 
 module.exports = {
+  invalidateCache,
   todayIso,
   listProfiles,
   activeProfile,

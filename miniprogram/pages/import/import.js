@@ -5,6 +5,7 @@ const theme = require('../../utils/theme.js');
 Page({
   data: {
     palette: theme.palette('warm', false),
+    statusBarHeight: 24,
     mode: 'paste',
     text: '',
     parsed: null,
@@ -14,7 +15,12 @@ Page({
   },
   onLoad(options) {
     const prefs = store.loadPrefs();
-    this.setData({ palette: theme.palette(prefs.theme, false), mode: (options && options.mode) || 'paste' });
+    const info = wx.getSystemInfoSync ? wx.getSystemInfoSync() : {};
+    this.setData({
+      palette: theme.palette(prefs.theme, false),
+      statusBarHeight: info.statusBarHeight || 24,
+      mode: (options && options.mode) || 'paste',
+    });
   },
   onTextInput(event) {
     this.setData({ text: event.detail.value });

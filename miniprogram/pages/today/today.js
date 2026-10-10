@@ -5,12 +5,17 @@ const theme = require('../../utils/theme.js');
 Page({
   data: {
     palette: theme.palette('warm', false),
+    statusBarHeight: 24,
     snapshot: null,
     countdown: '',
     reminderEnabled: true,
   },
   onShow() {
     if (this.getTabBar && this.getTabBar()) this.getTabBar().setData({ selected: 0 });
+    if (this.data.statusBarHeight === 24) {
+      const info = wx.getSystemInfoSync ? wx.getSystemInfoSync() : {};
+      this.setData({ statusBarHeight: info.statusBarHeight || 24 });
+    }
     this.reload();
   },
   reload() {

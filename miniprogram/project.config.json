@@ -1,5 +1,5 @@
 {
-  "appid": "touristappid",
+  "appid": "wxacf0e9804a8f3962",
   "projectname": "XClass",
   "compileType": "miniprogram",
   "libVersion": "3.5.5",
@@ -10,7 +10,29 @@
     "postcss": true,
     "minified": true,
     "ignoreDevUnusedFiles": false,
-    "checkSiteMap": false
+    "checkSiteMap": false,
+    "compileWorklet": false,
+    "uglifyFileName": false,
+    "uploadWithSourceMap": true,
+    "packNpmManually": false,
+    "packNpmRelationList": [],
+    "minifyWXSS": true,
+    "minifyWXML": true,
+    "localPlugins": false,
+    "disableUseStrict": false,
+    "useCompilerPlugins": false,
+    "condition": false,
+    "babelSetting": {
+      "ignore": [],
+      "disablePlugins": [],
+      "outputPath": ""
+    }
   },
-  "description": "XClass 本地课表（微信小程序端）：课表/今日/工具/设置 + 离线导入，不联网"
+  "description": "XClass 本地课表（微信小程序端）：课表/今日/工具/设置 + 离线导入，不联网",
+  "simulatorPluginLibVersion": {},
+  "packOptions": {
+    "ignore": [],
+    "include": []
+  },
+  "editorSetting": {}
 }

@@ -19,6 +19,7 @@ function gpaOf(score) {
 Page({
   data: {
     palette: theme.palette('warm', false),
+    statusBarHeight: 24,
     tab: 0,
     tabs: ['绩点计算器', '成绩查询', '考试安排', '学业完成'],
     gpaCourses: [],
@@ -29,6 +30,10 @@ Page({
   },
   onShow() {
     if (this.getTabBar && this.getTabBar()) this.getTabBar().setData({ selected: 2 });
+    if (this.data.statusBarHeight === 24) {
+      const info = wx.getSystemInfoSync ? wx.getSystemInfoSync() : {};
+      this.setData({ statusBarHeight: info.statusBarHeight || 24 });
+    }
     const prefs = store.loadPrefs();
     this.setData({ palette: theme.palette(prefs.theme, false) });
     this.reload();

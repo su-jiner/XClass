@@ -10,7 +10,7 @@ page {
 }
 
 .page-header {
-  padding: 88rpx 8rpx 16rpx;
+  padding: 12rpx 8rpx 16rpx;
   display: flex;
   align-items: center;
   justify-content: space-between;

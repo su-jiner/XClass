@@ -16,9 +16,11 @@ App({
   refreshTheme() {
     const theme = require('./utils/theme.js');
     const prefs = store.loadPrefs();
-    const systemDark = wx.getSystemInfoSync
-      ? (wx.getSystemInfoSync().theme === 'dark')
-      : false;
+    if (this.systemDarkCache == null) {
+      const info = wx.getSystemInfoSync ? wx.getSystemInfoSync() : {};
+      this.systemDarkCache = info.theme === 'dark';
+    }
+    const systemDark = this.systemDarkCache;
     const dark = prefs.darkMode === 'dark' || (prefs.darkMode === 'system' && systemDark);
     this.globalData.prefs = prefs;
     this.globalData.palette = theme.palette(prefs.theme, dark);

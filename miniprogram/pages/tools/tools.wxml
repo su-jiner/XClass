@@ -1,4 +1,4 @@
-<view class="page" style="background:{{palette.page}};color:{{palette.text}}">
+<view class="page" style="background:{{palette.page}};color:{{palette.text}};padding-top:{{statusBarHeight + 8}}px">
   <view class="page-header">
     <view>
       <view class="page-title">工具</view>

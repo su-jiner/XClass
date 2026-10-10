@@ -3,26 +3,33 @@
   left: 0;
   right: 0;
   bottom: 0;
-  height: 110rpx;
   display: flex;
-  border-top: 1rpx solid;
-  padding-bottom: env(safe-area-inset-bottom);
+  padding: 6rpx 0 calc(6rpx + env(safe-area-inset-bottom));
 }
 
 .tabbar-item {
   flex: 1;
   display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tabbar-capsule {
+  display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: 22rpx;
+  padding: 8rpx 26rpx;
+  border-radius: 32rpx;
+  min-width: 108rpx;
 }
 
 .tabbar-icon {
-  font-size: 34rpx;
-  line-height: 40rpx;
+  width: 40rpx;
+  height: 40rpx;
 }
 
 .tabbar-text {
+  font-size: 20rpx;
   margin-top: 2rpx;
 }
