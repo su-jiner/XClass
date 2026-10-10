@@ -12,6 +12,8 @@ struct TimetablePage: View {
     @State private var selectedWeek = 1
     @State private var detailItem: (course: CourseSchedule, meeting: MeetingTime)?
     @State private var showAddSheet = false
+    @State private var showImportSheet = false
+    @State private var showAddChooser = false
 
     var body: some View {
         NavigationStack {
@@ -23,6 +25,14 @@ struct TimetablePage: View {
             .navigationBarHidden(true)
             .sheet(isPresented: $showAddSheet, onDismiss: { reload() }) {
                 AddCourseSheet(palette: palette, guessWeek: currentWeek)
+            }
+            .sheet(isPresented: $showImportSheet, onDismiss: { reload() }) {
+                ImportView(palette: palette)
+            }
+            .confirmationDialog("添加课程", isPresented: $showAddChooser, titleVisibility: .visible) {
+                Button("手动添加课程") { showAddSheet = true }
+                Button("导入课表文件 / 粘贴文本") { showImportSheet = true }
+                Button("取消", role: .cancel) {}
             }
             .sheet(item: $detailItem) { item in
                 CourseDetailSheet(palette: palette, course: item.course, meeting: item.meeting)
@@ -54,7 +64,7 @@ struct TimetablePage: View {
                     .foregroundColor(palette.textSecondary)
             }
             Spacer()
-            Button { showAddSheet = true } label: {
+            Button { showAddChooser = true } label: {
                 Image(systemName: "plus").foregroundColor(palette.iconTint)
             }
             .padding(8)

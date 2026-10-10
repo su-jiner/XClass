@@ -68,15 +68,20 @@ struct TodayPage: View {
 
     private var firstTime: String {
         guard let first = meetings.map({ $0.meeting.startSection }).min(),
-              SectionTimes.ranges.indices.contains(first - 1) else { return "无" }
-        return String(SectionTimes.ranges[first - 1].prefix(5))
+              let meeting = meetings.first(where: { $0.meeting.startSection == first })?.meeting,
+              let range = TimeProfileResolver.timeRange(profiles, meeting: meeting) else { return "无" }
+        return range.start
     }
 
     private var lastTime: String {
         guard let last = meetings.map({ $0.meeting.endSection }).max(),
-              SectionTimes.ranges.indices.contains(last - 1) else { return "无" }
-        return String(SectionTimes.ranges[last - 1].suffix(5))
+              let meeting = meetings.last(where: { $0.meeting.endSection == last })?.meeting,
+              let range = TimeProfileResolver.timeRange(profiles, meeting: meeting) else { return "无" }
+        return range.end
     }
+
+    /// 多校区：按课程所属校区时间表取时间
+    private var profiles: [SectionTimeProfile] { ProfileStore.shared.loadTimeProfiles() }
 
     private func statCard(_ text: String) -> some View {
         Text(text)
@@ -99,14 +104,19 @@ struct TodayPage: View {
     private func courseCard(_ item: (courseIndex: Int, course: CourseSchedule, meeting: MeetingTime)) -> some View {
         let start = min(max(item.meeting.startSection, 1), SectionTimes.ranges.count)
         let end = min(max(item.meeting.endSection, start), SectionTimes.ranges.count)
-        let startText = String(SectionTimes.ranges[start - 1].prefix(5))
-        let endText = String(SectionTimes.ranges[end - 1].suffix(5))
+        let range = TimeProfileResolver.timeRange(profiles, meeting: item.meeting)
+        let startText = range?.start ?? "--:--"
+        let endText = range?.end ?? "--:--"
+        let campusName = item.meeting.campusId.flatMap { id in
+            profiles.first(where: { $0.id == id })?.name
+        }
         return VStack(alignment: .leading, spacing: 3) {
             Text(item.course.courseName)
                 .font(.system(size: 14, weight: .medium))
             Text("第\(start)-\(end)节  \(startText)-\(endText)")
                 .font(.system(size: 14))
-            Text(item.meeting.location.isEmpty ? "教室待定" : item.meeting.location)
+            Text([campusName, item.meeting.location.isEmpty ? nil : item.meeting.location]
+                .compactMap { $0 }.joined(separator: " · "))
                 .font(.system(size: 14))
         }
         .foregroundColor(palette.textPrimary)

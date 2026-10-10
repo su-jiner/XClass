@@ -13,7 +13,14 @@ struct XClassApp: App {
                 .preferredColorScheme(colorScheme)
                 .task {
                     await ReminderScheduler.refreshIfEnabled()
+                    LiveActivityManager.refresh()
                 }
+        }
+        .onChange(of: scenePhase) { phase in
+            if phase == .active {
+                ReminderScheduler.refreshIfEnabled()
+                LiveActivityManager.refresh()
+            }
         }
     }
 
@@ -116,8 +123,7 @@ enum ReminderScheduler {
                 body = "今天没有课程安排"
             } else {
                 let first = meetings.min { $0.meeting.startSection < $1.meeting.startSection }!
-                let time = SectionTimes.ranges.indices.contains(first.meeting.startSection - 1)
-                    ? String(SectionTimes.ranges[first.meeting.startSection - 1].prefix(5)) : "--:--"
+                let time = TimeProfileResolver.timeRange(ProfileStore.shared.loadTimeProfiles(), meeting: first.meeting)?.start ?? "--:--"
                 body = "\(meetings.count) 门课，最早 \(time) \(first.course.courseName)"
             }
 

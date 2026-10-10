@@ -138,6 +138,19 @@ struct SettingsPage: View {
                 notifyChangedAndReload()
                 toast = "已新建并切换到：\(info.name)"
             }
+            NavigationLink {
+                TimeProfilesPage(palette: palette)
+            } label: {
+                HStack {
+                    Text("节次时间表").foregroundColor(palette.textPrimary)
+                    Spacer()
+                    Text(ProfileStore.shared.loadTimeProfiles().count <= 1
+                         ? "仅默认"
+                         : "\(ProfileStore.shared.loadTimeProfiles().count) 套")
+                        .font(.caption)
+                        .foregroundColor(palette.textSecondary)
+                }
+            }
         }
     }
 

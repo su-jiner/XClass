@@ -75,8 +75,14 @@ final class ProfileStore {
     // MARK: - 目录
 
     private var rootDir: URL {
-        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("XClass", isDirectory: true)
+        // 组件/锁屏/灵动岛与 App 共享同一份数据：优先 App Group 容器，未配置时回落 App 沙盒
+        let base: URL
+        if let group = SharedContainer.containerURL {
+            base = group.appendingPathComponent("XClass", isDirectory: true)
+        } else {
+            base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+                .appendingPathComponent("XClass", isDirectory: true)
+        }
         try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
         return base
     }
@@ -120,6 +126,47 @@ final class ProfileStore {
         meta.activeId = id
         save(meta)
         return ProfileInfo(id: id, name: profileName, isActive: true, updatedAt: now, semesterStartDate: start)
+    }
+
+    enum ImportMode { case overwriteActive, createNew }
+
+    /// 导入向导入库：覆盖当前课表或新建课表；campusMap 用于把解析出的校区简称映射为时间表 ID。
+    @discardableResult
+    func importCourses(
+        _ courses: [CourseSchedule],
+        mode: ImportMode,
+        newProfileName: String? = nil,
+        semesterStartDate: SimpleDate? = nil,
+        campusMap: [String: String] = [:]
+    ) -> String {
+        lock.lock(); defer { lock.unlock() }
+        var meta = ensureInitialized()
+        let now = Date()
+        // campusMap 已在调用方（ImportView）用于把别名换成时间表 ID，这里直接写盘
+        let persisted = courses
+        let start = semesterStartDate ?? SemesterStartDatePolicy.inferFromCourses(persisted)
+
+        switch mode {
+        case .overwriteActive:
+            let activeIndex = meta.profiles.firstIndex { $0.id == meta.activeId } ?? 0
+            let active = meta.profiles[activeIndex]
+            writeCourses(persisted, to: active.coursesFile)
+            meta.profiles[activeIndex].updatedAt = now
+            meta.profiles[activeIndex].semesterStartDate = start.isoString
+            save(meta)
+            return active.name
+        case .createNew:
+            let id = UUID().uuidString
+            let trimmed = newProfileName?.trimmingCharacters(in: .whitespaces)
+            let name = (trimmed?.isEmpty ?? true) ? "课表\(timestampLabel())" : trimmed!
+            let fileName = "courses_\(id).json"
+            writeCourses(persisted, to: fileName)
+            meta.profiles.append(ProfileMeta(id: id, name: name, coursesFile: fileName,
+                                             createdAt: now, updatedAt: now, semesterStartDate: start.isoString))
+            meta.activeId = id
+            save(meta)
+            return name
+        }
     }
 
     func renameProfile(_ id: String, to newName: String) -> Bool {
