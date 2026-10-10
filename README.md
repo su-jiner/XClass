@@ -1,6 +1,6 @@
 # XClass
 
-本地课表应用，开源、无广告、**全程离线**（不访问任何外部服务）。支持 Android / iOS / 鸿蒙三端（采用"双原生轻量移植"架构，Android 为主版本，详见 [docs/PORTING.md](docs/PORTING.md)）。
+本地课表应用，开源、无广告、**全程离线**（不访问任何外部服务）。支持 Android / iOS / 鸿蒙 / 微信小程序 四端（采用"多端轻量移植"架构，Android 为主版本，详见 [docs/PORTING.md](docs/PORTING.md)）。
 
 ## 项目简介
 
@@ -20,6 +20,19 @@ XClass 是一个纯本地课表工具：手动录入课表、管理多份课表�
 
 ## 主要功能
 
+- 多校区节次时间表
+	- 一个学校/校区/楼栋可各配一套节次时间（如 真理道·教学楼 10:25-12:00、真理道·实训楼 10:10-11:30）
+	- 今日页、桌面组件、上课提醒与课表时间列都按**课程所属校区**取时间；可在设置页管理，也可粘贴「XX校区上课时间」文本自动识别
+- 课表导入（离线）
+	- 课表页「+」→ 手动添加 / 导入课表文件 / 粘贴文本导入
+	- Android 支持 PDF（文本层优先，扫描件回退离线 OCR）、图片（ML Kit 中文离线识别）、txt/md/csv/tsv、docx/xlsx
+	- iOS 支持 txt/md/csv/tsv、图片（Vision）、PDF（文本层）；鸿蒙与小程序支持粘贴文本与 txt/md/csv/tsv
+	- 导入结果一律先预览校对（可逐条删除）再选择「覆盖当前课表 / 新建课表」
+- 桌面与锁屏组件
+	- Android：今日课程、下一节课、今日时间轴、本周课表微缩（同时声明锁屏组件，Android 15+/16+ 可见）
+	- iOS：同四件套（WidgetKit）+ 锁屏 accessory 组件 + **灵动岛/锁屏实时活动**（课前 15 分钟开始、下课结束），接入步骤见 [ios/WIDGET_SETUP.md](ios/WIDGET_SETUP.md)
+	- 鸿蒙：四张服务卡片（FormKit）+ 实况窗（LiveViewKit）
+	- 微信小程序：无桌面组件（平台限制），改为小程序内今日提醒 + 写入手机日历 + 添加到桌面
 - 多课表管理
 	- 课表管理页可查看所有课表
 	- 支持切换当前课表、重命名、删除、新建空课表
@@ -68,6 +81,7 @@ XClass 是一个纯本地课表工具：手动录入课表、管理多份课表�
 	- `reminder/`：每日课程提醒
 - `ios/`：iOS 版（SwiftUI，核心逻辑与 Android 逐函数对齐，XCTest 覆盖）
 - `harmonyos/`：鸿蒙版（ArkUI，核心逻辑可用 `node verify/run.mjs` 在任意平台回归）
+- `miniprogram/`：微信小程序版（页面与 Android 对齐，核心逻辑可用 `node miniprogram/verify/run.mjs` 回归）
 - `docs/PORTING.md`：三端同步开发指南与核心逻辑对应表
 - `app/src/main/assets/`
 	- `target.url`：校内导入入口

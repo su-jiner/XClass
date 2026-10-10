@@ -1,6 +1,8 @@
 # 三端同步开发指南（Android / iOS / HarmonyOS）
 
-本项目采用「双原生轻量移植」架构：**Android 是参考实现（source of truth）**，iOS（SwiftUI）与鸿蒙（ArkUI）各自移植同一套核心逻辑。核心逻辑量约 400 行，三端逐函数对齐，均有单元测试保障一致性。三端均为纯本地应用：不访问任何外部服务，课表只来自手动添加与 JSON 备份恢复。
+本项目采用「多端轻量移植」架构：**Android 是参考实现（source of truth）**，iOS（SwiftUI）、鸿蒙（ArkUI）与微信小程序（WXML/JS）各自移植同一套核心逻辑。所有端均为纯本地应用：不访问任何外部服务，课表来自手动添加、离线导入与 JSON 备份恢复。
+
+> 小程序端仓库入口：`miniprogram/`（测试号 AppID，纯离线导入：粘贴文本 + 聊天文件 txt/md/csv/tsv；发布需正式 AppID）。回归脚本：`node miniprogram/verify/run.mjs`。
 
 ## 目录结构
 
@@ -34,6 +36,10 @@ docs/PORTING.md               # 本文件
 | 学期日期 | `data/SemesterStartDatePolicy.kt` | `Core/SemesterStartDatePolicy.swift` | `Core.ets: inferFromSemesterLabelOrNull/...` |
 | 备份格式 | `data/ScheduleBackupCodec.kt`（version 1） | `Core/ImportParser.swift: ScheduleBackupCodec` | `Core.ets: encodeBackup/decodeBackup` |
 | 多课表存储 | `data/ImportedScheduleStorage.kt` | `Core/ProfileStore.swift` | `core/ProfileStore.ets` |
+| 节次时间表（多校区） | `model/TimeProfile.kt` + `data/TimeProfileStore.kt` | `Core/TimeProfile.swift` | `Core.ets: SectionTimeProfile/timeRangeOf/resolveProfile` |
+| 课表导入解析 | `importing/`（单元格语法 + 表格重建 + 时间表识别） | `Core/CourseTableImporter.swift` | `Core.ets: parseCourseTableText` |
+| 备份格式版本 | **v2**（含 `timeProfiles` 与 `campusId`，兼容 v1 读取） | v2 | v2 |
+| 桌面/锁屏组件 | 4 个 AppWidgetProvider（含 keyguard） | WidgetKit 四件套 + 锁屏 accessory + 灵动岛实时活动（`ios/WIDGET_SETUP.md`） | 4 张 FormKit 服务卡片 + 实况窗 |
 
 三端的备份文件格式（version 1 JSON）与 meta.json + courses_*.json 存储布局完全一致，可以互相恢复对方导出的备份。
 

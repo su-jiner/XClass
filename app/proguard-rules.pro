@@ -14,3 +14,10 @@
 -keepclasseswithmembers class cn.xiao.xyaax.** {
     kotlinx.serialization.KSerializer serializer(...);
 }
+
+# PdfBox-Android：可选的 JPEG2000（JPX）解码器未打包，仅在遇到 JPX 图像时才会用到
+-dontwarn com.gemalto.jp2.**
+
+# ML Kit / PdfBox 的可选参考
+-dontwarn org.bouncycastle.**
+-dontwarn org.apache.pdfbox.**
