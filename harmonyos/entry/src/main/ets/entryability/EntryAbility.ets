@@ -4,6 +4,7 @@ import { ConfigurationConstant } from '@kit.AbilityKit';
 import { ProfileStore } from '../core/ProfileStore.ets';
 import { Prefs } from '../model/Prefs.ets';
 import { ReminderService } from '../model/ReminderService.ets';
+import { LiveViewService } from '../model/LiveViewService.ets';
 
 export default class EntryAbility extends UIAbility {
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
@@ -29,6 +30,7 @@ export default class EntryAbility extends UIAbility {
 
   onForeground(): void {
     ReminderService.refreshIfEnabled();
+    LiveViewService.refreshIfEnabled();
   }
 
   onBackground(): void {}

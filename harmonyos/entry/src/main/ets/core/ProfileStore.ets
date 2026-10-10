@@ -62,6 +62,14 @@ export class ProfileStore {
     ProfileStore.instance = new ProfileStore(context.filesDir);
   }
 
+  /** 服务卡片（FormExtensionAbility）等非 UIAbility 场景：用扩展上下文初始化 */
+  static initWithFilesDir(filesDir: string): ProfileStore {
+    if (ProfileStore.instance === null) {
+      ProfileStore.instance = new ProfileStore(filesDir);
+    }
+    return ProfileStore.instance;
+  }
+
   constructor(filesDir: string) {
     this.dir = filesDir + '/timetables';
     if (!fs.accessSync(this.dir)) {
