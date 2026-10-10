@@ -9,6 +9,13 @@ App({
     // 首次启动初始化默认课表，并把偏好读入全局
     store.listProfiles();
     this.refreshTheme();
+    const prefs = store.loadPrefs();
+    if (prefs.defaultPage === 'today') {
+      // 默认页面偏好：tabBar 首项是课表，需要时切到日程
+      setTimeout(() => {
+        wx.switchTab({ url: '/pages/today/today' });
+      }, 120);
+    }
   },
   onShow() {
     this.refreshTheme();

@@ -39,8 +39,8 @@ Component({
     const dark = prefs.darkMode === 'dark' || (prefs.darkMode === 'system' && systemDark());
     const palette = theme.palette(prefs.theme, dark);
     const defs = [
-      { pagePath: '/pages/today/today', text: '日程', icon: 'today' },
       { pagePath: '/pages/timetable/timetable', text: '课表', icon: 'timetable' },
+      { pagePath: '/pages/today/today', text: '日程', icon: 'today' },
       { pagePath: '/pages/tools/tools', text: '工具', icon: 'tools' },
       { pagePath: '/pages/settings/settings', text: '设置', icon: 'settings' },
     ];

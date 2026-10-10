@@ -32,9 +32,10 @@ Page({
     rows: [],
     touchStartX: 0,
     rowHeight: 96,
+    scale: 1,
   },
   onShow() {
-    if (this.getTabBar && this.getTabBar()) this.getTabBar().setData({ selected: 1 });
+    if (this.getTabBar && this.getTabBar()) this.getTabBar().setData({ selected: 0 });
     if (this.data.statusBarHeight === 24) {
       const info = wx.getSystemInfoSync ? wx.getSystemInfoSync() : {};
       this.setData({ statusBarHeight: info.statusBarHeight || 24 });
@@ -61,6 +62,8 @@ Page({
       profileName: store.activeProfile().name,
     });
     this.computeRowHeight();
+    const scaleMap = { small: 0.9, normal: 1, large: 1.15 };
+    this.setData({ scale: scaleMap[prefs.fontScale] || 1 });
     this.renderWeek(keepWeek);
   },
   /**

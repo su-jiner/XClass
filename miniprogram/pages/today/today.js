@@ -11,7 +11,7 @@ Page({
     reminderEnabled: true,
   },
   onShow() {
-    if (this.getTabBar && this.getTabBar()) this.getTabBar().setData({ selected: 0 });
+    if (this.getTabBar && this.getTabBar()) this.getTabBar().setData({ selected: 1 });
     if (this.data.statusBarHeight === 24) {
       const info = wx.getSystemInfoSync ? wx.getSystemInfoSync() : {};
       this.setData({ statusBarHeight: info.statusBarHeight || 24 });

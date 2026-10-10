@@ -31,9 +31,9 @@
         style="height:{{rowHeight}}rpx"
       >
         <view class="cell cell-time" style="background:{{palette.gridLeft}}">
-          <view class="section-no" style="color:{{palette.textPrimary}}">{{row.section}}</view>
-          <view class="section-time" style="color:{{palette.textSecondary}}">{{row.startTime}}</view>
-          <view class="section-time" style="color:{{palette.textSecondary}}">{{row.endTime}}</view>
+          <view class="section-no" style="color:{{palette.textPrimary}};font-size:{{24 * scale}}rpx">{{row.section}}</view>
+          <view class="section-time" style="color:{{palette.textSecondary}};font-size:{{18 * scale}}rpx">{{row.startTime}}</view>
+          <view class="section-time" style="color:{{palette.textSecondary}};font-size:{{18 * scale}}rpx">{{row.endTime}}</view>
         </view>
         <view
           class="cell cell-course"
@@ -47,8 +47,8 @@
           style="background:{{cell.empty ? (cell.isTodayColumn ? palette.gridDayToday : palette.gridDay) : cell.background}};color:{{cell.empty ? palette.textPrimary : cell.textColor}};border-radius:{{cell.empty ? '10rpx' : cell.radius}}"
         >
           <block wx:if="{{!cell.empty && cell.name}}">
-            <view class="course-name">{{cell.name}}</view>
-            <view class="course-detail" wx:if="{{cell.detail}}">{{cell.detail}}</view>
+            <view class="course-name" style="font-size:{{20 * scale}}rpx">{{cell.name}}</view>
+            <view class="course-detail" wx:if="{{cell.detail}}" style="font-size:{{17 * scale}}rpx">{{cell.detail}}</view>
             <view class="course-badge" wx:if="{{cell.badge}}">{{cell.badge}}</view>
           </block>
         </view>

@@ -10,6 +10,7 @@ Page({
     themes: [['warm', '暖色'], ['ocean', '海蓝'], ['mint', '薄荷']],
     darkModes: [['system', '跟随系统'], ['light', '浅色'], ['dark', '深色']],
     fontScales: [['small', '小号'], ['normal', '标准'], ['large', '大号']],
+    defaultPages: [['timetable', '课表'], ['today', '日程']],
     profiles: [],
     timeProfiles: [],
     defaultTimeProfileId: 'default',
@@ -41,6 +42,14 @@ Page({
     const patch = {};
     patch[field] = value;
     store.savePrefs(patch);
+    this.reload();
+  },
+  updateFontScale(event) {
+    store.savePrefs({ fontScale: event.currentTarget.dataset.value });
+    this.reload();
+  },
+  updateDefaultPage(event) {
+    store.savePrefs({ defaultPage: event.currentTarget.dataset.value });
     this.reload();
   },
   toggleNonCurrent(event) {
