@@ -3,7 +3,7 @@ package cn.xiao.xyaax.data
 import android.content.Context
 import cn.xiao.xyaax.domain.WeekScheduleCalculator
 import cn.xiao.xyaax.model.CourseSchedule
-import cn.xiao.xyaax.widget.TodayWidgetProvider
+import cn.xiao.xyaax.widget.WidgetSupport
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -127,7 +127,7 @@ object ScheduleRepository {
         runCatching { load(context) }
             .onSuccess { data ->
                 _timetable.value = data
-                TodayWidgetProvider.updateAll(context)
+                WidgetSupport.updateAll(context)
             }
     }
 }

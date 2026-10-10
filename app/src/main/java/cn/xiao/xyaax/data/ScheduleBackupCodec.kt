@@ -14,7 +14,7 @@ import kotlinx.serialization.json.Json
  * 独立于存储层的内部持久化模型，保证备份格式稳定、可跨版本迁移。
  */
 object ScheduleBackupCodec {
-    private const val BACKUP_VERSION = 1
+    private const val BACKUP_VERSION = 2
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -26,7 +26,33 @@ object ScheduleBackupCodec {
     data class BackupFile(
         val version: Int = BACKUP_VERSION,
         val exportedAt: String = "",
-        val profiles: List<BackupProfile> = emptyList()
+        val profiles: List<BackupProfile> = emptyList(),
+        /** version 2 起：节次时间表（含校区映射），旧版备份缺省为空 */
+        val timeProfiles: List<BackupTimeProfile> = emptyList(),
+        val campusMap: Map<String, String> = emptyMap(),
+        val defaultProfileId: String? = null
+    )
+
+    @Serializable
+    data class BackupTimeProfile(
+        val id: String,
+        val name: String,
+        val blocks: List<BackupBlock> = emptyList()
+    )
+
+    @Serializable
+    data class BackupBlock(
+        val startSection: Int,
+        val endSection: Int,
+        val startTime: String,
+        val endTime: String
+    )
+
+    data class BackupEnvelope(
+        val profiles: List<BackupProfile>,
+        val timeProfiles: List<BackupTimeProfile>,
+        val campusMap: Map<String, String>,
+        val defaultProfileId: String?
     )
 
     @Serializable
@@ -63,18 +89,36 @@ object ScheduleBackupCodec {
         val parity: String = "ALL"
     )
 
-    fun encode(exportedAt: String, profiles: List<BackupProfile>): String {
-        return json.encodeToString(BackupFile(version = BACKUP_VERSION, exportedAt = exportedAt, profiles = profiles))
+    fun encode(
+        exportedAt: String,
+        profiles: List<BackupProfile>,
+        timeProfiles: List<BackupTimeProfile> = emptyList(),
+        campusMap: Map<String, String> = emptyMap(),
+        defaultProfileId: String? = null
+    ): String {
+        return json.encodeToString(
+            BackupFile(
+                version = BACKUP_VERSION,
+                exportedAt = exportedAt,
+                profiles = profiles,
+                timeProfiles = timeProfiles,
+                campusMap = campusMap,
+                defaultProfileId = defaultProfileId
+            )
+        )
     }
 
     /** 解码备份文件内容，格式不合法时返回 null */
     fun decode(content: String): List<BackupProfile>? {
-        return runCatching {
-            val file = json.decodeFromString<BackupFile>(content)
-            if (file.version !in 1..BACKUP_VERSION) return null
-            file.profiles
-        }.getOrNull()
+        return decodeEnvelope(content)?.profiles
     }
+
+    /** 解码完整信封（含 v2 的时间表与校区映射）。 */
+    fun decodeEnvelope(content: String): BackupEnvelope? = runCatching {
+        val file = json.decodeFromString<BackupFile>(content)
+        if (file.version !in 1..BACKUP_VERSION) return null
+        BackupEnvelope(file.profiles, file.timeProfiles, file.campusMap, file.defaultProfileId)
+    }.getOrNull()
 
     fun BackupCourse.toCourseSchedule(): CourseSchedule {
         return CourseSchedule(

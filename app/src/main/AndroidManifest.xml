@@ -78,6 +78,43 @@
         </receiver>
 
         <receiver
+            android:name=".widget.NextCourseWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_next_course_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.TodayTimelineWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_timeline_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.WeekGridWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_week_grid_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.WidgetRefreshReceiver"
+            android:exported="false" />
+
+        <receiver
             android:name=".reminder.DailyReminderReceiver"
             android:exported="false">
             <intent-filter>

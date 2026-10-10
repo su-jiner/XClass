@@ -6,6 +6,8 @@ import cn.xiao.xyaax.model.MeetingTime
 import cn.xiao.xyaax.model.WeekParity
 import cn.xiao.xyaax.model.WeekRule
 import cn.xiao.xyaax.model.Weekday
+import cn.xiao.xyaax.model.SectionBlock
+import cn.xiao.xyaax.model.SectionTimeProfile
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -259,15 +261,47 @@ object ImportedScheduleStorage {
         }
         ScheduleBackupCodec.encode(
             exportedAt = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
-            profiles = profiles
+            profiles = profiles,
+            timeProfiles = TimeProfileStore.load(filesDir)
+                .filter { it.id != TimeProfileStore.DEFAULT_PROFILE_ID }
+                .map { profile ->
+                    ScheduleBackupCodec.BackupTimeProfile(
+                        id = profile.id,
+                        name = profile.name,
+                        blocks = profile.blocks.map { block ->
+                            ScheduleBackupCodec.BackupBlock(
+                                block.startSection, block.endSection, block.startTime, block.endTime
+                            )
+                        }
+                    )
+                },
+            campusMap = TimeProfileStore.loadCampusMap(filesDir),
+            defaultProfileId = TimeProfileStore.loadDefaultProfileId(filesDir)
         )
     }
 
     /** 用备份内容替换全部课表，返回恢复的课表数量；格式不合法时抛 IllegalArgumentException */
     fun importBackup(filesDir: File, content: String): Int = synchronized(lock) {
-        val backupProfiles = ScheduleBackupCodec.decode(content)
+        val envelope = ScheduleBackupCodec.decodeEnvelope(content)
             ?: throw IllegalArgumentException("备份文件格式不正确")
+        val backupProfiles = envelope.profiles
         require(backupProfiles.isNotEmpty()) { "备份文件不包含课表" }
+        if (envelope.timeProfiles.isNotEmpty()) {
+            TimeProfileStore.save(
+                filesDir = filesDir,
+                profiles = envelope.timeProfiles.map { profile ->
+                    SectionTimeProfile(
+                        id = profile.id,
+                        name = profile.name,
+                        blocks = profile.blocks.map {
+                            SectionBlock(it.startSection, it.endSection, it.startTime, it.endTime)
+                        }
+                    )
+                },
+                campusMap = envelope.campusMap,
+                defaultProfileId = envelope.defaultProfileId
+            )
+        }
         val storageDir = storageDir(filesDir)
         if (!storageDir.exists() && !storageDir.mkdirs()) {
             throw IOException("无法创建课表目录")

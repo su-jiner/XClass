@@ -52,7 +52,6 @@ class TimetableFragment : Fragment() {
     private lateinit var dateText: TextView
     private lateinit var weekPager: ViewPager2
     private lateinit var addCourseButton: ImageButton
-    private lateinit var importScheduleButton: ImageButton
     private var currentWeekIndex: Int = 1
     private var pageChangeCallback: ViewPager2.OnPageChangeCallback? = null
     private var pageChangeRegistered: Boolean = false
@@ -78,22 +77,14 @@ class TimetableFragment : Fragment() {
         dateText = view.findViewById(R.id.currentDateText)
         weekPager = view.findViewById(R.id.weekPager)
         addCourseButton = view.findViewById(R.id.addCourseButton)
-        importScheduleButton = view.findViewById(R.id.importScheduleButton)
 
         val palette = ThemePaletteProvider.fromContext(requireContext())
         addCourseButton.imageTintList = ColorStateList.valueOf(palette.iconTint)
-        importScheduleButton.imageTintList = ColorStateList.valueOf(palette.iconTint)
 
         observeTimetable()
 
         addCourseButton.setOnClickListener {
-            showManualAddDialog()
-        }
-
-        importScheduleButton.setOnClickListener {
-            importLauncher.launch(
-                android.content.Intent(requireContext(), cn.xiao.xyaax.ui.importing.ImportWizardActivity::class.java)
-            )
+            showAddChooser()
         }
     }
 
@@ -221,6 +212,83 @@ class TimetableFragment : Fragment() {
             "第${week}周（非本周）"
         }
         dateText.text = today.format(DateTimeFormatter.ofPattern("yyyy/M/d"))
+    }
+
+    /** 「+」按钮：选择手动添加 / 导入文件 / 粘贴文本。 */
+    private fun showAddChooser() {
+        val ctx = requireContext()
+        val palette = ThemePaletteProvider.fromContext(ctx)
+        val panel = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(34, 30, 34, 20)
+        }
+        val manual = android.widget.Button(ctx).apply { text = getString(R.string.add_chooser_manual) }
+        val file = android.widget.Button(ctx).apply { text = getString(R.string.add_chooser_file) }
+        val paste = android.widget.Button(ctx).apply { text = getString(R.string.add_chooser_paste) }
+        val cancel = android.widget.Button(ctx).apply { text = getString(R.string.action_cancel) }
+        UiFeedback.stylePrimaryButton(manual, palette)
+        UiFeedback.styleSecondaryButton(file, palette)
+        UiFeedback.styleSecondaryButton(paste, palette)
+        UiFeedback.styleSecondaryButton(cancel, palette)
+        listOf(file, paste, cancel).forEach { button ->
+            panel.addView(button, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = 10 })
+        }
+        panel.addView(manual, 0, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        ))
+
+        val dialog = AlertDialog.Builder(ctx)
+            .setTitle(R.string.add_chooser_title)
+            .setView(panel)
+            .create()
+        dialog.show()
+        UiFeedback.styleDialogSurface(dialog, palette)
+        manual.setOnClickListener {
+            dialog.dismiss()
+            showManualAddDialog()
+        }
+        file.setOnClickListener {
+            dialog.dismiss()
+            importLauncher.launch(
+                android.content.Intent(requireContext(), cn.xiao.xyaax.ui.importing.ImportWizardActivity::class.java)
+            )
+        }
+        paste.setOnClickListener {
+            dialog.dismiss()
+            showPasteDialog()
+        }
+        cancel.setOnClickListener { dialog.dismiss() }
+    }
+
+    /** 粘贴文本导入：直接复用导入向导的解析与校对流程。 */
+    private fun showPasteDialog() {
+        val ctx = requireContext()
+        val input = EditText(ctx).apply {
+            gravity = android.view.Gravity.TOP
+            minLines = 6
+            hint = getString(R.string.add_chooser_paste_hint)
+            setPadding(24, 20, 24, 20)
+        }
+        val dialog = AlertDialog.Builder(ctx)
+            .setTitle(R.string.add_chooser_paste)
+            .setView(input)
+            .setPositiveButton(R.string.import_wizard_title) { _, _ ->
+                val text = input.text?.toString().orEmpty()
+                if (text.isNotBlank()) {
+                    importLauncher.launch(
+                        android.content.Intent(requireContext(), cn.xiao.xyaax.ui.importing.ImportWizardActivity::class.java)
+                            .putExtra(cn.xiao.xyaax.ui.importing.ImportWizardActivity.EXTRA_PASTE_TEXT, text)
+                    )
+                }
+            }
+            .setNegativeButton(R.string.action_cancel, null)
+            .create()
+        dialog.show()
+        UiFeedback.styleDialogSurface(dialog, ThemePaletteProvider.fromContext(ctx))
     }
 
     private fun showManualAddDialog() {

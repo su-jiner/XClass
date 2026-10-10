@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/gridCellText"
+    android:layout_width="0dp"
+    android:layout_height="wrap_content"
+    android:layout_margin="1dp"
+    android:layout_weight="1"
+    android:ellipsize="end"
+    android:gravity="center"
+    android:maxLines="1"
+    android:minHeight="18dp"
+    android:textColor="#1B2430"
+    android:textSize="10sp" />

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/timelineRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_background"
+    android:orientation="vertical"
+    android:padding="12dp">
+
+    <TextView
+        android:id="@+id/timelineSubtitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textColor="#4A5568"
+        android:textSize="11sp" />
+
+    <LinearLayout
+        android:id="@+id/timelineList"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:orientation="vertical" />
+
+    <TextView
+        android:id="@+id/timelineEmpty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/widget_no_courses"
+        android:textColor="#4A5568"
+        android:textSize="12sp"
+        android:visibility="gone" />
+</LinearLayout>

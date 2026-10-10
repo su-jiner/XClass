@@ -75,7 +75,40 @@ class ImportWizardActivity : AppCompatActivity() {
         saveButton.isEnabled = false
 
         val shared = intent?.let { resolveSharedUri(it) }
-        if (shared != null) parseFile(shared) else openPicker()
+        val pastedText = intent?.getStringExtra(EXTRA_PASTE_TEXT)
+        when {
+            !pastedText.isNullOrBlank() -> parsePastedText(pastedText)
+            shared != null -> parseFile(shared)
+            else -> openPicker()
+        }
+    }
+
+    /** 粘贴文本导入：与文件导入共用解析管线，只跳过提取步骤。 */
+    private fun parsePastedText(text: String) {
+        summary.text = getString(R.string.import_parsing)
+        listContainer.removeAllViews()
+        saveButton.isEnabled = false
+        lifecycleScope.launch {
+            val parsed = withContext(Dispatchers.IO) {
+                CourseTableImporter.parse(cn.xiao.xyaax.importing.PlainTextLayout.toBlocks(text), text)
+            }
+            applyParseResult("粘贴文本", parsed)
+        }
+    }
+
+    private fun applyParseResult(sourceNote: String, parsed: CourseTableParseResult) {
+        result = parsed
+        courses.clear()
+        courses.addAll(parsed.courses)
+        summary.text = buildString {
+            append(sourceNote)
+            parsed.semester?.let { append(" · ").append(it) }
+            parsed.totalWeeks?.let { append(" · 共").append(it).append("周") }
+            append(" · 识别 ").append(parsed.courses.size).append(" 门课")
+            if (parsed.warnings.isNotEmpty()) append("\n").append(parsed.warnings.take(3).joinToString("；"))
+        }
+        renderCourses()
+        saveButton.isEnabled = courses.isNotEmpty()
     }
 
     override fun finish() {
@@ -118,23 +151,13 @@ class ImportWizardActivity : AppCompatActivity() {
             }
 
             outcome.onSuccess { (document, parsed) ->
-                result = parsed
-                courses.clear()
-                courses.addAll(parsed.courses)
-                summary.text = buildString {
+                val note = buildString {
                     append(document.note)
-                    parsed.semester?.let { append(" · ").append(it) }
-                    parsed.totalWeeks?.let { append(" · 共").append(it).append("周") }
-                    append(" · 识别 ").append(parsed.courses.size).append(" 门课")
                     if (parsed.timeTables.isNotEmpty()) {
                         append(" · 节次时间表 ").append(parsed.timeTables.size).append(" 套")
                     }
-                    if (parsed.warnings.isNotEmpty()) {
-                        append("\n").append(parsed.warnings.take(3).joinToString("；"))
-                    }
                 }
-                renderCourses()
-                saveButton.isEnabled = courses.isNotEmpty()
+                applyParseResult(note, parsed)
             }.onFailure { error ->
                 summary.text = getString(R.string.import_failed, error.message ?: "未知错误")
                 UiFeedback.showMessage(listContainer, getString(R.string.import_failed, error.message ?: ""), palette)
@@ -343,5 +366,6 @@ class ImportWizardActivity : AppCompatActivity() {
 
     companion object {
         const val EXTRA_IMPORTED = "extra_imported_count"
+        const val EXTRA_PASTE_TEXT = "extra_paste_text"
     }
 }

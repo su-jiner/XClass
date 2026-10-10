@@ -41,6 +41,11 @@
     <string name="import_mode_new">新建课表导入</string>
     <string name="import_saved">已导入 %2$d 门课程到「%1$s」</string>
     <string name="timetable_import">导入课表</string>
+    <string name="add_chooser_title">添加课程</string>
+    <string name="add_chooser_manual">手动添加课程</string>
+    <string name="add_chooser_file">导入课表文件（PDF / 图片 / 文本 / Word / Excel）</string>
+    <string name="add_chooser_paste">粘贴文本导入</string>
+    <string name="add_chooser_paste_hint">把课表文字粘贴到这里，例如：\n信息技术/(1-2节)12-14周(双),15-19周/（乌）E406/刘文杰</string>
     <string name="settings_timetable_manage">课表管理</string>
     <string name="settings_open_timetable_manage">打开课表管理页</string>
     <string name="settings_default_page">启动默认页面</string>
@@ -115,6 +120,10 @@
     <string name="widget_today_title">今日课程</string>
     <string name="widget_no_courses">今天没有课程安排</string>
     <string name="widget_open_app">打开课表</string>
+    <string name="widget_today_description">今日课程列表：课程名、节次时间与地点，可在桌面与锁屏使用</string>
+    <string name="widget_next_course_description">下一节课：课程名、时间与倒计时</string>
+    <string name="widget_timeline_description">今日时间轴：按节次纵向排列，进行中高亮</string>
+    <string name="widget_week_grid_description">本周课表微缩：7 天 × 6 节网格预览</string>
     <string name="notification_channel_reminder">今日课程提醒</string>
     <string name="course_detail_teacher">教师</string>
     <string name="course_detail_location">地点</string>
