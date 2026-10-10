@@ -87,6 +87,18 @@ Page({
       },
     });
   },
+  /** 查看指定课表的完整课表（所有周的课程，与课表页样式一致，可编辑，修改同步所有周） */
+  viewFullSchedule(event) {
+    const id = event.currentTarget.dataset.id;
+    const name = event.currentTarget.dataset.name || '';
+    wx.navigateTo({
+      url: '/pages/full-schedule/full-schedule?profile=' + encodeURIComponent(id) + '&name=' + encodeURIComponent(name),
+    });
+  },
+  /** 打开当前课表管理页（查看/修改/编辑课程入口） */
+  viewFullScheduleCurrent() {
+    wx.navigateTo({ url: '/pages/full-schedule/full-schedule' });
+  },
   createProfile() {
     wx.showModal({
       title: '新建课表',

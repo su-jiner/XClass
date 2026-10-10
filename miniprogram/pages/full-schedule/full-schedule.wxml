@@ -1,0 +1,121 @@
+<view class="page" style="background:{{palette.page}};color:{{palette.textPrimary}}">
+  <view class="header" style="padding-top:{{statusBarHeight}}px">
+    <view class="header-left">
+      <view class="back-button" bindtap="goBack" style="color:{{palette.textPrimary}}">‹ 返回</view>
+      <view class="full-title" style="color:{{palette.textPrimary}}">{{titleText}}</view>
+    </view>
+  </view>
+  <view class="full-subtitle" style="color:{{palette.textSecondary}}">全部周的课程都在这一页，点击课程可编辑，修改同步所有周</view>
+
+  <view class="grid">
+    <view class="grid-head">
+      <view class="head-time" style="background:{{palette.gridHeader}};color:{{palette.textPrimary}}">周</view>
+      <view
+        class="head-day"
+        wx:for="{{dayHeaders}}"
+        wx:key="label"
+        style="background:{{palette.gridHeader}};color:{{palette.textPrimary}}"
+      >
+        <view class="day-label">{{item.label}}</view>
+      </view>
+    </view>
+
+    <scroll-view class="grid-body" scroll-y enable-flex>
+      <view class="grid-main">
+        <view class="time-column">
+          <view
+            class="time-cell"
+            wx:for="{{sections}}"
+            wx:key="section"
+            style="height:{{rowHeight}}rpx;background:{{palette.gridLeft}}"
+          >
+            <view class="section-no" style="color:{{palette.textPrimary}};font-size:{{24 * scale}}rpx">{{item.section}}</view>
+            <view class="section-time" style="color:{{palette.textSecondary}};font-size:{{18 * scale}}rpx">{{item.startTime}}</view>
+            <view class="section-time" style="color:{{palette.textSecondary}};font-size:{{18 * scale}}rpx">{{item.endTime}}</view>
+          </view>
+        </view>
+        <view
+          class="day-panel"
+          wx:for="{{columns}}"
+          wx:for-item="column"
+          wx:for-index="dayIndex"
+          wx:key="dayIndex"
+          style="background:{{column.panelBg}};height:{{column.panelHeight}}rpx"
+        >
+          <view
+            class="course-card"
+            wx:for="{{column.courses}}"
+            wx:for-item="course"
+            wx:for-index="courseIndex"
+            wx:key="courseIndex"
+            data-day="{{dayIndex}}"
+            data-course-index="{{courseIndex}}"
+            bindtap="onCardTap"
+            style="top:{{course.top}}rpx;height:{{course.height}}rpx;background:{{course.color}};color:{{course.textColor}}"
+          >
+            <view class="course-name" style="font-size:{{20 * scale}}rpx">{{course.name}}</view>
+            <view class="course-detail" wx:if="{{course.location}}" style="font-size:{{17 * scale}}rpx">{{course.location}}</view>
+          </view>
+        </view>
+      </view>
+    </scroll-view>
+  </view>
+
+  <view class="empty-tip" wx:if="{{empty}}" style="color:{{palette.textSecondary}}">这个课表还没有课程</view>
+
+  <view class="manual-mask" wx:if="{{showManual}}" bindtap="closeManual">
+    <view class="manual-panel" catchtap="noop" style="background:{{palette.panel}}">
+      <view class="manual-title" style="color:{{palette.textPrimary}}">编辑课程</view>
+
+      <view class="manual-field">
+        <view class="manual-label" style="color:{{palette.textSecondary}}">课程名称</view>
+        <input class="manual-input" style="background:{{palette.panelAlt}};color:{{palette.textPrimary}}"
+          value="{{manualForm.name}}" data-field="name" bindinput="onManualField" placeholder="课程名称" placeholder-class="manual-ph" />
+      </view>
+
+      <view class="manual-row">
+        <view class="manual-half">
+          <view class="manual-label" style="color:{{palette.textSecondary}}">星期</view>
+          <picker mode="selector" range="{{weekdayNames}}" value="{{manualForm.weekdayIndex}}" bindchange="onManualWeekday">
+            <view class="manual-input manual-picker" style="background:{{palette.panelAlt}};color:{{palette.textPrimary}}">{{weekdayNames[manualForm.weekdayIndex]}} ▾</view>
+          </picker>
+        </view>
+        <view class="manual-half">
+          <view class="manual-label" style="color:{{palette.textSecondary}}">周次</view>
+          <input class="manual-input" style="background:{{palette.panelAlt}};color:{{palette.textPrimary}}"
+            value="{{manualForm.weekText}}" data-field="weekText" bindinput="onManualField" placeholder="如 1-16周 / 3-9周(单)" placeholder-class="manual-ph" />
+        </view>
+      </view>
+
+      <view class="manual-row">
+        <view class="manual-half">
+          <view class="manual-label" style="color:{{palette.textSecondary}}">开始节</view>
+          <input class="manual-input" type="number" style="background:{{palette.panelAlt}};color:{{palette.textPrimary}}"
+            value="{{manualForm.startSection}}" data-field="startSection" bindinput="onManualField" />
+        </view>
+        <view class="manual-half">
+          <view class="manual-label" style="color:{{palette.textSecondary}}">结束节</view>
+          <input class="manual-input" type="number" style="background:{{palette.panelAlt}};color:{{palette.textPrimary}}"
+            value="{{manualForm.endSection}}" data-field="endSection" bindinput="onManualField" />
+        </view>
+      </view>
+
+      <view class="manual-field">
+        <view class="manual-label" style="color:{{palette.textSecondary}}">上课地点（可留空）</view>
+        <input class="manual-input" style="background:{{palette.panelAlt}};color:{{palette.textPrimary}}"
+          value="{{manualForm.location}}" data-field="location" bindinput="onManualField" placeholder="如 教三302" placeholder-class="manual-ph" />
+      </view>
+
+      <view class="manual-field">
+        <view class="manual-label" style="color:{{palette.textSecondary}}">授课教师（可留空）</view>
+        <input class="manual-input" style="background:{{palette.panelAlt}};color:{{palette.textPrimary}}"
+          value="{{manualForm.teacher}}" data-field="teacher" bindinput="onManualField" placeholder="如 张三" placeholder-class="manual-ph" />
+      </view>
+
+      <view class="manual-actions">
+        <view class="manual-btn" style="background:{{palette.panelAlt}};color:{{palette.textPrimary}}" bindtap="closeManual">取消</view>
+        <view class="manual-btn manual-btn-primary" style="background:{{palette.buttonBackground}};color:{{palette.buttonText}}" bindtap="saveManual">保存（同步所有周）</view>
+      </view>
+    </view>
+  </view>
+</view>

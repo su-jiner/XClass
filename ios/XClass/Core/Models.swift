@@ -188,6 +188,24 @@ enum WeekScheduleCalculator {
         return result
     }
 
+    /// 全周视图：返回课表内全部排课（所有周），用于课表管理「查看完整课表」。
+    static func allMeetings(
+        of courses: [CourseSchedule]
+    ) -> [(courseIndex: Int, course: CourseSchedule, meeting: MeetingTime, isCurrentWeek: Bool, nextActiveWeek: Int)] {
+        var result: [(Int, CourseSchedule, MeetingTime, Bool, Int)] = []
+        for (index, course) in courses.enumerated() {
+            for meeting in course.meetings {
+                result.append((index, course, meeting, true, firstActiveWeek(of: meeting)))
+            }
+        }
+        return result
+    }
+
+    static func firstActiveWeek(of meeting: MeetingTime) -> Int {
+        if meeting.weekRules.isEmpty { return 1 }
+        return nextActiveWeek(of: meeting, from: 1) ?? 1
+    }
+
     static func nextActiveWeek(of meeting: MeetingTime, from week: Int) -> Int? {
         if meeting.weekRules.isEmpty { return week }
         guard let maxEnd = meeting.weekRules.map({ $0.endWeek }).max() else { return nil }

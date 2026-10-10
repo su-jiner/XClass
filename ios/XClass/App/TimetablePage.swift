@@ -10,10 +10,12 @@ struct TimetablePage: View {
     @State private var currentWeek = 1
     @State private var totalWeeks = WeekScheduleCalculator.defaultTotalWeeks
     @State private var selectedWeek = 1
-    @State private var detailItem: (course: CourseSchedule, meeting: MeetingTime)?
+    @State private var detailItem: CourseDetailItem?
     @State private var showAddSheet = false
     @State private var showImportSheet = false
     @State private var showAddChooser = false
+    @State private var showEditSheet = false
+    @State private var editingItem: (index: Int, course: CourseSchedule, meeting: MeetingTime)?
 
     var body: some View {
         NavigationStack {
@@ -45,8 +47,19 @@ struct TimetablePage: View {
                 Button("取消", role: .cancel) {}
             }
             .sheet(item: $detailItem) { item in
-                CourseDetailSheet(palette: palette, course: item.course, meeting: item.meeting)
+                CourseDetailSheet(palette: palette, course: item.course, meeting: item.meeting,
+                                  onEdit: {
+                                      editingItem = (item.courseIndex, item.course, item.meeting)
+                                      detailItem = nil
+                                      showEditSheet = true
+                                  })
                     .presentationDetents([.medium, .large])
+            }
+            .sheet(isPresented: $showEditSheet, onDismiss: { reload() }) {
+                if let editing = editingItem {
+                    AddCourseSheet(palette: palette, guessWeek: currentWeek,
+                                   editing: editing, editingProfileId: nil)
+                }
             }
             .onAppear { reload() }
             .onChange(of: notifier.version) { _ in reload() }
@@ -102,7 +115,10 @@ struct TimetablePage: View {
                                                                   showNonCurrent: false),
                     fontScale: AppPreferences.fontScale,
                     currentSection: currentSection,
-                    onTap: { course, meeting in detailItem = (course, meeting) }
+                    showDates: true,
+                    onTap: { courseIndex, course, meeting in
+                        detailItem = CourseDetailItem(courseIndex: courseIndex, course: course, meeting: meeting)
+                    }
                 )
                 .tag(week)
             }
@@ -144,7 +160,8 @@ struct WeekGridView: View {
     let items: [(courseIndex: Int, course: CourseSchedule, meeting: MeetingTime, isCurrentWeek: Bool, nextActiveWeek: Int)]
     let fontScale: Double
     let currentSection: Int?
-    let onTap: (CourseSchedule, MeetingTime) -> Void
+    var showDates: Bool = true
+    let onTap: (Int, CourseSchedule, MeetingTime) -> Void
 
     private let leftColumnWidth: CGFloat = 44
     private let rowHeight: CGFloat = 46
@@ -183,7 +200,7 @@ struct WeekGridView: View {
 
     private func dayColumn(dayIndex: Int, width: CGFloat) -> some View {
         let date = weekStart.adding(days: dayIndex)
-        let isToday = date == today
+        let isToday = showDates && date == today
         let dayItems = items.filter { $0.meeting.weekday.rawValue == dayIndex + 1 }
         let visible = resolveOverlaps(dayItems)
 
@@ -191,8 +208,10 @@ struct WeekGridView: View {
             VStack(spacing: 0) {
                 Text(Weekday(rawValue: dayIndex + 1)?.shortLabel ?? "")
                     .font(.system(size: 12, weight: isToday ? .bold : .regular))
-                Text("\(date.month)/\(date.day)")
-                    .font(.system(size: 9))
+                if showDates {
+                    Text("\(date.month)/\(date.day)")
+                        .font(.system(size: 9))
+                }
             }
             .foregroundColor(palette.textPrimary)
             .frame(width: width, height: 34)
@@ -225,7 +244,7 @@ struct WeekGridView: View {
         let color = cardColors[item.courseIndex % cardColors.count]
         let isCover = AppPreferences.coverImageKey == "\(item.meeting.weekday.rawValue):\(item.meeting.startSection)"
         return Button {
-            onTap(item.course, item.meeting)
+            onTap(item.courseIndex, item.course, item.meeting)
         } label: {
             VStack(alignment: .leading, spacing: 1) {
                 if isCover {
@@ -284,6 +303,7 @@ struct CourseDetailSheet: View {
     let palette: ThemePalette
     let course: CourseSchedule
     let meeting: MeetingTime
+    var onEdit: (() -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -306,6 +326,14 @@ struct CourseDetailSheet: View {
             .font(.system(size: 14, weight: .medium))
             .foregroundColor(isCover ? palette.textSecondary : palette.iconTint)
             .frame(maxWidth: .infinity)
+            if let onEdit = onEdit {
+                Button("编辑课程（修改同步所有周）") { onEdit() }
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(palette.buttonText)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(RoundedRectangle(cornerRadius: 10).fill(palette.buttonBackground))
+            }
             Spacer()
         }
         .padding(20)
@@ -346,4 +374,12 @@ struct CourseDetailSheet: View {
             .font(.system(size: 14))
             .foregroundColor(palette.textSecondary)
     }
+}
+
+/// 课程详情弹窗携带课程索引，用于「编辑课程」定位。
+struct CourseDetailItem: Identifiable {
+    let id = UUID()
+    let courseIndex: Int
+    let course: CourseSchedule
+    let meeting: MeetingTime
 }

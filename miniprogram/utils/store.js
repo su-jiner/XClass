@@ -230,6 +230,24 @@ function deleteCourse(index) {
   return true;
 }
 
+/** 编辑课程定义（含周规则），全局生效：所有周同步。profileId 为空时作用于当前课表。 */
+function updateCourse(courseIndex, newCourse, profileId) {
+  const courses = loadCourses(profileId);
+  if (courseIndex < 0 || courseIndex >= courses.length) return false;
+  courses[courseIndex] = newCourse;
+  saveCourses(courses, profileId);
+  return true;
+}
+
+/** 删除指定课表中的课程（课表管理/完整课表视图使用）。 */
+function deleteCourseInProfile(index, profileId) {
+  const courses = loadCourses(profileId);
+  if (!profileId || index < 0 || index >= courses.length) return false;
+  courses.splice(index, 1);
+  saveCourses(courses, profileId);
+  return true;
+}
+
 /** 导入入库：覆盖当前课表或新建课表 */
 function importCourses(parsedCourses, mode, newName, semesterStartDate, campusMap) {
   const resolved = (parsedCourses || []).map((course) => ({

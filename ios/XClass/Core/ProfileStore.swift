@@ -237,6 +237,66 @@ final class ProfileStore {
         return readCourses(active.coursesFile)
     }
 
+    /// 按课表 ID 加载课程（nil 或空串时加载当前课表）。
+    func loadCourses(profileId: String?) -> [CourseSchedule] {
+        lock.lock(); defer { lock.unlock() }
+        let meta = ensureInitialized()
+        let profile: ProfileMeta
+        if let profileId = profileId, !profileId.isEmpty,
+           let found = meta.profiles.first(where: { $0.id == profileId }) {
+            profile = found
+        } else {
+            profile = meta.profiles.first { $0.id == meta.activeId } ?? meta.profiles[0]
+        }
+        return readCourses(profile.coursesFile)
+    }
+
+    /// 编辑课程定义（全局生效：所有周同步），profileId 为空时作用于当前课表。
+    func updateCourse(index: Int, newCourse: CourseSchedule, profileId: String?) throws {
+        lock.lock(); defer { lock.unlock() }
+        var meta = ensureInitialized()
+        let profile: ProfileMeta
+        if let profileId = profileId, !profileId.isEmpty,
+           let found = meta.profiles.first(where: { $0.id == profileId }) {
+            profile = found
+        } else {
+            profile = meta.profiles.first { $0.id == meta.activeId } ?? meta.profiles[0]
+        }
+        var courses = readCourses(profile.coursesFile)
+        guard courses.indices.contains(index) else {
+            throw NSError(domain: "ProfileStore", code: 3,
+                          userInfo: [NSLocalizedDescriptionKey: "课程不存在，可能已被删除"])
+        }
+        courses[index] = newCourse
+        writeCourses(courses, to: profile.coursesFile)
+        if let idx = meta.profiles.firstIndex(where: { $0.id == profile.id }) {
+            meta.profiles[idx].updatedAt = Date()
+        }
+        save(meta)
+    }
+
+    /// 删除指定课表中的课程；返回是否成功。
+    func deleteCourseInProfile(index: Int, profileId: String?) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        var meta = ensureInitialized()
+        let profile: ProfileMeta
+        if let profileId = profileId, !profileId.isEmpty,
+           let found = meta.profiles.first(where: { $0.id == profileId }) {
+            profile = found
+        } else {
+            profile = meta.profiles.first { $0.id == meta.activeId } ?? meta.profiles[0]
+        }
+        var courses = readCourses(profile.coursesFile)
+        guard courses.indices.contains(index) else { return false }
+        courses.remove(at: index)
+        writeCourses(courses, to: profile.coursesFile)
+        if let idx = meta.profiles.firstIndex(where: { $0.id == profile.id }) {
+            meta.profiles[idx].updatedAt = Date()
+        }
+        save(meta)
+        return true
+    }
+
     func getActiveSemesterStartDate() -> SimpleDate {
         lock.lock(); defer { lock.unlock() }
         let meta = ensureInitialized()

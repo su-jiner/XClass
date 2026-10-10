@@ -2,8 +2,8 @@
   <view class="header" style="padding-top:{{statusBarHeight}}px">
     <view class="header-left">
       <view bindtap="goCurrentWeek">
-        <view class="header-week" style="color:{{palette.textPrimary}}">{{headerWeek}}</view>
-        <view class="header-date" style="color:{{palette.textSecondary}}">{{headerDate}} · {{profileName}}</view>
+        <view class="header-week" style="color:{{palette.textPrimary}}">{{allModeHeader || headerWeek}}</view>
+        <view class="header-date" wx:if="{{!isAllMode}}" style="color:{{palette.textSecondary}}">{{headerDate}} · {{profileName}}</view>
       </view>
       <view class="add-button" bindtap="onAddTap" style="background:{{palette.buttonBackground}};color:{{palette.iconTint}}">＋</view>
     </view>
@@ -65,7 +65,7 @@
     </scroll-view>
   </view>
 
-  <view class="week-hint" style="color:{{palette.textSecondary}}">
+  <view class="week-hint" wx:if="{{!isAllMode}}" style="color:{{palette.textSecondary}}">
     <text bindtap="goPrevWeek" class="week-arrow">‹ 上一周</text>
     <text class="week-current">第 {{week}} / {{totalWeeks}} 周（左右滑动切周）</text>
     <text bindtap="goNextWeek" class="week-arrow">下一周 ›</text>
@@ -87,7 +87,7 @@
 
   <view class="manual-mask" wx:if="{{showManual}}" bindtap="closeManual">
     <view class="manual-panel" catchtap="noop" style="background:{{palette.panel}}">
-      <view class="manual-title" style="color:{{palette.textPrimary}}">手动添加课程</view>
+      <view class="manual-title" style="color:{{palette.textPrimary}}">{{manualTitle}}</view>
 
       <view class="manual-field">
         <view class="manual-label" style="color:{{palette.textSecondary}}">课程名称</view>

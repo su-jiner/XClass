@@ -4,7 +4,8 @@
     "pages/today/today",
     "pages/tools/tools",
     "pages/settings/settings",
-    "pages/import/import"
+    "pages/import/import",
+    "pages/full-schedule/full-schedule"
   ],
   "window": {
     "navigationStyle": "custom",

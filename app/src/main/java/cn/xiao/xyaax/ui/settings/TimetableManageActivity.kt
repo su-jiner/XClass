@@ -211,6 +211,9 @@ class TimetableManageActivity : AppCompatActivity() {
             val renameButton = Button(this@TimetableManageActivity).apply {
                 text = getString(R.string.manage_rename)
             }
+            val fullScheduleButton = Button(this@TimetableManageActivity).apply {
+                text = getString(R.string.full_schedule_open)
+            }
             val deleteButton = Button(this@TimetableManageActivity).apply {
                 text = getString(R.string.manage_delete)
             }
@@ -218,11 +221,16 @@ class TimetableManageActivity : AppCompatActivity() {
                 text = getString(R.string.action_cancel)
             }
             val palette = ThemePaletteProvider.fromContext(this@TimetableManageActivity)
+            UiFeedback.stylePrimaryButton(fullScheduleButton, palette)
             UiFeedback.styleSecondaryButton(renameButton, palette)
             UiFeedback.styleSecondaryButton(deleteButton, palette)
             UiFeedback.styleSecondaryButton(cancelButton, palette)
 
-            panel.addView(renameButton)
+            panel.addView(fullScheduleButton)
+            panel.addView(renameButton, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = 10 })
             panel.addView(deleteButton, LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
@@ -239,6 +247,10 @@ class TimetableManageActivity : AppCompatActivity() {
             actionDialog.show()
             styleDialogButtons(actionDialog)
 
+            fullScheduleButton.setOnClickListener {
+                actionDialog.dismiss()
+                FullScheduleActivity.start(this@TimetableManageActivity, item.id, item.name)
+            }
             renameButton.setOnClickListener {
                 actionDialog.dismiss()
                 renameProfile(item)

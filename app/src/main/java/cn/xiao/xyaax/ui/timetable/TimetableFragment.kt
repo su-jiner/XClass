@@ -188,6 +188,11 @@ class TimetableFragment : Fragment() {
                                     }
                                     UiFeedback.showMessage(view, message, ThemePaletteProvider.fromContext(requireContext()))
                                 }
+                            },
+                            onEditCourse = { selected ->
+                                cn.xiao.xyaax.ui.settings.EditCourseActivity.start(
+                                    requireContext(), null, selected.courseIndex, selected.meetingIndex
+                                )
                             }
                         )
                     }

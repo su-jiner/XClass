@@ -32,7 +32,22 @@ object WeekScheduleCalculator {
         return courses.flatMapIndexed { index, course ->
             course.meetings
                 .filter { isMeetingActiveInWeek(it, week) }
-                .map { meeting -> CourseMeetingRef(index, course, meeting) }
+                .map { meeting -> CourseMeetingRef(index, course, meeting, course.meetings.indexOf(meeting).coerceAtLeast(0)) }
+        }
+    }
+
+    /** 全周视图：返回课表内全部排课（所有周），用于课表管理「查看完整课表」。 */
+    fun meetingsForFullView(courses: List<CourseSchedule>): List<CourseMeetingDisplayRef> {
+        return courses.flatMapIndexed { index, course ->
+            course.meetings.mapIndexed { meetingIndex, meeting ->
+                CourseMeetingDisplayRef(
+                    courseIndex = index,
+                    course = course,
+                    meeting = meeting,
+                    isCurrentWeek = true,
+                    nextActiveWeek = firstActiveWeekOr(meeting, 1)
+                )
+            }
         }
     }
 
@@ -86,6 +101,10 @@ object WeekScheduleCalculator {
         return null
     }
 
+    /** 首次激活周（weekRules 为空视为每周都有课，返回 1）。 */
+    fun firstActiveWeekOr(meeting: MeetingTime, fallback: Int): Int =
+        nextActiveWeekFrom(meeting, 1) ?: fallback
+
     private fun isMeetingActiveInWeek(meeting: MeetingTime, week: Int): Boolean {
         if (meeting.weekRules.isEmpty()) {
             return true
@@ -103,7 +122,8 @@ object WeekScheduleCalculator {
 data class CourseMeetingRef(
     val courseIndex: Int,
     val course: CourseSchedule,
-    val meeting: MeetingTime
+    val meeting: MeetingTime,
+    val meetingIndex: Int
 )
 
 data class CourseMeetingDisplayRef(
@@ -114,6 +134,11 @@ data class CourseMeetingDisplayRef(
     val nextActiveWeek: Int
 ) {
     fun toCourseMeetingRef(): CourseMeetingRef {
-        return CourseMeetingRef(courseIndex, course, meeting)
+        return CourseMeetingRef(
+            courseIndex,
+            course,
+            meeting,
+            course.meetings.indexOf(meeting).coerceAtLeast(0)
+        )
     }
 }

@@ -248,6 +248,37 @@ object ImportedScheduleStorage {
         readCoursesFile(filesDir, active.coursesFile)
     }
 
+    /** 按课表 ID 加载课程（课表管理-查看完整课表）。 */
+    fun loadCoursesForProfile(filesDir: File, profileId: String): List<CourseSchedule>? = synchronized(lock) {
+        val meta = ensureInitialized(filesDir)
+        val profile = meta.profiles.firstOrNull { it.id == profileId } ?: return null
+        readCoursesFile(filesDir, profile.coursesFile)
+    }
+
+    /** 编辑课程：整体替换指定课表中的课程定义（含周规则），全局生效（所有周同步）。 */
+    fun updateCourseInProfile(
+        filesDir: File,
+        profileId: String,
+        courseIndex: Int,
+        expected: CourseSchedule,
+        newCourse: CourseSchedule
+    ): Boolean = synchronized(lock) {
+        val meta = ensureInitialized(filesDir)
+        val profile = meta.profiles.firstOrNull { it.id == profileId } ?: return false
+        val courses = readCoursesFile(filesDir, profile.coursesFile)
+        if (courses.getOrNull(courseIndex) != expected) return false
+
+        val updated = courses.toMutableList()
+        updated[courseIndex] = newCourse
+        writeCoursesFile(filesDir, profile.coursesFile, updated)
+        val now = System.currentTimeMillis()
+        saveMeta(filesDir, meta.copy(
+            activeId = meta.activeId,
+            profiles = meta.profiles.map { if (it.id == profile.id) it.copy(updatedAt = now) else it }
+        ))
+        true
+    }
+
     fun exportBackup(filesDir: File): String = synchronized(lock) {
         val meta = ensureInitialized(filesDir)
         val profiles = meta.profiles.map { profile ->

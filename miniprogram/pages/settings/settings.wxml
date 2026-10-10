@@ -15,9 +15,11 @@
       <view>
         <text class="muted" bindtap="renameProfile" data-id="{{item.id}}">重命名</text>
         <text class="muted" style="margin-left:24rpx" bindtap="deleteProfile" data-id="{{item.id}}">删除</text>
+        <text class="muted" style="margin-left:24rpx" bindtap="viewFullSchedule" data-id="{{item.id}}" data-name="{{item.name}}">查看完整课表</text>
       </view>
     </view>
     <view class="button secondary" bindtap="createProfile" style="background:{{palette.panelAlt}};color:{{palette.text}}">新建空课表</view>
+    <view class="button secondary" bindtap="viewFullScheduleCurrent" style="margin-top:16rpx;background:{{palette.panelAlt}};color:{{palette.text}}">打开课表管理页（查看/修改/编辑课程）</view>
   </view>
 
   <view class="card" style="background:{{palette.panel}}">

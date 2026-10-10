@@ -179,6 +179,15 @@ export struct SettingsPage {
                 .padding(6)
                 .bindMenu([
                   {
+                    value: '查看完整课表',
+                    action: (): void => {
+                      router.pushUrl({
+                        url: 'pages/FullSchedulePage',
+                        params: { profileId: profile.id, profileName: profile.name },
+                      });
+                    },
+                  },
+                  {
                     value: profile.isActive ? '已是当前课表' : '切换到此课表',
                     action: (): void => {
                       if (profile.isActive) {

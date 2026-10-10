@@ -1,8 +1,13 @@
 import SwiftUI
 
+/// 手动添加课程 / 编辑课程共用表单。
+/// editing 非空时进入编辑模式：预填课程信息，保存时整体替换课程定义（所有周同步）。
 struct AddCourseSheet: View {
     let palette: ThemePalette
     let guessWeek: Int
+    var editing: (index: Int, course: CourseSchedule, meeting: MeetingTime)?
+    var editingProfileId: String?
+
     @Environment(\.dismiss) private var dismiss
 
     @State private var courseName = ""
@@ -15,6 +20,15 @@ struct AddCourseSheet: View {
     @State private var endWeek = 1
     @State private var parity: WeekParity = .all
     @State private var errorMessage: String?
+
+    init(palette: ThemePalette, guessWeek: Int,
+         editing: (index: Int, course: CourseSchedule, meeting: MeetingTime)? = nil,
+         editingProfileId: String? = nil) {
+        self.palette = palette
+        self.guessWeek = guessWeek
+        self.editing = editing
+        self.editingProfileId = editingProfileId
+    }
 
     var body: some View {
         NavigationStack {
@@ -44,20 +58,35 @@ struct AddCourseSheet: View {
                     Section { Text(errorMessage).foregroundColor(.red).font(.footnote) }
                 }
             }
-            .navigationTitle("手动添加课程")
+            .navigationTitle(editing == nil ? "手动添加课程" : "编辑课程")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("取消") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("保存") { save() }
+                    Button(editing == nil ? "保存" : "保存（同步所有周）") { save() }
                 }
             }
-            .onAppear {
-                startWeek = max(guessWeek, 1)
-                endWeek = max(guessWeek, 1)
-            }
+            .onAppear(perform: prefill)
+        }
+    }
+
+    private func prefill() {
+        if let editing = editing {
+            let rule = editing.meeting.weekRules.first
+            courseName = editing.course.courseName
+            teacher = editing.course.teacher
+            location = editing.meeting.location
+            weekday = editing.meeting.weekday
+            startSection = editing.meeting.startSection
+            endSection = editing.meeting.endSection
+            startWeek = rule?.startWeek ?? 1
+            endWeek = rule?.endWeek ?? 16
+            parity = rule?.parity ?? .all
+        } else {
+            startWeek = max(guessWeek, 1)
+            endWeek = max(guessWeek, 1)
         }
     }
 
@@ -71,11 +100,50 @@ struct AddCourseSheet: View {
         guard endWeek >= startWeek else { errorMessage = "结束周不能小于开始周"; return }
 
         do {
-            try ProfileStore.shared.addManualCourse(.init(
-                courseName: name, teacher: teacher.trimmingCharacters(in: .whitespaces),
-                location: location.trimmingCharacters(in: .whitespaces),
-                weekday: weekday, startSection: startSection, endSection: endSection,
-                startWeek: startWeek, endWeek: endWeek, parity: parity))
+            if let editing = editing {
+                let old = editing.course
+                var meetings = old.meetings
+                let rule = WeekRule(startWeek: startWeek, endWeek: endWeek, parity: parity)
+                if let meetingIndex = old.meetings.firstIndex(where: {
+                    $0.weekday == editing.meeting.weekday
+                        && $0.startSection == editing.meeting.startSection
+                        && $0.endSection == editing.meeting.endSection
+                        && $0.location == editing.meeting.location
+                }) {
+                    meetings[meetingIndex] = MeetingTime(
+                        weekday: weekday, startSection: startSection, endSection: endSection,
+                        weekRules: [rule], location: location.trimmingCharacters(in: .whitespaces))
+                } else if !meetings.isEmpty {
+                    meetings[0] = MeetingTime(
+                        weekday: weekday, startSection: startSection, endSection: endSection,
+                        weekRules: [rule], location: location.trimmingCharacters(in: .whitespaces))
+                } else {
+                    meetings = [MeetingTime(
+                        weekday: weekday, startSection: startSection, endSection: endSection,
+                        weekRules: [rule], location: location.trimmingCharacters(in: .whitespaces))]
+                }
+                let rawWeekText: String
+                switch parity {
+                case .all: rawWeekText = "\(startWeek)-\(endWeek)周"
+                case .odd: rawWeekText = "单周 \(startWeek)-\(endWeek)周"
+                case .even: rawWeekText = "双周 \(startWeek)-\(endWeek)周"
+                }
+                let updated = CourseSchedule(
+                    courseName: name,
+                    teacher: teacher.trimmingCharacters(in: .whitespaces),
+                    semester: old.semester,
+                    credit: old.credit,
+                    rawWeekText: rawWeekText,
+                    meetings: meetings
+                )
+                try ProfileStore.shared.updateCourse(index: editing.index, newCourse: updated, profileId: editingProfileId)
+            } else {
+                try ProfileStore.shared.addManualCourse(.init(
+                    courseName: name, teacher: teacher.trimmingCharacters(in: .whitespaces),
+                    location: location.trimmingCharacters(in: .whitespaces),
+                    weekday: weekday, startSection: startSection, endSection: endSection,
+                    startWeek: startWeek, endWeek: endWeek, parity: parity))
+            }
             StoreChangeNotifier.shared.notifyChanged()
             dismiss()
         } catch {

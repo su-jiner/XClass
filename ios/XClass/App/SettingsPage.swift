@@ -129,6 +129,9 @@ struct SettingsPage: View {
                         if !profile.isActive {
                             Button("切换到此课表") { switchTo(profile) }
                         }
+                        NavigationLink("查看完整课表") {
+                            FullSchedulePage(palette: palette, profileId: profile.id, profileName: profile.name)
+                        }
                         Button("重命名") { renameText = profile.name; renameTarget = profile }
                         Button("删除", role: .destructive) { deleteConfirm = profile }
                     } label: {

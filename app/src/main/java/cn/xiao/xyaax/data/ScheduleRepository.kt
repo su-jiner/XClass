@@ -89,6 +89,23 @@ object ScheduleRepository {
         deleted
     }
 
+    /** 编辑课程定义（全局生效：所有周同步），profileId 为空时作用于当前课表。 */
+    suspend fun updateCourse(
+        context: Context,
+        profileId: String?,
+        courseIndex: Int,
+        expected: CourseSchedule,
+        newCourse: CourseSchedule
+    ): Result<Boolean> = mutate(context) {
+        if (!profileId.isNullOrBlank()) {
+            ImportedScheduleStorage.updateCourseInProfile(context.filesDir, profileId, courseIndex, expected, newCourse)
+        } else {
+            val active = ImportedScheduleStorage.listProfiles(context.filesDir).firstOrNull { it.isActive }
+                ?: return@mutate false
+            ImportedScheduleStorage.updateCourseInProfile(context.filesDir, active.id, courseIndex, expected, newCourse)
+        }
+    }
+
     suspend fun createEmptyProfile(context: Context, name: String): Result<ImportedScheduleStorage.TimetableProfile> =
         mutate(context) {
             ImportedScheduleStorage.createEmptyProfile(context.filesDir, name)

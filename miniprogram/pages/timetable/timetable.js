@@ -47,6 +47,9 @@ Page({
       location: '',
       teacher: '',
     },
+    isAllMode: false,
+    manualTitle: '手动添加课程',
+    allModeHeader: '',
   },
   onShow() {
     if (this.getTabBar && this.getTabBar()) this.getTabBar().setData({ selected: 0 });
@@ -73,6 +76,7 @@ Page({
       currentWeek: currentWeek,
       week: keepWeek,
       profileName: store.activeProfile().name,
+      isAllMode: false,
     });
     this.computeRowHeight();
     const scaleMap = { small: 0.9, normal: 1, large: 1.15 };
@@ -218,16 +222,71 @@ Page({
     if (!card) return;
     const course = this.courses[card.courseIndex];
     const range = this.data.sections[card.startSection - 1];
+    const content = [
+      '教师：' + (course.teacher || '未知'),
+      '地点：' + (card.location || '未标注'),
+      '节次：第' + card.startSection + '节 ' + (range ? range.startTime + '-' + range.endTime : ''),
+      '周次：' + (course.rawWeekText || ''),
+    ].join('\n');
+    const that = this;
     wx.showModal({
       title: course.courseName,
-      content: [
-        '教师：' + (course.teacher || '未知'),
-        '地点：' + (card.location || '未标注'),
-        '节次：第' + card.startSection + '节 ' + (range ? range.startTime + '-' + range.endTime : ''),
-        '周次：' + (course.rawWeekText || ''),
-      ].join('\n'),
-      showCancel: false,
-      confirmText: '知道了',
+      content: content,
+      showCancel: true,
+      cancelText: '编辑课程',
+      confirmText: '删除课程',
+      confirmColor: '#e64340',
+      success: (result) => {
+        if (result.cancel) {
+          that.editCourse(card.courseIndex);
+        } else if (result.confirm) {
+          that.deleteCourseConfirm(card.courseIndex);
+        }
+      },
+    });
+  },
+  /** 打开编辑表单：预填课程信息，保存时更新课程定义（所有周同步）。 */
+  editCourse(courseIndex) {
+    const course = this.courses[courseIndex];
+    if (!course) return;
+    const meeting = (course.meetings || [])[0] || {};
+    const weekdayIndex = Math.max(0, core.WEEKDAYS.indexOf(meeting.weekday));
+    this.editingCourseIndex = courseIndex;
+    this.setData({
+      showManual: true,
+      manualTitle: '编辑课程',
+      manualForm: {
+        name: course.courseName || '',
+        weekdayIndex: weekdayIndex,
+        startSection: String(meeting.startSection || 1),
+        endSection: String(meeting.endSection || 1),
+        weekText: course.rawWeekText || '1-16周',
+        location: meeting.location || '',
+        teacher: course.teacher || '',
+      },
+    });
+  },
+  deleteCourseConfirm(courseIndex) {
+    const course = this.courses[courseIndex];
+    if (!course) return;
+    const that = this;
+    wx.showModal({
+      title: '删除课程',
+      content: '确定从课表删除「' + course.courseName + '」吗？这会删除该课程的全部上课时间。',
+      confirmText: '删除',
+      confirmColor: '#e64340',
+      success: (result) => {
+        if (!result.confirm) return;
+        const ok = this.viewProfileId
+          ? store.deleteCourseInProfile(courseIndex, this.viewProfileId)
+          : store.deleteCourse(courseIndex);
+        if (ok) {
+          wx.showToast({ title: '已删除课程', icon: 'none' });
+          that.reload();
+        } else {
+          wx.showToast({ title: '删除失败，请重试', icon: 'none' });
+        }
+      },
     });
   },
   onAddTap() {
@@ -292,8 +351,10 @@ Page({
     });
   },
   showManualDialog() {
+    this.editingCourseIndex = -1;
     this.setData({
       showManual: true,
+      manualTitle: '手动添加课程',
       manualForm: {
         name: '',
         weekdayIndex: 0,
@@ -327,6 +388,47 @@ Page({
     const endSection = Math.max(startSection, Math.min(12, Number(form.endSection) || startSection));
     const sections = core.sectionRangeFromLabel(startSection + '-' + endSection)
       || { startSection: startSection, endSection: endSection };
+    const weekText = (form.weekText || '').trim() || '1-16周';
+    if (this.editingCourseIndex >= 0) {
+      const old = this.courses[this.editingCourseIndex];
+      if (!old) {
+        this.setData({ showManual: false });
+        return;
+      }
+      const meetings = (old.meetings || []).slice();
+      if (meetings.length > 0) {
+        meetings[0] = Object.assign({}, meetings[0], {
+          weekday: core.WEEKDAYS[form.weekdayIndex],
+          startSection: sections.startSection,
+          endSection: sections.endSection,
+          location: (form.location || '').trim(),
+          weekRules: core.parseWeekRules(weekText),
+        });
+      } else {
+        meetings.push({
+          weekday: core.WEEKDAYS[form.weekdayIndex],
+          startSection: sections.startSection,
+          endSection: sections.endSection,
+          weekRules: core.parseWeekRules(weekText),
+          location: (form.location || '').trim(),
+          campusId: null,
+        });
+      }
+      const updated = Object.assign({}, old, {
+        courseName: name,
+        teacher: (form.teacher || '').trim(),
+        rawWeekText: weekText,
+        meetings: meetings,
+      });
+      const ok = store.updateCourse(this.editingCourseIndex, updated, this.viewProfileId);
+      this.setData({ showManual: false });
+      this.reload();
+      wx.showToast({
+        title: ok ? '已保存，修改同步到所有周' : '保存失败，请重试',
+        icon: 'none',
+      });
+      return;
+    }
     store.addManualCourse({
       courseName: name,
       teacher: (form.teacher || '').trim(),
@@ -334,7 +436,7 @@ Page({
       weekday: core.WEEKDAYS[form.weekdayIndex],
       startSection: sections.startSection,
       endSection: sections.endSection,
-      weekText: (form.weekText || '').trim() || '1-16周',
+      weekText: weekText,
     });
     this.setData({ showManual: false });
     this.reload();

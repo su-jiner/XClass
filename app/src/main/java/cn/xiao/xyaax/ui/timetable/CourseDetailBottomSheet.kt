@@ -49,7 +49,8 @@ object CourseDetailBottomSheet {
         allCourses: List<CourseMeetingRef>,
         periodRanges: List<String>,
         onCoverPinned: (() -> Unit)? = null,
-        onDeleteCourse: ((CourseMeetingRef) -> Unit)? = null
+        onDeleteCourse: ((CourseMeetingRef) -> Unit)? = null,
+        onEditCourse: ((CourseMeetingRef) -> Unit)? = null
     ) {
         val dialog = BottomSheetDialog(context)
         val parent = FrameLayout(context)
@@ -88,6 +89,20 @@ object CourseDetailBottomSheet {
 
         val uniqueCourses = allCourses.distinctBy { it.courseIndex }
         var currentItem = primary
+
+        val editButton = view.findViewById<TextView>(R.id.detailEditCourseBtn)
+        editButton.visibility = if (onEditCourse == null) View.GONE else View.VISIBLE
+        editButton.setTextColor(palette.textPrimary)
+        editButton.background = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = 14f
+            setColor(palette.buttonBackground)
+        }
+        editButton.setOnClickListener {
+            val selected = currentItem
+            dialog.dismiss()
+            onEditCourse?.invoke(selected)
+        }
 
         val deleteButton = view.findViewById<TextView>(R.id.detailDeleteCourseBtn)
         deleteButton.visibility = if (onDeleteCourse == null) View.GONE else View.VISIBLE

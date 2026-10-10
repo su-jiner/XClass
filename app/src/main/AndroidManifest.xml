@@ -29,6 +29,14 @@
             android:name=".ui.settings.TimetableManageActivity"
             android:exported="false" />
         <activity
+            android:name=".ui.settings.FullScheduleActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.settings.EditCourseActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+        <activity
             android:name=".ui.settings.TimeProfileActivity"
             android:exported="false"
             android:configChanges="orientation|screenSize|keyboardHidden" />

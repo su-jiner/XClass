@@ -189,6 +189,26 @@ export function displayMeetings(courses: CourseSchedule[], week: number, showNon
   return result;
 }
 
+/** 全周视图：返回课表内全部排课（所有周），用于课表管理「查看完整课表」。 */
+export function allMeetings(courses: CourseSchedule[]): CourseMeetingRef[] {
+  const result: CourseMeetingRef[] = [];
+  courses.forEach((course, index) => {
+    for (const meeting of course.meetings) {
+      result.push({
+        courseIndex: index, course, meeting, isCurrentWeek: true,
+        nextActiveWeek: firstActiveWeekOf(meeting),
+      });
+    }
+  });
+  return result;
+}
+
+function firstActiveWeekOf(meeting: MeetingTime): number {
+  if (meeting.weekRules.length === 0) return 1;
+  const first = nextActiveWeekOf(meeting, 1);
+  return first === null ? 1 : first;
+}
+
 /** 冲突课程去重（对齐 Android resolveOverlapForDay） */
 export function resolveOverlaps(items: CourseMeetingRef[]): CourseMeetingRef[] {
   const occupied = new Array<boolean>(13).fill(false);

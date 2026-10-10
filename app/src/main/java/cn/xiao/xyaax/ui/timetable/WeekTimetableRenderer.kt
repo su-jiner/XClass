@@ -25,7 +25,9 @@ class WeekTimetableRenderer(
     private val weekdayLabels: Map<Weekday, String>,
     private val fontScale: Float,
     private val palette: ThemePalette,
-    private val hasCustomBackground: Boolean
+    private val hasCustomBackground: Boolean,
+    /** 全周视图：表头不显示具体日期、不做"今天"高亮（用于课表管理-查看完整课表） */
+    private val allWeeksMode: Boolean = false
 ) {
     private val weekdays = listOf(
         Weekday.MONDAY,
@@ -68,7 +70,7 @@ class WeekTimetableRenderer(
         val context = headerRow.context
         val corner = TextView(context).apply {
             layoutParams = LinearLayout.LayoutParams(m.leftColumnWidth, m.headerCellHeight)
-            text = String.format(Locale.getDefault(), "%d月", weekStart.monthValue)
+            text = if (allWeeksMode) "" else String.format(Locale.getDefault(), "%d月", weekStart.monthValue)
             gravity = Gravity.CENTER
             textSize = 11f * fontScale
             setTypeface(typeface, Typeface.BOLD)
@@ -85,18 +87,22 @@ class WeekTimetableRenderer(
                 layoutParams = LinearLayout.LayoutParams(m.dayColumnWidth, m.headerCellHeight).apply {
                     marginStart = m.cellGap
                 }
-                text = String.format(
-                    Locale.getDefault(),
-                    "%s\n%s",
-                    weekdayLabels[weekday] ?: "一",
-                    date.format(DateTimeFormatter.ofPattern("M/d"))
-                )
+                text = if (allWeeksMode) {
+                    weekdayLabels[weekday] ?: "一"
+                } else {
+                    String.format(
+                        Locale.getDefault(),
+                        "%s\n%s",
+                        weekdayLabels[weekday] ?: "一",
+                        date.format(DateTimeFormatter.ofPattern("M/d"))
+                    )
+                }
                 gravity = Gravity.CENTER
                 textSize = 11f * fontScale
                 setTypeface(typeface, Typeface.BOLD)
                 includeFontPadding = false
                 setTextColor(palette.textPrimary)
-                background = if (isToday) {
+                background = if (!allWeeksMode && isToday) {
                     roundedBackground(withAlpha(palette.gridHeaderToday, panelAlpha), radius = 10f)
                 } else {
                     roundedBackground(withAlpha(palette.gridHeader, panelAlpha), radius = 10f)
@@ -173,7 +179,7 @@ class WeekTimetableRenderer(
 
         weekdays.forEachIndexed { index, weekday ->
             val date = weekStart.plusDays(index.toLong())
-            bodyRow.addView(buildDayColumn(bodyRow, m, weekday, items, onCourseClick, date == today, currentSection))
+            bodyRow.addView(buildDayColumn(bodyRow, m, weekday, items, onCourseClick, !allWeeksMode && date == today, currentSection))
         }
     }
 

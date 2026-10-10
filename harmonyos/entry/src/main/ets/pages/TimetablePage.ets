@@ -1,11 +1,12 @@
 import {
-  CourseSchedule, SimpleDate, CourseMeetingRef,
+  CourseSchedule, SimpleDate, CourseMeetingRef, ImportedCourse, ImportedMeeting,
   displayMeetings, guessCurrentWeek, totalWeeks, resolveOverlaps, SECTION_RANGES,
 } from '../core/Core.ets';
 import { ProfileStore } from '../core/ProfileStore.ets';
 import { currentPalette, CARD_COLORS, ThemePalette } from '../model/Theme.ets';
 import { Prefs } from '../model/Prefs.ets';
 import { AddCourseDialog } from './AddCourseDialog.ets';
+import { EditCourseDialog } from './EditCourseDialog.ets';
 import { router } from '@kit.ArkUI';
 
 const ROW_HEIGHT = 46;
@@ -23,10 +24,24 @@ export struct TimetablePage {
   @State currentWeek: number = 1;
   @State weeks: number = 20;
   @State selectedWeek: number = 1;
+  @State editingCourseIndex: number = -1;
+  @State editingCourse: ImportedCourse = {
+    courseName: '', teacher: '', semester: '', credit: null, rawWeekText: '', meetings: [],
+  };
   addDialogController: CustomDialogController = new CustomDialogController({
     builder: AddCourseDialog({
       onSaved: (): void => {
         AppStorage.setOrCreate('dataVersion', Date.now());
+      },
+    }),
+    autoCancel: true,
+    customStyle: false,
+  });
+  editDialogController: CustomDialogController = new CustomDialogController({
+    builder: EditCourseDialog({
+      course: this.editingCourse,
+      onSaved: (updated: ImportedCourse): void => {
+        this.applyEdit(updated);
       },
     }),
     autoCancel: true,
@@ -314,6 +329,14 @@ export struct TimetablePage {
         `学期：${item.course.semester}   学分：${creditText}`,
       buttons: [
         {
+          value: '编辑课程（修改同步所有周）',
+          action: (): void => {
+            this.editingCourseIndex = item.courseIndex;
+            this.editingCourse = this.toImportedCourse(item.course);
+            this.editDialogController.open();
+          },
+        },
+        {
           value: Prefs.coverImageKey() === slotKey ? '取消课表封面' : '设为课表封面',
           action: (): void => {
             Prefs.setCoverImageKey(Prefs.coverImageKey() === slotKey ? '' : slotKey);
@@ -323,5 +346,48 @@ export struct TimetablePage {
         { value: '知道了', action: (): void => {} },
       ],
     });
+  }
+
+  toImportedCourse(course: CourseSchedule): ImportedCourse {
+    return {
+      courseName: course.courseName,
+      teacher: course.teacher,
+      semester: course.semester,
+      credit: course.credit,
+      rawWeekText: course.rawWeekText,
+      meetings: course.meetings.map((m) => ({
+        weekday: m.weekday,
+        startSection: m.startSection,
+        endSection: m.endSection,
+        weekRules: m.weekRules,
+        location: m.location,
+        campusAlias: m.campusId ?? null,
+      })),
+    };
+  }
+
+  applyEdit(updated: ImportedCourse): void {
+    const old = this.courses[this.editingCourseIndex];
+    if (!old) return;
+    const meetings: CourseSchedule['meetings'] = updated.meetings.map((m: ImportedMeeting) => ({
+      weekday: m.weekday,
+      startSection: m.startSection,
+      endSection: m.endSection,
+      weekRules: m.weekRules,
+      location: m.location,
+      campusId: m.campusAlias,
+    }));
+    const newCourse: CourseSchedule = {
+      courseName: updated.courseName,
+      teacher: updated.teacher,
+      semester: old.semester,
+      credit: old.credit,
+      rawWeekText: updated.rawWeekText,
+      meetings: meetings,
+    };
+    const ok = ProfileStore.instance?.updateCourse(this.editingCourseIndex, newCourse, '') ?? false;
+    if (ok) {
+      AppStorage.setOrCreate('dataVersion', Date.now());
+    }
   }
 }

@@ -472,6 +472,48 @@ export class ProfileStore {
     return this.readCoursesFile(active.coursesFile);
   }
 
+  /** 按课表 ID 加载课程（profileId 为空时加载当前课表）。 */
+  loadCourses(profileId: string): CourseSchedule[] {
+    const meta = this.ensureInitialized();
+    const profile = profileId.length > 0
+      ? meta.profiles.find((p) => p.id === profileId)
+      : (meta.profiles.find((p) => p.id === meta.activeId) ?? meta.profiles[0]);
+    if (!profile) return [];
+    return this.readCoursesFile(profile.coursesFile);
+  }
+
+  /** 编辑课程定义（全局生效：所有周同步）。 */
+  updateCourse(courseIndex: number, newCourse: CourseSchedule, profileId: string): boolean {
+    const meta = this.ensureInitialized();
+    const profile = profileId.length > 0
+      ? meta.profiles.find((p) => p.id === profileId)
+      : (meta.profiles.find((p) => p.id === meta.activeId) ?? meta.profiles[0]);
+    if (!profile) return false;
+    const courses = this.readCoursesFile(profile.coursesFile);
+    if (courseIndex < 0 || courseIndex >= courses.length) return false;
+    courses[courseIndex] = newCourse;
+    this.writeCoursesFile(profile.coursesFile, courses);
+    profile.updatedAt = Date.now();
+    this.writeMeta(meta);
+    return true;
+  }
+
+  /** 删除指定课表中的课程。 */
+  deleteCourseInProfile(courseIndex: number, profileId: string): boolean {
+    const meta = this.ensureInitialized();
+    const profile = profileId.length > 0
+      ? meta.profiles.find((p) => p.id === profileId)
+      : (meta.profiles.find((p) => p.id === meta.activeId) ?? meta.profiles[0]);
+    if (!profile) return false;
+    const courses = this.readCoursesFile(profile.coursesFile);
+    if (courseIndex < 0 || courseIndex >= courses.length) return false;
+    courses.splice(courseIndex, 1);
+    this.writeCoursesFile(profile.coursesFile, courses);
+    profile.updatedAt = Date.now();
+    this.writeMeta(meta);
+    return true;
+  }
+
   getActiveSemesterStartDate(): SimpleDate {
     const meta = this.ensureInitialized();
     const active = meta.profiles.find((p) => p.id === meta.activeId) ?? meta.profiles[0];
