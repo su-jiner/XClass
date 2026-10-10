@@ -171,16 +171,27 @@ Page({
       }
       const item = meetings[index];
       index += 1;
-      const date = new Date(`${store.todayIso()}T00:00:00`);
-      const target = new Date(date);
-      target.setDate(date.getDate() - (core.WEEKDAYS.indexOf(item.meeting.weekday) - (date.getDay() === 0 ? 7 : date.getDay())));
-      const start = core.timeRangeOf(core.resolveProfile(store.loadTimeProfiles(), item.meeting.campusId), item.meeting.startSection, item.meeting.endSection);
+      // 本周周一 = 学期第一周周一 + (当前周 - 1) * 7 天；再按星期偏移
+      const weekStart = new Date(`${semesterStart}T00:00:00`);
+      weekStart.setDate(weekStart.getDate() + (week - 1) * 7);
+      const target = new Date(weekStart);
+      target.setDate(weekStart.getDate() + (core.WEEKDAYS.indexOf(item.meeting.weekday)));
+      const range = core.timeRangeOf(
+        core.resolveProfile(store.loadTimeProfiles(), item.meeting.campusId),
+        item.meeting.startSection,
+        item.meeting.endSection
+      );
+      const startMinutes = range ? Number(String(range.startTime).split(':')[0]) * 60 + Number(String(range.startTime).split(':')[1]) : 8 * 60;
+      target.setHours(Math.floor(startMinutes / 60), startMinutes % 60, 0, 0);
+      const duration = range
+        ? Math.max(45 * 60, (Number(String(range.endTime).split(':')[0]) * 60 + Number(String(range.endTime).split(':')[1])) - startMinutes)
+        : 90 * 60;
       if (wx.addPhoneCalendar) {
         wx.addPhoneCalendar({
           title: item.course.courseName,
           location: item.meeting.location,
           startTime: Math.floor(target.getTime() / 1000),
-          endTime: Math.floor(target.getTime() / 1000) + 5400,
+          endTime: Math.floor(target.getTime() / 1000) + duration,
           alarm: true,
           alarmOffset: 600,
           success: addNext,
