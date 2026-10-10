@@ -1,0 +1,72 @@
+<view class="page" style="background:{{palette.page}};color:{{palette.text}}">
+  <view class="page-header">
+    <view>
+      <view class="page-title">工具</view>
+      <view class="page-subtitle">绩点 / 成绩 / 考试 / 学业，全部本地手动录入</view>
+    </view>
+  </view>
+
+  <view class="segment" style="background:{{palette.panelAlt}}">
+    <view
+      wx:for="{{tabs}}"
+      wx:key="*this"
+      class="segment-item"
+      data-index="{{index}}"
+      bindtap="switchTab"
+      style="{{tab === index ? 'background:' + palette.panel + ';font-weight:600' : ''}}"
+    >{{item}}</view>
+  </view>
+
+  <block wx:if="{{tab === 0}}">
+    <view class="card" style="background:{{palette.panelAlt}}">
+      <view class="row">
+        <view>
+          <view class="muted">保研绩点（4.0 制）</view>
+          <view style="font-size:48rpx;font-weight:700">{{summary.gpa}}</view>
+        </view>
+        <view>
+          <view class="muted">加权平均</view>
+          <view style="font-size:34rpx">{{summary.weighted}}</view>
+        </view>
+        <view>
+          <view class="muted">总学分</view>
+          <view style="font-size:34rpx">{{summary.credits}}</view>
+        </view>
+      </view>
+    </view>
+    <view class="card" wx:for="{{gpaCourses}}" wx:key="index" style="background:{{palette.panel}}">
+      <view class="row">
+        <view>{{item.courseName}}</view>
+        <view class="muted" bindtap="toggleInclude" data-index="{{index}}">{{item.included === false ? '已排除（点击计入）' : '计入中（点击排除）'}}</view>
+      </view>
+      <view class="muted">{{item.score}} 分 · {{item.credit}} 学分</view>
+    </view>
+    <view class="button" bindtap="addGpaCourse" style="background:{{palette.panelAlt}};color:{{palette.icon}}">添加课程</view>
+    <view class="button secondary" bindtap="clearGpa" style="background:{{palette.panelAlt}};color:{{palette.text}}">清空</view>
+  </block>
+
+  <block wx:if="{{tab === 1}}">
+    <view class="card" wx:for="{{grades}}" wx:key="index" style="background:{{palette.panel}}">
+      <view>{{item.courseName}}</view>
+      <view class="muted">{{item.credit}} 学分 · {{item.score}} · {{item.semester}}</view>
+    </view>
+    <view class="button" bindtap="addGrade" style="background:{{palette.panelAlt}};color:{{palette.icon}}">添加成绩</view>
+  </block>
+
+  <block wx:if="{{tab === 2}}">
+    <view class="card" wx:for="{{exams}}" wx:key="index" style="background:{{palette.panel}}">
+      <view>{{item.courseName}}</view>
+      <view class="muted">{{item.time}} · {{item.location}} {{item.seat}}</view>
+    </view>
+    <view class="button" bindtap="addExam" style="background:{{palette.panelAlt}};color:{{palette.icon}}">添加考试</view>
+  </block>
+
+  <block wx:if="{{tab === 3}}">
+    <view class="card" style="background:{{palette.panelAlt}}">
+      <view class="muted">毕业总学分完成度</view>
+      <view style="font-size:40rpx;font-weight:700">{{progress.totalEarned}} / {{progress.totalRequired}}</view>
+      <view class="muted">{{progress.note}}</view>
+    </view>
+    <view class="button" bindtap="editProgress" style="background:{{palette.panelAlt}};color:{{palette.icon}}">手动编辑学业指标</view>
+  </block>
+</view>

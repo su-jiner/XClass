@@ -1,0 +1,29 @@
+<view class="page" style="background:{{palette.page}};color:{{palette.text}}">
+  <view class="page-header">
+    <view>
+      <view class="page-title">日程</view>
+      <view class="page-subtitle" wx:if="{{snapshot}}">{{snapshot.date}} · 第{{snapshot.week}}周</view>
+    </view>
+  </view>
+
+  <view class="card" style="background:{{palette.panelAlt}}" wx:if="{{reminderEnabled}}">
+    <view style="font-size:30rpx;font-weight:600">今日提醒</view>
+    <view class="muted" style="margin-top:8rpx">{{countdown}}</view>
+  </view>
+
+  <view class="card" style="background:{{palette.panel}}" wx:for="{{snapshot.items}}" wx:key="index">
+    <view class="row">
+      <view style="font-size:32rpx;font-weight:600">{{item.courseName}}</view>
+      <view class="chip" wx:if="{{item.isOngoing}}" style="background:{{palette.panelAlt}};color:{{palette.icon}}">进行中</view>
+    </view>
+    <view class="muted">{{item.startTime}}-{{item.endTime}} · 第{{item.startSection}}-{{item.endSection}}节</view>
+    <view class="muted" wx:if="{{item.location || item.campusName}}">{{item.campusName}} {{item.location}}</view>
+    <view class="muted" wx:if="{{item.teacher}}">{{item.teacher}}</view>
+  </view>
+
+  <view class="card" style="background:{{palette.panel}}" wx:if="{{snapshot && snapshot.items.length === 0}}">
+    <view class="muted">今天没有课程安排</view>
+  </view>
+
+  <view class="button" bindtap="openImport" style="background:{{palette.panelAlt}};color:{{palette.icon}}">导入课表</view>
+</view>

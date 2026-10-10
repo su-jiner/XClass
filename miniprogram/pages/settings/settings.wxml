@@ -1,0 +1,81 @@
+<view class="page" style="background:{{palette.page}};color:{{palette.text}}">
+  <view class="page-header">
+    <view>
+      <view class="page-title">设置</view>
+      <view class="page-subtitle">课表、提醒与外观偏好（全部本地保存）</view>
+    </view>
+  </view>
+
+  <view class="card" style="background:{{palette.panel}}">
+    <view style="font-size:30rpx;font-weight:600">课表管理</view>
+    <view class="row" wx:for="{{profiles}}" wx:key="id">
+      <view bindtap="switchProfile" data-id="{{item.id}}">
+        {{item.name}}{{item.isActive ? ' · 当前' : ''}}
+      </view>
+      <view>
+        <text class="muted" bindtap="renameProfile" data-id="{{item.id}}">重命名</text>
+        <text class="muted" style="margin-left:24rpx" bindtap="deleteProfile" data-id="{{item.id}}">删除</text>
+      </view>
+    </view>
+    <view class="button secondary" bindtap="createProfile" style="background:{{palette.panelAlt}};color:{{palette.text}}">新建空课表</view>
+  </view>
+
+  <view class="card" style="background:{{palette.panel}}">
+    <view style="font-size:30rpx;font-weight:600">节次时间表（多校区）</view>
+    <view class="muted" wx:for="{{timeProfiles}}" wx:key="id">{{item.name}}（{{item.blocks.length}} 段）</view>
+    <view class="button secondary" bindtap="addTimeProfileByText" style="background:{{palette.panelAlt}};color:{{palette.text}}">从文本识别时间表</view>
+  </view>
+
+  <view class="card" style="background:{{palette.panel}}">
+    <view style="font-size:30rpx;font-weight:600">外观</view>
+    <view class="muted">主题色</view>
+    <view class="segment" style="background:{{palette.panelAlt}}">
+      <view
+        wx:for="{{themes}}"
+        wx:key="*this"
+        class="segment-item"
+        data-field="theme"
+        data-value="{{item[0]}}"
+        bindtap="updatePrefs"
+        style="{{prefs.theme === item[0] ? 'background:' + palette.panel + ';font-weight:600' : ''}}"
+      >{{item[1]}}</view>
+    </view>
+    <view class="muted">深浅模式</view>
+    <view class="segment" style="background:{{palette.panelAlt}}">
+      <view
+        wx:for="{{darkModes}}"
+        wx:key="*this"
+        class="segment-item"
+        data-field="darkMode"
+        data-value="{{item[0]}}"
+        bindtap="updatePrefs"
+        style="{{prefs.darkMode === item[0] ? 'background:' + palette.panel + ';font-weight:600' : ''}}"
+      >{{item[1]}}</view>
+    </view>
+    <view class="row">
+      <view class="row-label">显示非本周课程</view>
+      <switch checked="{{prefs.showNonCurrent}}" bindchange="toggleNonCurrent" />
+    </view>
+  </view>
+
+  <view class="card" style="background:{{palette.panel}}">
+    <view style="font-size:30rpx;font-weight:600">提醒与日历</view>
+    <view class="row">
+      <view class="row-label">今日课程提醒条</view>
+      <switch checked="{{prefs.reminderEnabled}}" data-field="reminderEnabled" bindchange="toggleNonCurrent" />
+    </view>
+    <view class="button secondary" bindtap="writeCalendar" style="background:{{palette.panelAlt}};color:{{palette.text}}">写入手机日历（本周课程 + 提前 10 分钟提醒）</view>
+    <view class="muted">小程序没有桌面/锁屏组件；可点右上角「…」→ 添加到桌面，或使用「我的小程序」置顶。</view>
+  </view>
+
+  <view class="card" style="background:{{palette.panel}}">
+    <view style="font-size:30rpx;font-weight:600">数据</view>
+    <view class="button secondary" bindtap="exportBackup" style="background:{{palette.panelAlt}};color:{{palette.text}}">导出备份（与三端互通）</view>
+    <view class="button secondary" bindtap="importBackup" style="background:{{palette.panelAlt}};color:{{palette.text}}">从备份恢复</view>
+  </view>
+
+  <view class="card" style="background:{{palette.panel}}">
+    <view style="font-size:30rpx;font-weight:600">关于</view>
+    <view class="muted">XClass {{version}} · 纯本地课表，不联网、无广告</view>
+  </view>
+</view>

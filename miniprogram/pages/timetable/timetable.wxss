@@ -1,0 +1,41 @@
+.add-button {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 40rpx;
+  font-size: 44rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.week-swiper {
+  width: 100%;
+}
+
+.grid-header,
+.grid-row {
+  display: flex;
+}
+
+.grid-cell {
+  flex: 1;
+  min-height: 76rpx;
+  padding: 8rpx 4rpx;
+  font-size: 20rpx;
+  text-align: center;
+  border-radius: 10rpx;
+  margin: 2rpx;
+  box-sizing: border-box;
+}
+
+.grid-time {
+  flex: 0 0 96rpx;
+}
+
+.course-cell {
+  min-height: 96rpx;
+  font-size: 22rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

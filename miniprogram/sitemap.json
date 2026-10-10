@@ -1,0 +1,4 @@
+{
+  "desc": "XClass 小程序站点索引配置",
+  "rules": [{ "action": "disallow", "page": "*" }]
+}

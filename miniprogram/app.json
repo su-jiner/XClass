@@ -1,0 +1,29 @@
+{
+  "pages": [
+    "pages/timetable/timetable",
+    "pages/today/today",
+    "pages/tools/tools",
+    "pages/settings/settings",
+    "pages/import/import"
+  ],
+  "window": {
+    "navigationStyle": "custom",
+    "backgroundColor": "#F7E7CC",
+    "backgroundTextStyle": "dark"
+  },
+  "tabBar": {
+    "custom": true,
+    "color": "#8A6A45",
+    "selectedColor": "#5A3D1F",
+    "backgroundColor": "#FFF6E8",
+    "list": [
+      { "pagePath": "pages/today/today", "text": "日程" },
+      { "pagePath": "pages/timetable/timetable", "text": "课表" },
+      { "pagePath": "pages/tools/tools", "text": "工具" },
+      { "pagePath": "pages/settings/settings", "text": "设置" }
+    ]
+  },
+  "sitemapLocation": "sitemap.json",
+  "style": "v2",
+  "lazyCodeLoading": "requiredComponents"
+}

@@ -1,0 +1,486 @@
+/**
+ * XClass 小程序解析层：与 Android/iOS/鸿蒙逐函数对齐（纯逻辑，无 wx API 依赖）。
+ * 覆盖：周次解析、单元格语法、标签识别、页眉页脚元数据、节次时间表、表格/列表解析。
+ */
+
+const WEEKDAYS = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
+const PARITY = { ALL: 'ALL', ODD: 'ODD', EVEN: 'EVEN' };
+const DEFAULT_TOTAL_WEEKS = 20;
+const DEFAULT_PROFILE_ID = 'default';
+const DEFAULT_PROFILE_NAME = '默认（12 节）';
+const DEFAULT_RANGES = [
+  '08:00-08:45', '08:45-09:40', '10:00-10:45', '10:45-11:40',
+  '13:30-14:15', '14:15-15:10', '15:30-16:15', '16:15-17:10',
+  '18:20-19:05', '19:05-19:50', '20:00-20:45', '20:45-21:30'
+];
+
+function defaultTimeProfile() {
+  return {
+    id: DEFAULT_PROFILE_ID,
+    name: DEFAULT_PROFILE_NAME,
+    blocks: DEFAULT_RANGES.map(function (range, index) {
+      const parts = range.split('-');
+      return { startSection: index + 1, endSection: index + 1, startTime: parts[0], endTime: parts[1] };
+    })
+  };
+}
+
+/** 周次文本 → WeekRule[]（支持 7-19周 / 12-14周(双),15-19周 / 第1,3,5周（单）/ 单周） */
+function parseWeekRules(raw, defaultTotalWeeks) {
+  const total = defaultTotalWeeks || DEFAULT_TOTAL_WEEKS;
+  let text = String(raw || '').trim();
+  if (!text) return [{ startWeek: 1, endWeek: total, parity: PARITY.ALL }];
+  text = text.replace(/[（(]?\s*第?\s*\d{1,2}\s*[-—–~～至]\s*\d{1,2}\s*节\s*[）)]?/g, ' ');
+  const globalParity = text.indexOf('单') >= 0 ? PARITY.ODD : (text.indexOf('双') >= 0 ? PARITY.EVEN : PARITY.ALL);
+  const tokens = text.split(/[,，、;；]/).map(function (item) { return item.trim(); })
+    .filter(function (item) { return item && /\d/.test(item); });
+  const rules = [];
+  tokens.forEach(function (token) {
+    const parity = token.indexOf('单') >= 0 ? PARITY.ODD : (token.indexOf('双') >= 0 ? PARITY.EVEN : globalParity);
+    const range = token.match(/(\d{1,2})\s*[-—–~～至]\s*(\d{1,2})/);
+    if (range) {
+      rules.push({
+        startWeek: Math.min(Number(range[1]), Number(range[2])),
+        endWeek: Math.max(Number(range[1]), Number(range[2])),
+        parity: parity
+      });
+      return;
+    }
+    (token.match(/\d{1,2}/g) || []).forEach(function (value) {
+      const week = Number(value);
+      if (week >= 1 && week <= 30) rules.push({ startWeek: week, endWeek: week, parity: parity });
+    });
+  });
+  if (!rules.length) return [{ startWeek: 1, endWeek: total, parity: PARITY.ALL }];
+  const seen = {};
+  return rules
+    .filter(function (rule) {
+      const key = rule.startWeek + '-' + rule.endWeek + '-' + rule.parity;
+      if (seen[key]) return false;
+      seen[key] = true;
+      return true;
+    })
+    .sort(function (a, b) { return a.startWeek - b.startWeek || a.endWeek - b.endWeek; });
+}
+
+function weekRulesText(rules) {
+  return (rules || []).map(function (rule) {
+    const base = rule.startWeek === rule.endWeek ? rule.startWeek + '周' : rule.startWeek + '-' + rule.endWeek + '周';
+    if (rule.parity === PARITY.ODD) return base + '(单)';
+    if (rule.parity === PARITY.EVEN) return base + '(双)';
+    return base;
+  }).join(',');
+}
+
+const CAMPUS_RE = /^[（(]\s*([^）)]{1,4})\s*[）)]/;
+const TEACHER_TAIL_RE = /[（(][^）)]{1,3}[）)]\s*$/;
+const SECTION_RE = /[（(]?\s*(\d{1,2})\s*[-—–~～至]\s*(\d{1,2})\s*节?\s*[）)]?/;
+
+/** 单元格 → 课程条目；一格多门课按换行/分号拆 */
+function parseCellEntries(cellText, defaultTotalWeeks) {
+  return String(cellText || '')
+    .split(/[\n\r]+/)
+    .reduce(function (acc, line) { return acc.concat(line.split(/[；;]/)); }, [])
+    .map(function (line) { return line.trim(); })
+    .filter(function (line) { return line.length >= 2; })
+    .map(function (line) { return parseCellEntry(line, defaultTotalWeeks); })
+    .filter(Boolean);
+}
+
+function parseCellEntry(raw, defaultTotalWeeks) {
+  const parts = raw.split(/[\/／⁄|]/).map(function (item) { return item.trim(); })
+    .filter(function (item) { return item.length > 0; });
+  if (!parts.length) return null;
+  const courseName = parts[0];
+  if (!courseName) return null;
+  const sectionAndWeeks = parts[1] || '';
+  const locationRaw = parts[2] || '';
+  const teacherRaw = parts.slice(3).join('/').trim();
+  const campusMatch = locationRaw.match(CAMPUS_RE);
+  return {
+    courseName: courseName,
+    teacher: teacherRaw.replace(TEACHER_TAIL_RE, '').trim(),
+    location: locationRaw.replace(CAMPUS_RE, '').trim() || locationRaw.trim(),
+    campusAlias: campusMatch ? campusMatch[1].trim() : null,
+    weekRules: parseWeekRules(sectionAndWeeks, defaultTotalWeeks),
+    rawText: raw
+  };
+}
+
+function sectionsOf(text) {
+  const match = String(text || '').match(SECTION_RE);
+  if (!match) return null;
+  const start = Number(match[1]);
+  const end = Number(match[2]);
+  if (start < 1 || start > 12 || end < 1 || end > 12) return null;
+  return { startSection: Math.min(start, end), endSection: Math.max(start, end) };
+}
+
+const WEEKDAY_ALIASES = [
+  ['星期一', '周一', '礼拜一', 'mon', 'monday'],
+  ['星期二', '周二', '礼拜二', 'tue', 'tuesday'],
+  ['星期三', '周三', '礼拜三', 'wed', 'wednesday'],
+  ['星期四', '周四', '礼拜四', 'thu', 'thursday'],
+  ['星期五', '周五', '礼拜五', 'fri', 'friday'],
+  ['星期六', '周六', '礼拜六', 'sat', 'saturday'],
+  ['星期日', '星期天', '周日', '周天', 'sun', 'sunday']
+];
+
+function weekdayIndex(text) {
+  const normalized = String(text || '').trim().toLowerCase().replace(/\s+/g, '');
+  if (!normalized) return null;
+  for (let i = 0; i < WEEKDAY_ALIASES.length; i += 1) {
+    if (WEEKDAY_ALIASES[i].some(function (alias) { return normalized.indexOf(alias) >= 0; })) return i + 1;
+  }
+  return null;
+}
+
+const CHINESE_ROWS = { '一': 1, '二': 3, '三': 5, '四': 7, '五': 9, '六': 11 };
+
+/** 行标签（一~六 / 34节 / 9-12节）→ 节次区间 */
+function sectionRangeFromLabel(text) {
+  const normalized = String(text || '').trim().replace(/\s+/g, '');
+  if (!normalized) return null;
+  const range = normalized.match(/(\d{1,2})\s*[-—–~～至]\s*(\d{1,2})/);
+  if (range) {
+    const start = Number(range[1]);
+    const end = Number(range[2]);
+    if (start >= 1 && start <= 12 && end >= 1 && end <= 12) {
+      return { startSection: Math.min(start, end), endSection: Math.max(start, end) };
+    }
+  }
+  const compact = normalized.match(/^(\d{1,2})节?$/);
+  if (compact) {
+    const digits = compact[1];
+    if (digits.length === 2 && Number(digits[0]) < Number(digits[1])) {
+      return { startSection: Number(digits[0]), endSection: Number(digits[1]) };
+    }
+    const single = Number(digits);
+    if (single >= 9) return { startSection: 9, endSection: 12 };
+    return { startSection: single, endSection: Math.min(12, single + 1) };
+  }
+  const rows = Object.keys(CHINESE_ROWS)
+    .filter(function (key) { return normalized.indexOf(key) >= 0; })
+    .map(function (key) { return CHINESE_ROWS[key]; });
+  if (rows.length) {
+    const start = Math.min.apply(null, rows);
+    const end = rows.length === 1 ? start + 1 : Math.max.apply(null, rows) + 1;
+    return { startSection: start, endSection: Math.min(12, end) };
+  }
+  const digits = normalized.match(/\d{1,2}/g);
+  if (digits && digits.length >= 2) {
+    return {
+      startSection: Math.min(Number(digits[0]), Number(digits[1])),
+      endSection: Math.max(Number(digits[0]), Number(digits[1]))
+    };
+  }
+  return null;
+}
+
+function parsePageMetadata(text) {
+  const source = String(text || '');
+  const semesterMatch = source.match(/(\d{4})\s*-\s*(\d{4})\s*年\s*第?\s*([一二1-3])\s*学期/);
+  const startMatch = source.match(/本学期\s*(\d{4})\s*[-/年]\s*(\d{1,2})\s*[-/月]\s*(\d{1,2})/)
+    || source.match(/(\d{4})\s*年?\s*[-/年]\s*(\d{1,2})\s*[-/月]\s*(\d{1,2})/);
+  const weekMatches = (source.match(/共\s*(\d{1,2})\s*周/g) || [])
+    .map(function (item) { return Number((item.match(/\d{1,2}/) || [0])[0]); })
+    .filter(function (value) { return value >= 1 && value <= 30; });
+  const other = (source.match(/其他课程[：:]\s*(.+)/) || [])[1];
+  const termLabel = { '一': '第1学期', '1': '第1学期', '二': '第2学期', '2': '第2学期', '三': '第3学期', '3': '第3学期' };
+  return {
+    semester: semesterMatch ? semesterMatch[1] + '-' + semesterMatch[2] + '年' + (termLabel[semesterMatch[3]] || '') : null,
+    startYear: startMatch ? Number(startMatch[1]) : null,
+    startMonth: startMatch ? Number(startMatch[2]) : null,
+    startDay: startMatch ? Number(startMatch[3]) : null,
+    totalWeeks: weekMatches.length ? Math.max.apply(null, weekMatches) : null,
+    otherCourseLines: other ? other.split(/[；;]/).map(function (item) { return item.trim(); }).filter(Boolean) : []
+  };
+}
+
+const TIME_RE = /\d{1,2}\s*[:：]\s*\d{2}\s*[-—–~～至]\s*\d{1,2}\s*[:：]\s*\d{2}/g;
+const SECTION_LABEL_RE = /^\s*(\d{1,2})\s*[-—–~～]?\s*(\d{1,2})?\s*节/;
+
+function resolveSectionBlock(raw, explicitEnd) {
+  const digits = String(raw).trim();
+  if (explicitEnd && explicitEnd >= 1 && explicitEnd <= 12) {
+    const start = Number(digits) || 1;
+    return start <= explicitEnd ? [start, explicitEnd] : [explicitEnd, start];
+  }
+  if (digits.length === 2) {
+    const first = Number(digits[0]);
+    const second = Number(digits[1]);
+    if (first >= 1 && first <= 9 && second > first) return [first, second];
+  }
+  const single = Number(digits) || 1;
+  return single >= 9 ? [9, 12] : [single, Math.min(12, single + 1)];
+}
+
+/** 「XX校区上课时间」分块表 → 多套节次时间表 */
+function parseTimeTables(text) {
+  const lines = String(text || '').split(/\r?\n/).map(function (line) { return line.trim(); })
+    .filter(function (line) { return line.length > 0; });
+  const profiles = [];
+  let group = null;
+  let columns = [];
+  let rows = [];
+
+  function flush() {
+    if (group && rows.length) {
+      if (columns.length <= 1) {
+        const blocks = rows.map(function (row) {
+          const time = row.times[0];
+          if (!time) return null;
+          const parts = time.split(/\s*[-—–~～至]\s*/);
+          return parts.length >= 2
+            ? { startSection: row.section[0], endSection: row.section[1], startTime: parts[0], endTime: parts[1] }
+            : null;
+        }).filter(Boolean);
+        if (blocks.length) profiles.push({ id: 'mp-' + group, name: group, blocks: blocks });
+      } else {
+        columns.forEach(function (columnName, index) {
+          const blocks = rows.map(function (row) {
+            const time = row.times[index];
+            if (!time) return null;
+            const parts = time.split(/\s*[-—–~～至]\s*/);
+            return parts.length >= 2
+              ? { startSection: row.section[0], endSection: row.section[1], startTime: parts[0], endTime: parts[1] }
+              : null;
+          }).filter(Boolean);
+          if (blocks.length) profiles.push({ id: 'mp-' + group + '-' + columnName, name: group + '·' + columnName, blocks: blocks });
+        });
+      }
+    }
+    rows = [];
+    columns = [];
+  }
+
+  lines.forEach(function (line) {
+    const header = line.match(/^(.{2,20}?校区).*上课时间/);
+    if (header) {
+      flush();
+      group = header[1].trim();
+      return;
+    }
+    if (!group) return;
+    const times = (line.match(TIME_RE) || []).map(function (item) { return item.replace(/：/g, ':'); });
+    const label = line.match(SECTION_LABEL_RE);
+    if (label && times.length) {
+      rows.push({
+        section: resolveSectionBlock(label[1], label[2] ? Number(label[2]) : null),
+        times: times
+      });
+      return;
+    }
+    if (!times.length && /楼|场/.test(line)) {
+      columns = line.split(/[\s|｜]+/).map(function (item) { return item.trim(); })
+        .filter(function (item) { return item && item !== '节次'; });
+    }
+  });
+  flush();
+  return profiles;
+}
+
+function timeRangeOf(profile, startSection, endSection) {
+  if (!profile || !profile.blocks || !profile.blocks.length) return null;
+  let start = null;
+  let end = null;
+  profile.blocks.forEach(function (block) {
+    if (startSection >= block.startSection && startSection <= block.endSection) start = block;
+    if (endSection >= block.startSection && endSection <= block.endSection) end = block;
+  });
+  if (!start) {
+    start = profile.blocks.slice().sort(function (a, b) {
+      return Math.abs(a.startSection - startSection) - Math.abs(b.startSection - startSection);
+    })[0];
+  }
+  if (!end) end = start;
+  return start && end ? { startTime: start.startTime, endTime: end.endTime } : null;
+}
+
+function resolveProfile(profiles, campusId) {
+  const list = profiles && profiles.length ? profiles : [defaultTimeProfile()];
+  if (!campusId) return list.filter(function (p) { return p.id === DEFAULT_PROFILE_ID; })[0] || list[0];
+  return list.filter(function (p) { return p.id === campusId; })[0]
+    || list.filter(function (p) { return p.id === DEFAULT_PROFILE_ID; })[0]
+    || list[0];
+}
+
+function parseTableRows(rows, defaultTotalWeeks) {
+  const warnings = [];
+  const courses = [];
+  let headerIndex = -1;
+  for (let i = 0; i < rows.length; i += 1) {
+    const count = (rows[i] || []).filter(function (cell) { return weekdayIndex(cell); }).length;
+    if (count >= 4) { headerIndex = i; break; }
+  }
+  if (headerIndex < 0) return { courses: courses, warnings: warnings };
+
+  const columns = [];
+  (rows[headerIndex] || []).forEach(function (cell, index) {
+    const weekday = weekdayIndex(cell);
+    if (weekday) columns.push({ index: index, weekday: weekday });
+  });
+
+  for (let rowIndex = headerIndex + 1; rowIndex < rows.length; rowIndex += 1) {
+    const row = rows[rowIndex] || [];
+    const rowSection = sectionRangeFromLabel(row[0] || '');
+    columns.forEach(function (column) {
+      const cell = String(row[column.index] || '').trim();
+      if (!cell) return;
+      const entries = parseCellEntries(cell, defaultTotalWeeks);
+      if (!entries.length) {
+        warnings.push('第 ' + (rowIndex + 1) + ' 行「' + cell + '」未能识别，建议手动补充');
+        return;
+      }
+      entries.forEach(function (entry) {
+        const sections = sectionsOf(entry.rawText) || rowSection;
+        if (!sections) {
+          warnings.push('「' + entry.courseName + '」缺少节次信息，已跳过');
+          return;
+        }
+        courses.push({
+          courseName: entry.courseName,
+          teacher: entry.teacher,
+          meetings: [{
+            weekday: WEEKDAYS[column.weekday - 1],
+            startSection: sections.startSection,
+            endSection: sections.endSection,
+            weekRules: entry.weekRules,
+            location: entry.location,
+            campusAlias: entry.campusAlias
+          }]
+        });
+      });
+    });
+  }
+  return { courses: courses, warnings: warnings };
+}
+
+/** 支持引号包裹的 CSV/TSV：`"12-14周(双),15-19周"` 这类含分隔符的单元格不会被拆开 */
+function splitDelimited(text, delimiter) {
+  const rows = [];
+  String(text || '').split(/\r?\n/).forEach(function (line) {
+    if (!line.trim()) return;
+    const cells = [];
+    let current = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i += 1) {
+      const char = line[i];
+      if (char === '"') {
+        if (inQuotes && line[i + 1] === '"') { current += '"'; i += 1; } else { inQuotes = !inQuotes; }
+        continue;
+      }
+      if (char === delimiter && !inQuotes) {
+        cells.push(current.trim());
+        current = '';
+        continue;
+      }
+      current += char;
+    }
+    cells.push(current.trim());
+    rows.push(cells);
+  });
+  return rows;
+}
+
+/** 列表式：每行一门课，含星期与节次 */
+function parseListStyle(lines, defaultTotalWeeks) {
+  const courses = [];
+  const warnings = [];
+  String(lines || '').split(/\r?\n/).forEach(function (line) {
+    const weekday = weekdayIndex(line);
+    const sections = sectionRangeFromLabel(line);
+    if (!weekday || !sections) return;
+    const cleaned = line.replace(/星期[一二三四五六日天]|周[一二三四五六日天]/g, '');
+    parseCellEntries(cleaned, defaultTotalWeeks).forEach(function (entry) {
+      courses.push({
+        courseName: entry.courseName,
+        teacher: entry.teacher,
+        meetings: [{
+          weekday: WEEKDAYS[weekday - 1],
+          startSection: sections.startSection,
+          endSection: sections.endSection,
+          weekRules: entry.weekRules,
+          location: entry.location,
+          campusAlias: entry.campusAlias
+        }]
+      });
+    });
+  });
+  if (!courses.length) warnings.push('未识别到课表结构，请确认内容或改用粘贴文本导入');
+  return { courses: courses, warnings: warnings };
+}
+
+function mergeCourses(courses) {
+  const order = [];
+  const grouped = {};
+  (courses || []).forEach(function (course) {
+    const key = course.courseName.trim() + '|' + String(course.teacher || '').trim();
+    if (!grouped[key]) { grouped[key] = []; order.push(key); }
+    grouped[key].push(course);
+  });
+  return order.map(function (key) {
+    const group = grouped[key];
+    const first = group[0];
+    return {
+      courseName: first.courseName,
+      teacher: first.teacher,
+      semester: first.semester || '',
+      credit: first.credit == null ? null : first.credit,
+      rawWeekText: weekRulesText((first.meetings[0] || {}).weekRules),
+      meetings: group.reduce(function (acc, item) { return acc.concat(item.meetings); }, [])
+    };
+  });
+}
+
+/** 导入总入口：rawText（粘贴文本/文本文件）或 rows（CSV/表格） */
+function parseCourseTable(rawText, rows) {
+  const metadata = parsePageMetadata(rawText || '');
+  const total = metadata.totalWeeks || DEFAULT_TOTAL_WEEKS;
+  const parsed = rows && rows.length ? parseTableRows(rows, total) : parseListStyle(rawText, total);
+  const courses = mergeCourses(parsed.courses);
+  const timeTables = parseTimeTables(rawText || '');
+  const aliases = [];
+  courses.forEach(function (course) {
+    course.meetings.forEach(function (meeting) {
+      if (meeting.campusAlias && aliases.indexOf(meeting.campusAlias) < 0) aliases.push(meeting.campusAlias);
+    });
+  });
+  return {
+    courses: courses,
+    semester: metadata.semester,
+    semesterStartDate: metadata.startYear
+      ? metadata.startYear + '-' + String(metadata.startMonth || 9).padStart(2, '0') + '-' + String(metadata.startDay || 1).padStart(2, '0')
+      : null,
+    totalWeeks: metadata.totalWeeks,
+    timeTables: timeTables,
+    campusAliases: aliases,
+    warnings: parsed.warnings
+  };
+}
+
+module.exports = {
+  WEEKDAYS: WEEKDAYS,
+  PARITY: PARITY,
+  DEFAULT_TOTAL_WEEKS: DEFAULT_TOTAL_WEEKS,
+  DEFAULT_PROFILE_ID: DEFAULT_PROFILE_ID,
+  DEFAULT_PROFILE_NAME: DEFAULT_PROFILE_NAME,
+  DEFAULT_RANGES: DEFAULT_RANGES,
+  defaultTimeProfile: defaultTimeProfile,
+  parseWeekRules: parseWeekRules,
+  weekRulesText: weekRulesText,
+  parseCellEntries: parseCellEntries,
+  parseCellEntry: parseCellEntry,
+  sectionsOf: sectionsOf,
+  weekdayIndex: weekdayIndex,
+  sectionRangeFromLabel: sectionRangeFromLabel,
+  parsePageMetadata: parsePageMetadata,
+  parseTimeTables: parseTimeTables,
+  timeRangeOf: timeRangeOf,
+  resolveProfile: resolveProfile,
+  parseTableRows: parseTableRows,
+  splitDelimited: splitDelimited,
+  parseListStyle: parseListStyle,
+  mergeCourses: mergeCourses,
+  parseCourseTable: parseCourseTable
+};

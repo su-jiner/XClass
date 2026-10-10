@@ -1,0 +1,39 @@
+<view class="page" style="background:{{palette.page}};color:{{palette.text}}">
+  <view class="page-header">
+    <view>
+      <view class="page-title">导入课表</view>
+      <view class="page-subtitle">纯本地解析：粘贴文本或从聊天记录选 txt/md/csv/tsv 文件（不支持图片/PDF）</view>
+    </view>
+  </view>
+
+  <view class="card" style="background:{{palette.panel}}">
+    <textarea
+      class="input"
+      style="background:{{palette.panelAlt}};color:{{palette.text}};width:100%;height:220rpx"
+      placeholder="粘贴课表文本，例如：信息技术/(1-2节)12-14周(双),15-19周/（乌）E406/刘文杰"
+      value="{{text}}"
+      bindinput="onTextInput"
+    />
+    <view class="button" bindtap="parseText" style="background:{{palette.panelAlt}};color:{{palette.icon}}">解析粘贴文本</view>
+    <view class="button secondary" bindtap="chooseFile" style="background:{{palette.panelAlt}};color:{{palette.text}}">从聊天记录选择文件</view>
+  </view>
+
+  <view class="card" wx:if="{{parsed}}" style="background:{{palette.panelAlt}}">
+    <view>识别到 {{preview.length}} 门课</view>
+    <view class="muted" wx:if="{{parsed.semester}}">学期：{{parsed.semester}}</view>
+    <view class="muted" wx:if="{{parsed.totalWeeks}}">总周数：{{parsed.totalWeeks}}</view>
+    <view class="muted" wx:if="{{parsed.timeTables.length}}">节次时间表：{{parsed.timeTables.length}} 套（已保存并建立校区映射）</view>
+    <view class="muted" wx:for="{{warnings}}" wx:key="*this">⚠ {{item}}</view>
+  </view>
+
+  <view class="card" wx:for="{{preview}}" wx:key="index" style="background:{{palette.panel}}">
+    <view class="row">
+      <view style="font-size:30rpx;font-weight:600">{{item.courseName}}</view>
+      <view class="muted" data-index="{{index}}" bindtap="removeCourse">删除</view>
+    </view>
+    <view class="muted">{{item.detail}}</view>
+    <view class="muted" wx:if="{{item.teacher}}">{{item.teacher}}</view>
+  </view>
+
+  <view class="button" wx:if="{{preview.length}}" bindtap="save" style="background:{{palette.panelAlt}};color:{{palette.icon}}">保存到课表</view>
+</view>
