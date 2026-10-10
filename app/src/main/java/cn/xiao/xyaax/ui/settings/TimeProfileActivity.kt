@@ -88,7 +88,10 @@ class TimeProfileActivity : AppCompatActivity() {
                 setTypeface(typeface, android.graphics.Typeface.BOLD)
             })
             addView(TextView(this@TimeProfileActivity).apply {
-                text = profile.blocks.joinToString("  ") { "${it.startSection}-${it.endSection}节 ${it.startTime}-${it.endTime}" }
+                text = profile.blocks.joinToString("  ") {
+                    val label = if (it.startSection == it.endSection) "${it.startSection}节" else "${it.startSection}-${it.endSection}节"
+                    "$label ${it.startTime}-${it.endTime}"
+                }
                 setTextColor(palette.textSecondary)
                 textSize = 12f
             })
