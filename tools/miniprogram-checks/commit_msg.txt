@@ -1,9 +1,0 @@
-fix: 修复小程序无法编译问题
-
-- project.config.json appid 还原为仓库有效 appid wxacf0e9804a8f3962
-  （此前被改为 wx71fe9ee9aa858f78，开发者工具无法编译/预览的根因）
-- timetable.js/import.js 补齐弹窗 catchtap noop 占位 handler（3 处未定义方法）
-- 诊断脚本移出 miniprogram 目录（tools/miniprogram-checks/），避免编译干扰
-
-验证：小程序 12 个 JS node --check 全过、10 个 JSON 解析全过、
-6 个 WXML 标签配对全过、wxml 事件绑定全部有定义、verify 22 项 PASS
