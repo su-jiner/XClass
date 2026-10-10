@@ -83,7 +83,7 @@ class UpdateRepositoryTest {
             apk = ApkMetadata(
                 size = 10485760L,
                 sha256 = sha256,
-                signerSha256 = "4c45560b69c1c7d1fb400a17ea5b0b9cd841fb1ab8dd9d4ef65357e78ecef3bf",
+                signerSha256 = "c385ae7041b3b5166bdd4ee9761e26d0e1c379349fa94c27365b47ba9093cebc",
                 mirrors = listOf(
                     "https://example.com/updates/android/versions/$versionCode/XClass.apk",
                     "https://github.com/su-jiner/XClass/releases/download/v$versionName/XClass.apk"

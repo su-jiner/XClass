@@ -1,5 +1,6 @@
 import SwiftUI
 import PhotosUI
+import UIKit
 
 struct SettingsPage: View {
     let palette: ThemePalette
@@ -346,6 +347,17 @@ struct SettingsPage: View {
     private var aboutSection: some View {
         Section {
             LabeledContent("版本", value: appVersion)
+            Button {
+                if let url = URL(string: "https://github.com/su-jiner/XClass/releases") {
+                    UIApplication.shared.open(url)
+                }
+            } label: {
+                HStack {
+                    Text("检查新版本").foregroundColor(palette.textPrimary)
+                    Spacer()
+                    Text("GitHub Releases").font(.system(size: 12)).foregroundColor(palette.iconTint)
+                }
+            }
         } footer: {
             Text("XClass · iOS 版，与 Android / 鸿蒙 / 微信小程序功能对齐")
         }

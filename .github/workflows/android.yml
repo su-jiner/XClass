@@ -25,12 +25,14 @@ jobs:
 
   # 发布签名构建：仅在打 tag（v*）时触发。
   # 签名凭据全部来自 GitHub Secrets（仓库不再提交任何密码/密钥文件）：
-  #   ANDROID_KEYSTORE_BASE64  - key.jks 的 base64 文本
-  #   ANDROID_STORE_PASSWORD   - store 密码
-  #   ANDROID_KEY_PASSWORD     - key 密码
-  #   ANDROID_KEY_ALIAS        - 别名（可选，默认 XiaoXiao）
+  #   ANDROID_KEYSTORE_BASE64  - key.jks 的 base64 文本（含 XiaoXiao 与 update-key 两个别名）
+  #   ANDROID_STORE_PASSWORD   - store 密码（PKCS12 下 key 密码与 store 密码相同）
+  #   ANDROID_KEY_PASSWORD     - key 密码（与 STORE 相同即可）
+  #   ANDROID_KEY_ALIAS        - APK 签名别名（keystore 实际为小写 xiaoxiao）
   release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
       - uses: actions/checkout@v7
@@ -55,8 +57,73 @@ jobs:
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: bash ./gradlew assembleRelease --no-daemon
+      - name: Rename APK to stable asset name
+        run: |
+          set -euo pipefail
+          APK=$(ls app/build/outputs/apk/release/*.apk | head -1)
+          cp "$APK" XClass.apk
+          ls -la XClass.apk
+      - name: Sign update manifest (stable.json)
+        env:
+          KEYSTORE_PATH: ${{ runner.temp }}/keystore/key.jks
+          STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          APK=XClass.apk
+          SIZE=$(stat -c%s "$APK")
+          SHA256=$(sha256sum "$APK" | cut -d' ' -f1)
+          SIGNER=$(keytool -exportcert -alias "$KEY_ALIAS" -keystore "$KEYSTORE_PATH" -storepass "$STORE_PASSWORD" -rfc \
+            | openssl x509 -noout -fingerprint -sha256 | sed 's/.*=//;s/://g' | tr 'A-F' 'a-f')
+          VERSION_CODE=$(grep -oP 'versionCode\s*=\s*\K\d+' app/build.gradle.kts)
+          VERSION_NAME=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts)
+          PUBLISHED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          export SIZE SHA256 SIGNER VERSION_CODE VERSION_NAME PUBLISHED_AT
+          python3 - <<'PY'
+          import json, os
+          payload = {
+            "schema": 1,
+            "packageName": "cn.xiao.xyaax",
+            "channel": "stable",
+            "versionCode": int(os.environ["VERSION_CODE"]),
+            "versionName": os.environ["VERSION_NAME"],
+            "minSdk": 26,
+            "publishedAt": os.environ["PUBLISHED_AT"],
+            "notes": ["XClass " + os.environ["VERSION_NAME"] + " 正式发布：签名构建 APK，GitHub Release 提供应用内更新检测。"],
+            "apk": {
+              "size": int(os.environ["SIZE"]),
+              "sha256": os.environ["SHA256"],
+              "signerSha256": os.environ["SIGNER"],
+              "mirrors": ["https://github.com/su-jiner/XClass/releases/latest/download/XClass.apk"]
+            }
+          }
+          with open("payload.json", "w", encoding="utf-8", newline="\n") as f:
+              f.write(json.dumps(payload, ensure_ascii=False, separators=(",", ":")))
+          PY
+          javac -encoding UTF-8 tools/update-sign/SignManifest.java
+          java -cp tools/update-sign SignManifest sign payload.json \
+            "$KEYSTORE_PATH" "$STORE_PASSWORD" "$STORE_PASSWORD" update-key main-2026 stable.json
+          # 用 update-key 公钥自校验信封签名
+          PUB_B64=$(keytool -exportcert -alias update-key -keystore "$KEYSTORE_PATH" -storepass "$STORE_PASSWORD" -rfc \
+            | openssl x509 -pubkey -noout | sed '1d;$d' | tr -d '\n')
+          java -cp tools/update-sign SignManifest verify stable.json "$PUB_B64"
+          echo "--- payload ---"; python3 -c "import json,base64;print(json.dumps(json.loads(base64.urlsafe_b64decode(json.load(open('stable.json'))['payload'])),ensure_ascii=False,indent=2))"
       - name: Upload release APK
         uses: actions/upload-artifact@v4
         with:
           name: xclass-release-apk
           path: app/build/outputs/apk/release/*.apk
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: XClass ${{ github.ref_name }}
+          body: |
+            ## XClass ${{ github.ref_name }}
+
+            - 签名正式 APK（GitHub Actions + 仓库 Secrets 签名凭据）
+            - 签名更新清单 stable.json（应用内更新检测入口）
+            - 下载安装后，设置页「检查新版本」可检测后续版本
+          files: |
+            XClass.apk
+            stable.json

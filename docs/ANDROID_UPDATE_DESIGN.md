@@ -1,6 +1,6 @@
 # Android 应用内更新设计
 
-状态：设计稿，**当前未启用**。应用内更新源为空（`UpdateSecurityConfig.DEFAULT_ENDPOINTS = emptyList()`），设置页只展示版本号、不做检查；客户端下载/验签/安装链路与单元测试保留，发布渠道确定后填入清单地址即可启用。适用于 `cn.xiao.xyaax` Android APK；不涉及 iOS、鸿蒙或应用商店内更新。
+状态：**已启用（v1.1.0-Beta 起）**。正式入口为 GitHub Release 上由 CI 签名构建并发布的 `stable.json`（`UpdateSecurityConfig.DEFAULT_ENDPOINTS` 已指向 GitHub），设置页版本行支持手动检查更新；客户端下载/验签/安装链路与单元测试随 CI 一起跑。适用于 `cn.xiao.xyaax` Android APK；不涉及 iOS、鸿蒙或应用商店内更新（三端设置页提供 GitHub Releases 检查入口）。
 
 ## 1. 现状与目标
 
@@ -35,7 +35,7 @@ flowchart LR
 稳定版只认下列两个清单入口。两端发布**完全相同的字节**：
 
 1. 国内：`<国内镜像域名>/updates/android/stable.json`（暂未启用）
-2. 海外：`https://github.com/su-jiner/XClass/releases/latest/download/stable.json`（仓库已就绪，清单待发布）
+2. 海外：`https://github.com/su-jiner/XClass/releases/latest/download/stable.json`（v1.1.0-Beta 起随 Release 发布）
 
 清单是一个 JSON 信封，`payload` 为 Base64URL 编码的 UTF-8 JSON 原始字节，`signature` 为针对这些**原始字节**计算的 `SHA256withRSA` 签名。先验签，再解析业务字段，避免 JSON 字段顺序、空白和转义造成签名歧义。`keyId` 用于以后增加公钥；旧公钥保留到所有仍可更新的客户端淘汰。
 
@@ -54,10 +54,10 @@ flowchart LR
   "apk": {
     "size": 10000000,
     "sha256": "64 位小写十六进制 SHA-256",
-    "signerSha256": "4c45560b69c1c7d1fb400a17ea5b0b9cd841fb1ab8dd9d4ef65357e78ecef3bf",
+    "signerSha256": "c385ae7041b3b5166bdd4ee9761e26d0e1c379349fa94c27365b47ba9093cebc",
     "mirrors": [
       "<国内镜像域名>/updates/android/versions/6/XClass.apk",
-      "https://github.com/su-jiner/XClass/releases/download/v1.0.0-Beta/XClass.apk"
+      "https://github.com/su-jiner/XClass/releases/download/v1.1.0-Beta/XClass.apk"
     ]
   }
 }

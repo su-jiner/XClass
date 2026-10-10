@@ -1,0 +1,8 @@
+feat: 启用正式发布链路（v1.1.0-Beta / versionCode 2）
+
+- 版本 bump：Android versionCode=2、versionName=1.1.0-Beta；iOS MARKETING_VERSION/CURRENT_PROJECT_VERSION；鸿蒙 app.json5；小程序设置页版本号
+- UpdateSecurityConfig：OFFICIAL_SIGNER_SHA256 换为新 keystore（XiaoXiao）证书指纹、TRUSTED_PUBLIC_KEYS 换为 update-key 公钥、DEFAULT_ENDPOINTS 指向 GitHub Release stable.json（应用内更新链路启用）
+- 更新链路单测指纹同步（UpdateManifestVerifier/UpdateRepository/ApkDownloader 三个测试文件）
+- 三端设置页新增检查新版本入口：iOS/鸿蒙打开 GitHub Releases、小程序复制下载页链接
+- CI release job 扩展：签名构建 APK → 重命名 XClass.apk → 提取 size/sha256/signerSha256/version 元数据 → Python 生成无 BOM payload → SignManifest 签名 → 用 update-key 公钥自校验 → action-gh-release 创建 Release（XClass.apk + stable.json）
+- 新增 tools/update-sign/SignManifest.java（纯 JDK 更新清单签名/验签工具，CI 与本机通用），本机签验闭环 VERIFY OK

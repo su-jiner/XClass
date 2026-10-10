@@ -72,7 +72,7 @@ class UpdateManifestVerifierTest {
           "apk": {
             "size": 10240000,
             "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-            "signerSha256": "4c45560b69c1c7d1fb400a17ea5b0b9cd841fb1ab8dd9d4ef65357e78ecef3bf",
+            "signerSha256": "c385ae7041b3b5166bdd4ee9761e26d0e1c379349fa94c27365b47ba9093cebc",
             "mirrors": [
               "https://example.com/updates/android/versions/6/XClass.apk",
               "https://github.com/su-jiner/XClass/releases/download/v2.2.0/XClass.apk"
@@ -185,7 +185,7 @@ class UpdateManifestVerifierTest {
     fun testNonOfficialApkSignerFailsEvenWithValidManifestSignature() {
         val otherSigner = "a".repeat(64)
         val payload = validPayloadJson.replace(
-            "4c45560b69c1c7d1fb400a17ea5b0b9cd841fb1ab8dd9d4ef65357e78ecef3bf",
+            "c385ae7041b3b5166bdd4ee9761e26d0e1c379349fa94c27365b47ba9093cebc",
             otherSigner
         )
         val result = UpdateManifestVerifier.verifyAndParse(

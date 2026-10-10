@@ -14,8 +14,8 @@ android {
         applicationId = "cn.xiao.xyaax"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0.0-Beta"
+        versionCode = 2
+        versionName = "1.1.0-Beta"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // 离线 OCR 依赖体积较大：只保留主流手机 ABI

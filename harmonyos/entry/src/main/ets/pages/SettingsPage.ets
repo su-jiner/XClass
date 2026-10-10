@@ -48,9 +48,18 @@ export struct SettingsPage {
       const info = bundleManager.getBundleInfoForSelf(bundleManager.BundleFlag.GET_BUNDLE_INFO_DEFAULT);
       return info.versionName;
     } catch (error) {
-      return '1.0.0-Beta';
+      return '1.1.0-Beta';
     }
   })();
+  /** 打开 GitHub Releases 检查新版本。 */
+  private checkUpdate(): void {
+    try {
+      const ctx = this.getUIContext().getHostContext() as common.UIAbilityContext;
+      ctx.openLink('https://github.com/su-jiner/XClass/releases');
+    } catch (error) {
+      // 打开失败时静默，不影响设置页
+    }
+  }
   private themeOptions: string[] = ['暖色', '海蓝', '薄荷', '樱粉', '墨夜'];
   private themeValues: string[] = ['warm', 'ocean', 'mint', 'sakura', 'midnight'];
   private appearanceOptions: string[] = ['跟随系统', '浅色', '深色'];
@@ -432,6 +441,15 @@ export struct SettingsPage {
         }
         .width('100%')
         .margin({ top: 8 })
+
+        Text('检查新版本 · GitHub Releases')
+          .fontSize(12)
+          .fontColor(this.palette().textSecondary)
+          .width('100%')
+          .margin({ top: 12 })
+          .onClick(() => {
+            this.checkUpdate();
+          })
 
         Text(`XClass · 鸿蒙版 ${this.appVersion}`)
           .fontSize(11)

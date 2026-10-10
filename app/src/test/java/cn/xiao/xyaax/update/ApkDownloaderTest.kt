@@ -65,7 +65,7 @@ class ApkDownloaderTest {
             apk = ApkMetadata(
                 size = size,
                 sha256 = "0000000000000000000000000000000000000000000000000000000000000000",
-                signerSha256 = "4c45560b69c1c7d1fb400a17ea5b0b9cd841fb1ab8dd9d4ef65357e78ecef3bf",
+                signerSha256 = "c385ae7041b3b5166bdd4ee9761e26d0e1c379349fa94c27365b47ba9093cebc",
                 mirrors = mirrors
             )
         )

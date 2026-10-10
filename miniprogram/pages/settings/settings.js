@@ -14,7 +14,7 @@ Page({
     profiles: [],
     timeProfiles: [],
     defaultTimeProfileId: 'default',
-    version: '1.0.0-Beta',
+    version: '1.1.0-Beta',
   },
   onShow() {
     if (this.getTabBar && this.getTabBar()) this.getTabBar().setData({ selected: 3 });
@@ -160,6 +160,12 @@ Page({
         this.reload();
         wx.showToast({ title: `已添加 ${profiles.length} 套时间表`, icon: 'none' });
       },
+    });
+  },
+  checkUpdate() {
+    wx.setClipboardData({
+      data: 'https://github.com/su-jiner/XClass/releases',
+      success: () => wx.showToast({ title: '已复制版本下载页链接', icon: 'none' }),
     });
   },
   writeCalendar() {
