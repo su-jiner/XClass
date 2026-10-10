@@ -565,6 +565,35 @@ export interface ParsedCellEntry {
   rawText: string;
 }
 
+/** 非课程噪声过滤：与 Android/iOS/小程序一致。丢弃表头、行标签、页脚注释与「其他课程」汇总行。 */
+const NOISE_LINE_PREFIX = /^(其他课程[：:]?|注[一二三四五]?[：:]?|说明[：:]?|备注[：:]?|打印时间|本学期|内容顺序|专业[：:]?|节次[：:]?|校区|上课时间|课程表?[：:]?|上午|下午|晚上|学期|\d{4}\s*[-—–~～至/]\s*\d{4}\s*年?)/;
+const NOISE_CELL_PREFIX = /^(其他课程[：:]?|注[一二三四五]?[：:]?|说明[：:]?|备注[：:]?|打印时间|本学期|内容顺序|专业[：:]?|节次[：:]?|校区|上课时间|课程表?[：:]?|星期[一二三四五六日天]$|上午|下午|晚上|学期|\d{4}\s*[-—–~～至/]\s*\d{4}\s*年?)/;
+const MAX_COURSE_NAME_LENGTH = 40;
+
+/** 整行是否应被当作噪声跳过（不解析为课程）。 */
+export function isNoiseLine(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed) return true;
+  if (NOISE_LINE_PREFIX.test(trimmed)) return true;
+  const hasCourseMark = trimmed.indexOf('/') >= 0 || trimmed.indexOf('节') >= 0 || trimmed.indexOf('周') >= 0;
+  return !hasCourseMark;
+}
+
+/** 单元格中的课程名是否像噪声（丢弃）。 */
+export function isNoiseCourseName(name: string): boolean {
+  const trimmed = name.trim();
+  if (!trimmed) return true;
+  if (trimmed.length > MAX_COURSE_NAME_LENGTH) return true;
+  if (NOISE_CELL_PREFIX.test(trimmed)) return true;
+  return /^\d{1,2}\s*[:：]\s*\d{2}/.test(trimmed);
+}
+
+/** 分享文本占位符归一化：空字段用 "-" 占位，导入时还原为空。 */
+export function normalizePlaceholder(value: string): string {
+  const trimmed = value.trim();
+  return trimmed === '-' || trimmed === '—' ? '' : trimmed;
+}
+
 /** 单元格：课程◇(节次)周次◇地点◇教师；一格多课按换行/分号拆 */
 export function parseCellEntries(cellText: string, defaultTotalWeeks: number = DEFAULT_TOTAL_WEEKS): ParsedCellEntry[] {
   const lines: string[] = [];
@@ -574,14 +603,16 @@ export function parseCellEntries(cellText: string, defaultTotalWeeks: number = D
     if (line.length < 2) return;
     const parts = line.split(/[\/／⁄|]/).map((item) => item.trim()).filter((item) => item.length > 0);
     if (!parts.length) return;
+    // 噪声守卫：表头/页脚/说明文字不应成为课程
+    if (isNoiseCourseName(parts[0])) return;
     const sectionAndWeeks = parts.length > 1 ? parts[1] : '';
     const locationRaw = parts.length > 2 ? parts[2] : '';
     const teacherRaw = parts.length > 3 ? parts.slice(3).join('/') : '';
     const campusMatch = locationRaw.match(CAMPUS_RE);
     entries.push({
       courseName: parts[0],
-      teacher: teacherRaw.replace(TEACHER_TAIL_RE, '').trim(),
-      location: locationRaw.replace(CAMPUS_RE, '').trim() || locationRaw.trim(),
+      teacher: normalizePlaceholder(teacherRaw.replace(TEACHER_TAIL_RE, '').trim()),
+      location: normalizePlaceholder(locationRaw.replace(CAMPUS_RE, '').trim() || locationRaw.trim()),
       campusAlias: campusMatch ? campusMatch[1].trim() : null,
       weekRules: parseWeekRulesText(sectionAndWeeks, defaultTotalWeeks),
       rawText: line,
@@ -768,6 +799,8 @@ export function parseCourseTableText(rawText: string, rows: string[][] | null = 
       });
       for (let rowIndex = headerIndex + 1; rowIndex < rows.length; rowIndex++) {
         const row = rows[rowIndex];
+        // 行级噪声过滤：表头/页脚/「其他课程」/「注一」等整行文本不得进入星期列
+        if (isNoiseLine(row.join(' '))) continue;
         const rowSection = sectionRangeFromLabel(row.length ? row[0] : '');
         columns.forEach((column) => {
           const cell = (row[column.index] ?? '').trim();
@@ -850,6 +883,12 @@ export function parseCourseTableText(rawText: string, rows: string[][] | null = 
     if (meeting.campusAlias && aliases.indexOf(meeting.campusAlias) < 0) aliases.push(meeting.campusAlias);
   }));
 
+  // 表外课程（「其他课程：」汇总行）：缺少星期/节次，无法放入课表网格，仅提示
+  const otherLines = metadata.otherCourseLines as string[];
+  if (otherLines && otherLines.length) {
+    warnings.push(`检测到表外课程（缺少星期与节次，未纳入课表）：${otherLines.slice(0, 5).join('；')}`);
+  }
+
   const startYear = metadata.startYear as number;
   const startMonth = metadata.startMonth as number;
   const startDay = metadata.startDay as number;
@@ -871,4 +910,201 @@ export function sectionTimeText(profiles: SectionTimeProfile[], meeting: Meeting
   const range = timeRangeOf(profile, meeting.startSection, meeting.endSection)
     ?? timeRangeOf(resolveProfile(profiles, null), meeting.startSection, meeting.endSection);
   return range ? `${range.startTime}-${range.endTime}` : '--:--';
+}
+
+// MARK: XClass 专属课表分享文本 v1（与 Android ShareTextCodec / iOS ShareTextCodec / 小程序 encodeShareText 一致）
+
+const SHARE_WEEKDAY_LABELS: string[] = ['星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日'];
+
+/** 生成课表分享文本：每行 `星期X 课程名/(节次)周次/地点/教师`，# 开头为元数据注释。 */
+export function encodeShareText(
+  courses: CourseSchedule[],
+  profileName: string | null = null,
+  semester: string | null = null,
+  semesterStart: string | null = null,
+  totalWeeks: number | null = null,
+  campusIdToAlias: Record<string, string> = {}
+): string {
+  const lines: string[] = [];
+  lines.push('# XClass 课表分享 v1');
+  if (profileName && profileName.trim().length > 0) lines.push(`# 课表：${profileName}`);
+  if (semester && semester.trim().length > 0) lines.push(`# 学期：${semester}`);
+  if (semesterStart && semesterStart.trim().length > 0) lines.push(`# 学期开始：${semesterStart}`);
+  if (totalWeeks && totalWeeks >= 1 && totalWeeks <= 60) lines.push(`# 总周数：${totalWeeks}`);
+
+  const rows: string[] = [];
+  courses.forEach((course) => {
+    (course.meetings ?? []).forEach((meeting) => {
+      if (meeting.weekday < 1 || meeting.weekday > 7) return;
+      const day = SHARE_WEEKDAY_LABELS[meeting.weekday - 1];
+      const sections = `${meeting.startSection}-${meeting.endSection}节`;
+      const weeks = (course.rawWeekText && course.rawWeekText.trim().length > 0)
+        ? course.rawWeekText
+        : weekRulesToText(meeting.weekRules);
+      const alias = meeting.campusId ? (campusIdToAlias[meeting.campusId] ?? '') : '';
+      let location = '';
+      if (alias.length > 0) location += `（${alias}）`;
+      location += meeting.location.trim();
+      if (location.length === 0) location = '-';
+      const teacher = course.teacher.trim();
+      rows.push(`${day} ${course.courseName}/(${sections})${weeks}/${location}/${teacher.length === 0 ? '-' : teacher}`);
+    });
+  });
+
+  const unique = rows.filter((value, index) => rows.indexOf(value) === index).sort();
+  unique.forEach((row) => lines.push(row));
+  return lines.join('\n') + '\n';
+}
+
+// MARK: 工具页逻辑（绩点 / 成绩 / 考试 / 学业，与 Android GpaCalculator + 小程序 tools.js 对齐）
+
+export interface GpaCourse {
+  courseName: string;
+  credit: number;
+  gradeType: string; // 'percent' | 'level'
+  score: number;
+  level: string;
+  included: boolean;
+}
+
+export interface GradeEntry {
+  courseName: string;
+  credit: number;
+  score: number;
+  semester: string;
+}
+
+export interface ExamEntry {
+  courseName: string;
+  time: string;
+  location: string;
+  seat: string;
+}
+
+export interface ProgressInfo {
+  totalRequired: number;
+  totalEarned: number;
+}
+
+export interface ProgressModule {
+  name: string;
+  required: number;
+  earned: number;
+}
+
+const LEVEL_SCORES: Record<string, number> = { '优秀': 95, '良好': 85, '中等': 75, '及格': 65, '不及格': 50 };
+
+/** 百分制分数 → 4.0 制绩点（吉林大学档位映射，与 Android GpaCalculator 一致） */
+export function gpaOfScore(score: number): number {
+  if (score >= 90) return 4.0;
+  if (score >= 85) return 3.7;
+  if (score >= 82) return 3.3;
+  if (score >= 78) return 3.0;
+  if (score >= 75) return 2.7;
+  if (score >= 72) return 2.3;
+  if (score >= 68) return 2.0;
+  if (score >= 64) return 1.5;
+  if (score >= 60) return 1.0;
+  return 0;
+}
+
+export function scoreOfGrade(grade: GpaCourse): number {
+  if (grade.gradeType === 'level') return LEVEL_SCORES[grade.level] ?? 0;
+  return grade.score;
+}
+
+/** 绩点汇总：GPA（学分加权）、加权平均分、算术平均分、总学分 */
+export function gpaSummary(courses: GpaCourse[]): { gpa: string; weighted: string; arithmetic: string; credits: string } {
+  let creditSum = 0;
+  let weighted = 0;
+  let gpaSum = 0;
+  let arithmetic = 0;
+  let count = 0;
+  courses.forEach((course) => {
+    if (course.included === false) return;
+    const score = scoreOfGrade(course);
+    const credit = Number(course.credit ?? 0);
+    creditSum += credit;
+    weighted += score * credit;
+    gpaSum += gpaOfScore(score) * credit;
+    arithmetic += score;
+    count += 1;
+  });
+  const fmt = (value: number, digits: number): string => {
+    const factor = Math.pow(10, digits);
+    return (Math.round(value * factor) / factor).toFixed(digits);
+  };
+  return {
+    gpa: creditSum > 0 ? fmt(gpaSum / creditSum, 2) : '0.00',
+    weighted: creditSum > 0 ? fmt(weighted / creditSum, 2) : '0.00',
+    arithmetic: count > 0 ? fmt(arithmetic / count, 2) : '0.00',
+    credits: fmt(creditSum, 1),
+  };
+}
+
+/** 成绩按学期分组，附学分合计与加权平均 */
+export function groupGradesBySemester(grades: GradeEntry[]): Array<{ name: string; items: GradeEntry[]; credits: number; average: number; count: number }> {
+  const order: string[] = [];
+  const grouped: Record<string, GradeEntry[]> = {};
+  grades.forEach((grade) => {
+    const key = (grade.semester ?? '').trim() || '未标注学期';
+    if (!grouped[key]) { grouped[key] = []; order.push(key); }
+    grouped[key].push(grade);
+  });
+  return order.map((key) => {
+    const items = grouped[key];
+    let creditSum = 0;
+    let weighted = 0;
+    items.forEach((item) => {
+      const credit = Number(item.credit ?? 0);
+      creditSum += credit;
+      weighted += Number(item.score ?? 0) * credit;
+    });
+    return {
+      name: key,
+      items: items,
+      credits: creditSum,
+      average: creditSum > 0 ? weighted / creditSum : 0,
+      count: items.length,
+    };
+  });
+}
+
+/** 最近一场考试倒计时文案 */
+export function examCountdownText(exams: ExamEntry[], nowMs: number = Date.now()): string {
+  if (exams.length === 0) return '暂无考试安排';
+  let upcoming: ExamEntry | null = null;
+  let upcomingTime = 0;
+  exams.forEach((exam) => {
+    const time = parseExamTimeMs(exam.time);
+    if (time !== null && time >= nowMs && (upcomingTime === 0 || time < upcomingTime)) {
+      upcoming = exam;
+      upcomingTime = time;
+    }
+  });
+  if (upcoming === null) return '考试均已结束';
+  const diffMs = upcomingTime - nowMs;
+  const days = Math.floor(diffMs / 86400000);
+  const hours = Math.floor((diffMs % 86400000) / 3600000);
+  return `距离「${upcoming.courseName}」还有 ${days} 天 ${hours} 小时`;
+}
+
+function parseExamTimeMs(text: string): number | null {
+  const match = String(text ?? '').match(/(\d{4})-(\d{1,2})-(\d{1,2})[ T]?(\d{1,2})?:?(\d{2})?/);
+  if (match === null) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]) - 1;
+  const day = Number(match[3]);
+  const hour = Number(match[4] ?? 8);
+  const minute = Number(match[5] ?? 30);
+  return new Date(year, month, day, hour, minute).getTime();
+}
+
+/** 按成绩累计已修学分（>=60 视为通过），用于学业完成页 */
+export function earnedCreditsFromGrades(grades: GradeEntry[]): number {
+  let sum = 0;
+  grades.forEach((grade) => {
+    if (Number(grade.score ?? 0) >= 60) sum += Number(grade.credit ?? 0);
+  });
+  return Math.round(sum * 10) / 10;
 }

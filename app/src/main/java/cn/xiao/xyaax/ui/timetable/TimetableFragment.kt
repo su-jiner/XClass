@@ -1,5 +1,6 @@
 package cn.xiao.xyaax.ui.timetable
 
+import android.content.Intent
 import android.graphics.Color
 import androidx.activity.result.contract.ActivityResultContracts
 import android.content.res.ColorStateList
@@ -27,12 +28,16 @@ import cn.xiao.xyaax.R
 import cn.xiao.xyaax.data.AppPreferences
 import cn.xiao.xyaax.data.ImportedScheduleStorage
 import cn.xiao.xyaax.data.ScheduleRepository
+import cn.xiao.xyaax.data.TimeProfileStore
 import cn.xiao.xyaax.domain.SectionTimes
+import cn.xiao.xyaax.importing.ShareTextCodec
 import cn.xiao.xyaax.model.WeekParity
 import cn.xiao.xyaax.model.Weekday
 import cn.xiao.xyaax.ui.theme.ThemePaletteProvider
 import cn.xiao.xyaax.ui.theme.UiFeedback
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -294,9 +299,45 @@ class TimetableFragment : Fragment() {
                 }
             }
             .setNegativeButton(R.string.action_cancel, null)
+            .setNeutralButton(R.string.add_chooser_export) { _, _ -> exportShareText() }
             .create()
         dialog.show()
         UiFeedback.styleDialogSurface(dialog, ThemePaletteProvider.fromContext(ctx))
+    }
+
+    /** 导出当前课表为 XClass 分享文本：通过系统分享发给朋友，对方粘贴/打开即可导入。 */
+    private fun exportShareText() {
+        val ctx = requireContext()
+        lifecycleScope.launch {
+            val text = withContext(Dispatchers.IO) {
+                val filesDir = ctx.filesDir
+                val courses = ImportedScheduleStorage.loadActiveCourses(filesDir)
+                if (courses.isEmpty()) return@withContext ""
+                val active = ImportedScheduleStorage.listProfiles(filesDir).firstOrNull { it.isActive }
+                val semesterStart = ImportedScheduleStorage.getActiveSemesterStartDate(filesDir)
+                val campusMap = TimeProfileStore.loadCampusMap(filesDir)
+                val idToAlias = campusMap.entries.associate { (alias, id) -> id to alias }
+                val semester = courses.firstOrNull { it.semester.isNotBlank() }?.semester
+                val totalWeeks = courses.flatMap { it.meetings }.flatMap { it.weekRules }.maxOfOrNull { it.endWeek }
+                ShareTextCodec.encode(
+                    courses = courses,
+                    profileName = active?.name,
+                    semester = semester,
+                    semesterStart = semesterStart,
+                    totalWeeks = totalWeeks,
+                    campusIdToAlias = idToAlias
+                )
+            }
+            if (text.isBlank()) {
+                UiFeedback.showMessage(requireView(), getString(R.string.import_empty), ThemePaletteProvider.fromContext(ctx))
+                return@launch
+            }
+            val send = Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_TEXT, text)
+            }
+            startActivity(Intent.createChooser(send, getString(R.string.add_chooser_export_title)))
+        }
     }
 
     private fun showManualAddDialog() {

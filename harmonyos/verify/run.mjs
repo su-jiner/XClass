@@ -51,6 +51,8 @@ import {
   parseWeekRulesText, weekRulesToText, parseCellEntries, sectionsOfText,
   sectionRangeFromLabel, weekdayIndexOfText, parsePageMetadata, parseTimeTablesText,
   parseCourseTableText, sectionTimeText, decodeBackupEnvelope,
+  isNoiseLine, isNoiseCourseName, normalizePlaceholder, encodeShareText,
+  gpaOfScore, scoreOfGrade, gpaSummary, groupGradesBySemester, examCountdownText, earnedCreditsFromGrades,
 } from './Core.ts';
 
 const results = [];
@@ -237,6 +239,135 @@ test('backup v2 keeps campus and time profiles', () => {
   assert.equal(restored.meetings[0].campusId, 'hm-wu');
   const v1 = decodeBackup(JSON.stringify({ version: 1, exportedAt: '', profiles: [{ name: '旧', semesterStartDate: null, courses: [] }] }));
   assert.equal(v1.length, 1);
+});
+
+// ---- 图片识别噪声过滤（页脚/表头不得成为课程） ----
+test('filters footer noise rows from grid', () => {
+  const rows = [
+    ['节次', '星期一', '星期二', '星期三', '星期四', '星期五'],
+    ['一', '体育（一）/(1-2节)7-19周/体育场1/殷乐', '', '', '', ''],
+    ['注一内容顺序为：课程◇周次◇地点◇教师 本学期2026-08-31正式上课至2027-01-22结束，共21周.', '', '', '', '', ''],
+    ['其他课程：军训技能张爽(共19周)/1-19周； 入学教育张爽(共19周)/1-19周；', '', '', '', '', ''],
+    ['2026-2027年第1学期 云计算261课表', '', '', '', '', ''],
+    ['打印时间：2026-10-09', '', '', '', '', ''],
+  ];
+  const parsed = parseCourseTableText(rows.map(r => r.join(' ')).join('\n'), rows);
+  assert.equal(parsed.courses.length, 1, '噪声行不得成为课程');
+  assert.equal(parsed.courses[0].courseName, '体育（一）');
+  assert.ok(parsed.warnings.some(w => w.indexOf('表外课程') >= 0), '表外课程应以 warning 提示');
+});
+
+test('filters noise course names inside cells', () => {
+  const entries = parseCellEntries('注一内容顺序为：课程◇周次◇地点◇教师\n打印时间：2026-10-09\n体育（一）/(1-2节)7-19周/体育场1/殷乐');
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].courseName, '体育（一）');
+});
+
+test('keeps real courses in list mode with weekday prefix', () => {
+  const parsed = parseCourseTableText('星期一 体育（一）/(1-2节)7-19周/体育场1/殷乐\n星期二 信息技术/(1-2节)12-14周(双),15-19周/（乌）E406/刘文杰');
+  assert.equal(parsed.courses.length, 2);
+});
+
+test('normalizes share placeholders', () => {
+  const entry = parseCellEntries('自习/(1-2节)1-16周/-/-')[0];
+  assert.equal(entry.courseName, '自习');
+  assert.equal(entry.location, '');
+  assert.equal(entry.teacher, '');
+});
+
+// ---- XClass 分享文本 v1 导出/导入回路 ----
+const shareCourses = [
+  {
+    courseName: '体育（一）', teacher: '殷乐', semester: '2026-2027年第1学期', credit: null, rawWeekText: '7-19周',
+    meetings: [{ weekday: 1, startSection: 1, endSection: 2, weekRules: [{ startWeek: 7, endWeek: 19, parity: 'ALL' }], location: '体育场1', campusId: null }],
+  },
+  {
+    courseName: '信息技术', teacher: '刘文杰', semester: '2026-2027年第1学期', credit: null, rawWeekText: '12-14周(双),15-19周',
+    meetings: [{ weekday: 2, startSection: 1, endSection: 2, weekRules: [{ startWeek: 12, endWeek: 14, parity: 'EVEN' }, { startWeek: 15, endWeek: 19, parity: 'ALL' }], location: 'E406', campusId: 'hm-wu' }],
+  },
+  {
+    courseName: '自习', teacher: '', semester: '', credit: null, rawWeekText: '1-16周',
+    meetings: [{ weekday: 5, startSection: 9, endSection: 10, weekRules: [{ startWeek: 1, endWeek: 16, parity: 'ALL' }], location: '', campusId: null }],
+  },
+];
+
+test('encodes share text with header and sorted rows', () => {
+  const text = encodeShareText(shareCourses, '默认课表', '2026-2027年第1学期', '2026-08-31', 21, { 'hm-wu': '乌' });
+  assert.ok(text.startsWith('# XClass 课表分享 v1'));
+  assert.ok(text.indexOf('# 课表：默认课表') >= 0);
+  assert.ok(text.indexOf('# 学期开始：2026-08-31') >= 0);
+  assert.ok(text.indexOf('星期一 体育（一）/(1-2节)7-19周/体育场1/殷乐') >= 0);
+  assert.ok(text.indexOf('星期二 信息技术/(1-2节)12-14周(双),15-19周/（乌）E406/刘文杰') >= 0);
+  assert.ok(text.indexOf('星期五 自习/(9-10节)1-16周/-/-') >= 0);
+});
+
+test('share text round-trips back into courses', () => {
+  const text = encodeShareText(shareCourses, '默认课表', '2026-2027年第1学期', '2026-08-31', 21, { 'hm-wu': '乌' });
+  const parsed = parseCourseTableText(text);
+  assert.equal(parsed.courses.length, 3);
+  const pe = parsed.courses.find(c => c.courseName === '体育（一）');
+  assert.equal(pe.teacher, '殷乐');
+  assert.equal(pe.meetings[0].startSection, 1);
+  assert.equal(pe.meetings[0].endSection, 2);
+  assert.equal(pe.meetings[0].weekRules[0].startWeek, 7);
+  const info = parsed.courses.find(c => c.courseName === '信息技术');
+  assert.equal(info.meetings[0].campusAlias, '乌');
+  assert.equal(info.meetings[0].weekRules[0].parity, 'EVEN');
+  const study = parsed.courses.find(c => c.courseName === '自习');
+  assert.equal(study.teacher, '');
+  assert.equal(study.meetings[0].location, '');
+});
+
+// ---- 工具页逻辑（绩点/成绩/考试/学业） ----
+const gpaCourses = [
+  { courseName: '高等数学', credit: 4, gradeType: 'percent', score: 92, level: '', included: true },
+  { courseName: '大学物理', credit: 3, gradeType: 'percent', score: 85, level: '', included: true },
+  { courseName: '体育', credit: 1, gradeType: 'level', score: 0, level: '优秀', included: true },
+  { courseName: '已排除课程', credit: 2, gradeType: 'percent', score: 100, level: '', included: false },
+];
+
+test('gpa band mapping matches Android', () => {
+  assert.equal(gpaOfScore(90), 4.0);
+  assert.equal(gpaOfScore(85), 3.7);
+  assert.equal(gpaOfScore(64), 1.5);
+  assert.equal(gpaOfScore(59), 0);
+  assert.equal(scoreOfGrade({ courseName: 'x', credit: 1, gradeType: 'level', score: 0, level: '良好', included: true }), 85);
+});
+
+test('gpa summary excludes disabled courses', () => {
+  const summary = gpaSummary(gpaCourses);
+  assert.equal(summary.gpa, ((4.0 * 4 + 3.7 * 3 + 4.0 * 1) / 8).toFixed(2));
+  assert.equal(summary.weighted, ((92 * 4 + 85 * 3 + 95 * 1) / 8).toFixed(2));
+  assert.equal(summary.arithmetic, ((92 + 85 + 95) / 3).toFixed(2));
+  assert.equal(summary.credits, '8.0');
+});
+
+test('grades group by semester with averages', () => {
+  const grades = [
+    { courseName: 'A', credit: 4, score: 90, semester: '2026-2027-1' },
+    { courseName: 'B', credit: 3, score: 80, semester: '2026-2027-1' },
+    { courseName: 'C', credit: 2, score: 70, semester: '' },
+  ];
+  const groups = groupGradesBySemester(grades);
+  assert.equal(groups.length, 2);
+  assert.equal(groups[0].name, '2026-2027-1');
+  assert.equal(groups[0].average, (4 * 90 + 3 * 80) / 7);
+  assert.equal(groups[1].name, '未标注学期');
+  assert.equal(earnedCreditsFromGrades(grades), 9);
+});
+
+test('exam countdown picks nearest upcoming exam', () => {
+  const now = Date.parse('2026-06-10T00:00:00');
+  const exams = [
+    { courseName: '旧考试', time: '2026-06-01 08:30', location: '', seat: '' },
+    { courseName: '高等数学', time: '2026-06-20 08:30', location: '逸夫楼101', seat: '32号' },
+    { courseName: '大学物理', time: '2026-07-01 08:30', location: '', seat: '' },
+  ];
+  const text = examCountdownText(exams, now);
+  assert.ok(text.indexOf('高等数学') >= 0);
+  assert.ok(text.indexOf('10 天') >= 0);
+  assert.equal(examCountdownText([], now), '暂无考试安排');
+  assert.equal(examCountdownText([{ courseName: '结束', time: '2026-01-01 08:30', location: '', seat: '' }], now), '考试均已结束');
 });
 
 for (const [status, name] of results) {

@@ -16,6 +16,7 @@
     />
     <view class="button" bindtap="parseText" style="background:{{palette.panelAlt}};color:{{palette.icon}}">解析粘贴文本</view>
     <view class="button secondary" bindtap="chooseFile" style="background:{{palette.panelAlt}};color:{{palette.text}}">从聊天记录选择文件</view>
+    <view class="button secondary" bindtap="exportShareText" style="background:{{palette.panelAlt}};color:{{palette.text}}">导出课表分享文本（复制给朋友）</view>
   </view>
 
   <view class="card" wx:if="{{parsed}}" style="background:{{palette.panelAlt}}">

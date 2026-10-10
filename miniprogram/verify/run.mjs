@@ -224,6 +224,84 @@ test('reads v1 backup without campus fields', () => {
   assert.equal(decoded.timeProfiles.length, 0);
 });
 
+// ---------------- 图片识别噪声过滤（页脚/表头不得成为课程） ----------------
+test('filters footer noise rows from grid', () => {
+  const csv = [
+    '节次,星期一,星期二,星期三,星期四,星期五',
+    '一,体育（一）/(1-2节)7-19周/体育场1/殷乐,,,,',
+    '注一内容顺序为：课程◇周次◇地点◇教师 本学期2026-08-31正式上课至2027-01-22结束，共21周.,,,,',
+    '其他课程：军训技能张爽(共19周)/1-19周； 入学教育张爽(共19周)/1-19周；,,,',
+    '2026-2027年第1学期 云计算261课表,,,,',
+    '打印时间：2026-10-09,,,,',
+  ].join('\n');
+  const rows = core.splitDelimited(csv, ',');
+  const parsed = core.parseCourseTable(csv, rows);
+  assert.equal(parsed.courses.length, 1, '噪声行不得成为课程');
+  assert.equal(parsed.courses[0].courseName, '体育（一）');
+  assert.ok(parsed.warnings.some((w) => w.indexOf('表外课程') >= 0), '表外课程应以 warning 提示');
+});
+
+test('filters noise course names inside cells', () => {
+  const entries = core.parseCellEntries('注一内容顺序为：课程◇周次◇地点◇教师\n打印时间：2026-10-09\n体育（一）/(1-2节)7-19周/体育场1/殷乐');
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].courseName, '体育（一）');
+});
+
+test('keeps real courses in list mode with weekday prefix', () => {
+  const parsed = core.parseCourseTable('星期一 体育（一）/(1-2节)7-19周/体育场1/殷乐\n星期二 信息技术/(1-2节)12-14周(双),15-19周/（乌）E406/刘文杰');
+  assert.equal(parsed.courses.length, 2);
+});
+
+test('normalizes share placeholders', () => {
+  const entry = core.parseCellEntries('自习/(1-2节)1-16周/-/-')[0];
+  assert.equal(entry.courseName, '自习');
+  assert.equal(entry.location, '');
+  assert.equal(entry.teacher, '');
+});
+
+// ---------------- XClass 分享文本 v1 导出/导入回路 ----------------
+const shareCourses = [
+  {
+    courseName: '体育（一）', teacher: '殷乐', semester: '2026-2027年第1学期', credit: null, rawWeekText: '7-19周',
+    meetings: [{ weekday: 'MONDAY', startSection: 1, endSection: 2, weekRules: [{ startWeek: 7, endWeek: 19, parity: 'ALL' }], location: '体育场1', campusId: null }],
+  },
+  {
+    courseName: '信息技术', teacher: '刘文杰', semester: '2026-2027年第1学期', credit: null, rawWeekText: '12-14周(双),15-19周',
+    meetings: [{ weekday: 'TUESDAY', startSection: 1, endSection: 2, weekRules: [{ startWeek: 12, endWeek: 14, parity: 'EVEN' }, { startWeek: 15, endWeek: 19, parity: 'ALL' }], location: 'E406', campusId: 'mp-wu' }],
+  },
+  {
+    courseName: '自习', teacher: '', semester: '', credit: null, rawWeekText: '1-16周',
+    meetings: [{ weekday: 'FRIDAY', startSection: 9, endSection: 10, weekRules: [{ startWeek: 1, endWeek: 16, parity: 'ALL' }], location: '', campusId: null }],
+  },
+];
+
+test('encodes share text with header and sorted rows', () => {
+  const text = core.encodeShareText(shareCourses, '默认课表', '2026-2027年第1学期', '2026-08-31', 21, { 'mp-wu': '乌' });
+  assert.ok(text.startsWith('# XClass 课表分享 v1'));
+  assert.ok(text.indexOf('# 课表：默认课表') >= 0);
+  assert.ok(text.indexOf('# 学期开始：2026-08-31') >= 0);
+  assert.ok(text.indexOf('星期一 体育（一）/(1-2节)7-19周/体育场1/殷乐') >= 0);
+  assert.ok(text.indexOf('星期二 信息技术/(1-2节)12-14周(双),15-19周/（乌）E406/刘文杰') >= 0);
+  assert.ok(text.indexOf('星期五 自习/(9-10节)1-16周/-/-') >= 0);
+});
+
+test('share text round-trips back into courses', () => {
+  const text = core.encodeShareText(shareCourses, '默认课表', '2026-2027年第1学期', '2026-08-31', 21, { 'mp-wu': '乌' });
+  const parsed = core.parseCourseTable(text);
+  assert.equal(parsed.courses.length, 3);
+  const pe = parsed.courses.find((c) => c.courseName === '体育（一）');
+  assert.equal(pe.teacher, '殷乐');
+  assert.equal(pe.meetings[0].startSection, 1);
+  assert.equal(pe.meetings[0].endSection, 2);
+  assert.equal(pe.meetings[0].weekRules[0].startWeek, 7);
+  const info = parsed.courses.find((c) => c.courseName === '信息技术');
+  assert.equal(info.meetings[0].campusAlias, '乌');
+  assert.equal(info.meetings[0].weekRules[0].parity, 'EVEN');
+  const study = parsed.courses.find((c) => c.courseName === '自习');
+  assert.equal(study.teacher, '');
+  assert.equal(study.meetings[0].location, '');
+});
+
 for (const [status, name] of results) {
   console.log(status.padEnd(4), name);
 }

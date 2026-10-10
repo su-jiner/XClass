@@ -76,6 +76,35 @@ const CAMPUS_RE = /^[（(]\s*([^）)]{1,4})\s*[）)]/;
 const TEACHER_TAIL_RE = /[（(][^）)]{1,3}[）)]\s*$/;
 const SECTION_RE = /[（(]?\s*(\d{1,2})\s*[-—–~～至]\s*(\d{1,2})\s*节?\s*[）)]?/;
 
+/** 非课程噪声过滤：与 Android/iOS/鸿蒙一致。丢弃表头、行标签、页脚注释与「其他课程」汇总行。 */
+const NOISE_LINE_PREFIX = /^(其他课程[：:]?|注[一二三四五]?[：:]?|说明[：:]?|备注[：:]?|打印时间|本学期|内容顺序|专业[：:]?|节次[：:]?|校区|上课时间|课程表?[：:]?|上午|下午|晚上|学期|\d{4}\s*[-—–~～至/]\s*\d{4}\s*年?)/;
+const NOISE_CELL_PREFIX = /^(其他课程[：:]?|注[一二三四五]?[：:]?|说明[：:]?|备注[：:]?|打印时间|本学期|内容顺序|专业[：:]?|节次[：:]?|校区|上课时间|课程表?[：:]?|星期[一二三四五六日天]$|上午|下午|晚上|学期|\d{4}\s*[-—–~～至/]\s*\d{4}\s*年?)/;
+const MAX_COURSE_NAME_LENGTH = 40;
+
+/** 整行是否应被当作噪声跳过（不解析为课程）。 */
+function isNoiseLine(text) {
+  const trimmed = String(text || '').trim();
+  if (!trimmed) return true;
+  if (NOISE_LINE_PREFIX.test(trimmed)) return true;
+  const hasCourseMark = trimmed.indexOf('/') >= 0 || trimmed.indexOf('节') >= 0 || trimmed.indexOf('周') >= 0;
+  return !hasCourseMark;
+}
+
+/** 单元格中的课程名是否像噪声（丢弃）。 */
+function isNoiseCourseName(name) {
+  const trimmed = String(name || '').trim();
+  if (!trimmed) return true;
+  if (trimmed.length > MAX_COURSE_NAME_LENGTH) return true;
+  if (NOISE_CELL_PREFIX.test(trimmed)) return true;
+  return /^\d{1,2}\s*[:：]\s*\d{2}/.test(trimmed);
+}
+
+/** 分享文本占位符归一化：空字段用 "-" 占位，导入时还原为空。 */
+function normalizePlaceholder(value) {
+  const trimmed = String(value || '').trim();
+  return trimmed === '-' || trimmed === '—' ? '' : trimmed;
+}
+
 /** 单元格 → 课程条目；一格多门课按换行/分号拆 */
 function parseCellEntries(cellText, defaultTotalWeeks) {
   return String(cellText || '')
@@ -93,14 +122,16 @@ function parseCellEntry(raw, defaultTotalWeeks) {
   if (!parts.length) return null;
   const courseName = parts[0];
   if (!courseName) return null;
+  // 噪声守卫：表头/页脚/说明文字不应成为课程
+  if (isNoiseCourseName(courseName)) return null;
   const sectionAndWeeks = parts[1] || '';
   const locationRaw = parts[2] || '';
   const teacherRaw = parts.slice(3).join('/').trim();
   const campusMatch = locationRaw.match(CAMPUS_RE);
   return {
     courseName: courseName,
-    teacher: teacherRaw.replace(TEACHER_TAIL_RE, '').trim(),
-    location: locationRaw.replace(CAMPUS_RE, '').trim() || locationRaw.trim(),
+    teacher: normalizePlaceholder(teacherRaw.replace(TEACHER_TAIL_RE, '').trim()),
+    location: normalizePlaceholder(locationRaw.replace(CAMPUS_RE, '').trim() || locationRaw.trim()),
     campusAlias: campusMatch ? campusMatch[1].trim() : null,
     weekRules: parseWeekRules(sectionAndWeeks, defaultTotalWeeks),
     rawText: raw
@@ -323,6 +354,8 @@ function parseTableRows(rows, defaultTotalWeeks) {
 
   for (let rowIndex = headerIndex + 1; rowIndex < rows.length; rowIndex += 1) {
     const row = rows[rowIndex] || [];
+    // 行级噪声过滤：表头/页脚/「其他课程」/「注一」等整行文本不得进入星期列
+    if (isNoiseLine(row.join(' '))) continue;
     const rowSection = sectionRangeFromLabel(row[0] || '');
     columns.forEach(function (column) {
       const cell = String(row[column.index] || '').trim();
@@ -446,6 +479,11 @@ function parseCourseTable(rawText, rows) {
       if (meeting.campusAlias && aliases.indexOf(meeting.campusAlias) < 0) aliases.push(meeting.campusAlias);
     });
   });
+  // 表外课程（「其他课程：」汇总行）：缺少星期/节次，无法放入课表网格，仅提示
+  if (metadata.otherCourseLines && metadata.otherCourseLines.length) {
+    parsed.warnings.push('检测到表外课程（缺少星期与节次，未纳入课表）：'
+      + metadata.otherCourseLines.slice(0, 5).join('；'));
+  }
   return {
     courses: courses,
     semester: metadata.semester,
@@ -457,6 +495,45 @@ function parseCourseTable(rawText, rows) {
     campusAliases: aliases,
     warnings: parsed.warnings
   };
+}
+
+/** XClass 专属课表分享文本 v1（与 Android/iOS/鸿蒙一致）：导出后可被任意端粘贴导入。 */
+function encodeShareText(courses, profileName, semester, semesterStart, totalWeeks, campusIdToAlias) {
+  const lines = ['# XClass 课表分享 v1'];
+  if (profileName && String(profileName).trim()) lines.push('# 课表：' + profileName);
+  if (semester && String(semester).trim()) lines.push('# 学期：' + semester);
+  if (semesterStart && String(semesterStart).trim()) lines.push('# 学期开始：' + semesterStart);
+  if (totalWeeks && totalWeeks >= 1 && totalWeeks <= 60) lines.push('# 总周数：' + totalWeeks);
+
+  const rows = [];
+  (courses || []).forEach(function (course) {
+    (course.meetings || []).forEach(function (meeting) {
+      // 小程序数据模型 weekday 为字符串枚举（'MONDAY'），兼容数字 1-7
+      let day = null;
+      if (typeof meeting.weekday === 'number') {
+        if (meeting.weekday < 1 || meeting.weekday > 7) return;
+        day = ['星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日'][meeting.weekday - 1];
+      } else {
+        const index = WEEKDAYS.indexOf(meeting.weekday);
+        if (index < 0) return;
+        day = ['星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日'][index];
+      }
+      const sections = meeting.startSection + '-' + meeting.endSection + '节';
+      const weeks = (course.rawWeekText && String(course.rawWeekText).trim())
+        ? course.rawWeekText
+        : weekRulesText(meeting.weekRules || []);
+      const alias = meeting.campusId && campusIdToAlias ? (campusIdToAlias[meeting.campusId] || '') : '';
+      let location = alias ? '（' + alias + '）' : '';
+      location += (meeting.location || '').trim();
+      if (!location) location = '-';
+      const teacher = (course.teacher || '').trim();
+      rows.push(day + ' ' + course.courseName + '/(' + sections + ')' + weeks + '/' + location + '/' + (teacher ? teacher : '-'));
+    });
+  });
+  rows.filter(function (value, index) { return rows.indexOf(value) === index; })
+    .sort()
+    .forEach(function (row) { lines.push(row); });
+  return lines.join('\n') + '\n';
 }
 
 module.exports = {
@@ -474,6 +551,9 @@ module.exports = {
   sectionsOf: sectionsOf,
   weekdayIndex: weekdayIndex,
   sectionRangeFromLabel: sectionRangeFromLabel,
+  isNoiseLine: isNoiseLine,
+  isNoiseCourseName: isNoiseCourseName,
+  normalizePlaceholder: normalizePlaceholder,
   parsePageMetadata: parsePageMetadata,
   parseTimeTables: parseTimeTables,
   timeRangeOf: timeRangeOf,
@@ -482,5 +562,6 @@ module.exports = {
   splitDelimited: splitDelimited,
   parseListStyle: parseListStyle,
   mergeCourses: mergeCourses,
-  parseCourseTable: parseCourseTable
+  parseCourseTable: parseCourseTable,
+  encodeShareText: encodeShareText
 };

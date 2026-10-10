@@ -84,7 +84,11 @@ object CourseTableImporter {
         val collected = mutableListOf<ParsedCourse>()
         if (headerRowIndex != null && columnAnchors.isNotEmpty()) {
             for (rowIndex in (headerRowIndex + 1) until gridRows.size) {
-                val row = rowCells(gridRows[rowIndex], columnAnchors)
+                val rowBlocks = gridRows[rowIndex]
+                // 行级噪声过滤：表头/页脚/「其他课程」/「注一」等整行文本不得进入星期列
+                val rowText = rowBlocks.joinToString(" ") { it.text }
+                if (ImportNoiseFilter.isNoiseLine(rowText)) continue
+                val row = rowCells(rowBlocks, columnAnchors)
                 if (row.isEmpty()) continue
                 val rowSectionRange = row.firstOrNull()?.let { ImportLabels.sectionRange(it) }
                 columnAnchors.forEachIndexed { columnIndex, anchor ->
@@ -122,6 +126,12 @@ object CourseTableImporter {
             }
         } else {
             collected += parseListStyle(blocks, totalWeeks, warnings)
+        }
+
+        // 表外课程（「其他课程：」汇总行）：缺少星期/节次，无法放入课表网格，仅提示
+        if (metadata.otherCourseLines.isNotEmpty()) {
+            warnings += "检测到表外课程（缺少星期与节次，未纳入课表）：" +
+                metadata.otherCourseLines.take(5).joinToString("；")
         }
 
         val merged = mergeCourses(collected)

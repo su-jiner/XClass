@@ -1,6 +1,6 @@
 import {
   CourseSchedule, CourseTableParseResult, ImportedCourse, Weekday, DEFAULT_TOTAL_WEEKS,
-  parseCourseTableText, parseWeekRulesText, parseTimeTablesText,
+  parseCourseTableText, parseWeekRulesText, parseTimeTablesText, encodeShareText,
 } from '../core/Core.ets';
 import { ProfileStore } from '../core/ProfileStore.ets';
 import { currentPalette, ThemePalette } from '../model/Theme.ets';
@@ -8,6 +8,7 @@ import { Prefs } from '../model/Prefs.ets';
 import { documentViewPicker } from '@kit.CoreFileKit';
 import { fs } from '@kit.CoreFileKit';
 import { util } from '@kit.ArkTS';
+import { pasteboard } from '@kit.BasicServicesKit';
 import { router } from '@kit.ArkUI';
 
 /**
@@ -144,6 +145,37 @@ struct ImportPage {
     setTimeout(() => router.back(), 800);
   }
 
+  /** 导出当前课表为 XClass 分享文本，复制到剪贴板（朋友粘贴即可导入任意端）。 */
+  exportShareText(): void {
+    const store = ProfileStore.instance;
+    if (!store) { this.toast = '课表存储未就绪'; return; }
+    const courses = store.loadActiveCourses();
+    if (courses.length === 0) { this.toast = '当前课表还没有课程，无法导出'; return; }
+    const active = store.listProfiles().find((p) => p.isActive);
+    const campusMap = store.loadCampusMap();
+    const idToAlias: Record<string, string> = {};
+    Object.keys(campusMap).forEach((alias) => { idToAlias[campusMap[alias]] = alias; });
+    const semester = courses.find((c) => c.semester.trim().length > 0)?.semester ?? null;
+    let totalWeeks: number | null = null;
+    courses.forEach((course) => course.meetings.forEach((meeting) => meeting.weekRules.forEach((rule) => {
+      if (totalWeeks === null || rule.endWeek > totalWeeks) totalWeeks = rule.endWeek;
+    })));
+    const text = encodeShareText(
+      courses,
+      active?.name ?? null,
+      semester,
+      store.getActiveSemesterStartDate().isoString(),
+      totalWeeks,
+      idToAlias
+    );
+    const data = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, text);
+    pasteboard.getSystemPasteboard().setData(data).then(() => {
+      this.toast = '已复制课表分享文本，可直接粘贴给朋友';
+    }).catch(() => {
+      this.toast = '复制失败，请重试';
+    });
+  }
+
   @Builder
   card() {
     Column() {
@@ -176,6 +208,11 @@ struct ImportPage {
             .backgroundColor(this.palette().panelAlt)
             .fontColor(this.palette().text)
             .onClick(() => this.pickFile())
+          Button('导出课表分享文本（复制到剪贴板）')
+            .width('100%').margin({ top: 8 })
+            .backgroundColor(this.palette().panelAlt)
+            .fontColor(this.palette().text)
+            .onClick(() => this.exportShareText())
 
           if (this.parsed !== null) {
             Column() {

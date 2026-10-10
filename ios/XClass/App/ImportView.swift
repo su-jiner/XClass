@@ -2,9 +2,11 @@ import SwiftUI
 import UniformTypeIdentifiers
 import Vision
 import PDFKit
+import UIKit
 
 /// 课表导入：粘贴文本 / 选择 txt·md·csv·tsv 文件 / 选择图片走 Vision 离线识别 / PDF 走文本层。
 /// 预览校对后覆盖当前课表或新建课表；解析规则与 Android、鸿蒙、小程序一致。
+/// 也可把当前课表导出为 XClass 分享文本（朋友粘贴/打开即可导入）。
 struct ImportView: View {
     let palette: ThemePalette
     @Environment(\.dismiss) private var dismiss
@@ -14,6 +16,8 @@ struct ImportView: View {
     @State private var courses: [CourseTableImporter.ParsedCourse] = []
     @State private var message = ""
     @State private var showFileImporter = false
+    @State private var shareText = ""
+    @State private var showShareSheet = false
 
     var body: some View {
         NavigationStack {
@@ -22,6 +26,12 @@ struct ImportView: View {
                     Text("纯本地解析：粘贴文本、选择 txt/md/csv/tsv，或选择图片/PDF 走离线识别")
                         .font(.system(size: 12))
                         .foregroundColor(palette.textSecondary)
+
+                    Button("导出课表分享文本") { exportShareText() }
+                        .frame(maxWidth: .infinity)
+                        .padding(10)
+                        .background(RoundedRectangle(cornerRadius: 12).fill(palette.panelAlt))
+                        .foregroundColor(palette.textPrimary)
 
                     TextEditor(text: $text)
                         .frame(height: 120)
@@ -115,7 +125,34 @@ struct ImportView: View {
             ) { result in
                 handleFileSelection(result)
             }
+            .sheet(isPresented: $showShareSheet) {
+                ActivityView(items: [shareText])
+            }
         }
+    }
+
+    /// 导出当前课表为 XClass 分享文本（朋友粘贴/打开即可导入任意端）。
+    private func exportShareText() {
+        let store = ProfileStore.shared
+        let courses = store.loadActiveCourses()
+        guard !courses.isEmpty else {
+            message = "当前课表还没有课程，无法导出"
+            return
+        }
+        let active = store.listProfiles().first(where: { $0.isActive })
+        let campusMap = store.loadCampusMap()
+        let idToAlias = Dictionary(uniqueKeysWithValues: campusMap.map { ($0.value, $0.key) })
+        let semester = courses.first(where: { !$0.semester.isEmpty })?.semester
+        let totalWeeks = courses.flatMap { $0.meetings }.flatMap { $0.weekRules }.map(\.endWeek).max()
+        shareText = ShareTextCodec.encode(
+            courses: courses,
+            profileName: active?.name,
+            semester: semester,
+            semesterStart: store.getActiveSemesterStartDate(),
+            totalWeeks: totalWeeks,
+            campusIdToAlias: idToAlias
+        )
+        showShareSheet = true
     }
 
     private func meetingText(_ course: CourseTableImporter.ParsedCourse) -> String {
@@ -181,20 +218,21 @@ struct ImportView: View {
         }
     }
 
-    /// 图片：Vision 离线中文识别（不联网），行级包围盒 → 文本块 → 同一套解析
+    /// 图片：Vision 离线中文识别（不联网）。与 Android 相同——用行包围盒重建表格（行/列坐标聚类），
+    /// 走「表格解析」而不是逐行找星期词，才能正确识别教务课表图片。
     private func recognizeImage(_ url: URL) {
         guard let image = UIImage(contentsOfFile: url.path)?.cgImage else {
             message = "图片读取失败"
             return
         }
+        let size = CGSize(width: image.width, height: image.height)
         let request = VNRecognizeTextRequest { request, _ in
-            let lines = (request.results as? [VNRecognizedTextObservation] ?? []).compactMap { observation in
-                observation.topCandidates(1).first?.string
-            }
+            let observations = (request.results as? [VNRecognizedTextObservation] ?? [])
+            let rows = self.visionRows(observations, imageSize: size)
+            let content = observations.compactMap { $0.topCandidates(1).first?.string }.joined(separator: "\n")
             DispatchQueue.main.async {
-                let content = lines.joined(separator: "\n")
-                self.message = "图片 OCR（离线识别，\(lines.count) 行）"
-                self.parse(rawText: content, fileName: "image.txt")
+                self.message = "图片 OCR（离线识别，\(rows.count) 行表格）"
+                self.parse(rawText: content, fileName: "image.txt", rows: rows)
             }
         }
         request.recognitionLanguages = ["zh-Hans", "en-US"]
@@ -203,6 +241,64 @@ struct ImportView: View {
         DispatchQueue.global(qos: .userInitiated).async {
             let handler = VNImageRequestHandler(cgImage: image, options: [:])
             try? handler.perform([request])
+        }
+    }
+
+    /// Vision 归一化包围盒（原点左下）→ 像素坐标 → 按 y 聚行、行内按 x 聚列，得到与 CSV 一致的 rows。
+    private func visionRows(_ observations: [VNRecognizedTextObservation], imageSize: CGSize) -> [[String]] {
+        struct Block {
+            let text: String
+            let x: CGFloat, y: CGFloat, width: CGFloat, height: CGFloat
+            var centerX: CGFloat { x + width / 2 }
+            var centerY: CGFloat { y + height / 2 }
+        }
+        var blocks: [Block] = []
+        for observation in observations {
+            guard let candidate = observation.topCandidates(1).first else { continue }
+            let box = observation.boundingBox
+            let x = box.minX * imageSize.width
+            let y = (1 - box.maxY) * imageSize.height
+            blocks.append(Block(
+                text: candidate.string.trimmingCharacters(in: .whitespacesAndNewlines),
+                x: x, y: y,
+                width: box.width * imageSize.width,
+                height: box.height * imageSize.height
+            ))
+        }
+        blocks = blocks.filter { !$0.text.isEmpty }
+        guard !blocks.isEmpty else { return [] }
+
+        // 按 y 投影聚类成行（与 Android TableGridBuilder 同容差：行高均值 × 0.6）
+        blocks.sort { $0.centerY < $1.centerY }
+        let heights = blocks.map(\.height).filter { $0 > 0 }
+        let avgHeight = heights.isEmpty ? 20 : heights.reduce(0, +) / CGFloat(heights.count)
+        let rowTolerance = avgHeight * 0.6
+        var rows: [[Block]] = []
+        for block in blocks {
+            if let last = rows.last, let anchor = last.first?.centerY, abs(block.centerY - anchor) <= rowTolerance {
+                rows[rows.count - 1].append(block)
+            } else {
+                rows.append([block])
+            }
+        }
+
+        // 行内按 x 聚类成列（间隙 > 均值宽度 × 0.9 视为新列）
+        return rows.map { row in
+            let sorted = row.sorted { $0.x < $1.x }
+            let widths = sorted.map(\.width).filter { $0 > 0 }
+            let avgWidth = widths.isEmpty ? 40 : widths.reduce(0, +) / CGFloat(widths.count)
+            let gapTolerance = max(12, avgWidth * 0.9)
+            var cells: [String] = []
+            var previousEnd: CGFloat = -.greatestFiniteMagnitude
+            for block in sorted {
+                if cells.isEmpty || block.x - previousEnd > gapTolerance {
+                    cells.append(block.text)
+                } else {
+                    cells[cells.count - 1] += " " + block.text
+                }
+                previousEnd = max(block.x + block.width, block.x)
+            }
+            return cells
         }
     }
 
@@ -251,4 +347,15 @@ struct ImportView: View {
         message = "已导入 \(schedules.count) 门课到「\(name)」"
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { dismiss() }
     }
+}
+
+/// 系统分享面板（UIActivityViewController 的 SwiftUI 包装）。
+private struct ActivityView: UIViewControllerRepresentable {
+    let items: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }

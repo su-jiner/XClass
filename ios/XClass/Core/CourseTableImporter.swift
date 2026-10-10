@@ -102,6 +102,8 @@ enum CourseTableImporter {
                 .map { $0.trimmingCharacters(in: .whitespaces) }
                 .filter { !$0.isEmpty }
             guard let courseName = parts.first else { return nil }
+            // 噪声守卫：表头/页脚/说明文字不应成为课程
+            if isNoiseCourseName(courseName) { return nil }
             let sectionAndWeeks = parts.count > 1 ? parts[1] : ""
             let locationRaw = parts.count > 2 ? parts[2] : ""
             let teacherRaw = parts.count > 3 ? parts.dropFirst(3).joined(separator: "/") : ""
@@ -113,13 +115,15 @@ enum CourseTableImporter {
                     of: #"^[（(]\s*[^）)]{1,4}\s*[）)]"#, with: "", options: .regularExpression
                 ).trimmingCharacters(in: .whitespaces)
             }
-            let teacher = teacherRaw.replacingOccurrences(
-                of: #"[（(][^）)]{1,3}[）)]\s*$"#, with: "", options: .regularExpression
-            ).trimmingCharacters(in: .whitespaces)
+            let teacher = normalizePlaceholder(
+                teacherRaw.replacingOccurrences(
+                    of: #"[（(][^）)]{1,3}[）)]\s*$"#, with: "", options: .regularExpression
+                ).trimmingCharacters(in: .whitespaces)
+            )
             return ParsedEntry(
                 courseName: courseName,
                 teacher: teacher,
-                location: location.isEmpty ? locationRaw : location,
+                location: normalizePlaceholder(location.isEmpty ? locationRaw : location),
                 campusAlias: campusAlias,
                 weekRules: parseWeekRules(sectionAndWeeks, defaultTotalWeeks: defaultTotalWeeks),
                 rawText: line
@@ -286,6 +290,8 @@ enum CourseTableImporter {
                 }
                 for rowIndex in (headerIndex + 1)..<rows.count {
                     let row = rows[rowIndex]
+                    // 行级噪声过滤：表头/页脚/「其他课程」/「注一」等整行文本不得进入星期列
+                    if isNoiseLine(row.joined(separator: " ")) { continue }
                     let rowSection = row.first.flatMap { sectionRangeFromLabel($0) }
                     for (index, weekday) in columns {
                         guard index < row.count else { continue }
@@ -347,6 +353,11 @@ enum CourseTableImporter {
                 if let alias = meeting.campusAlias, !aliases.contains(alias) { aliases.append(alias) }
             }
         }
+        // 表外课程（「其他课程：」汇总行）：缺少星期/节次，无法放入课表网格，仅提示
+        if !metadata.otherCourseLines.isEmpty {
+            warnings.append("检测到表外课程（缺少星期与节次，未纳入课表）："
+                + metadata.otherCourseLines.prefix(5).joined(separator: "；"))
+        }
         let startDate: String? = {
             guard let year = metadata.startYear else { return nil }
             return String(format: "%04d-%02d-%02d", year, metadata.startMonth ?? 9, metadata.startDay ?? 1)
@@ -360,6 +371,48 @@ enum CourseTableImporter {
             campusAliases: aliases,
             warnings: warnings
         )
+    }
+
+    private static let noiseLinePatterns = [
+        #"^(其他课程|说明|备注|打印时间|本学期|内容顺序|专业|节次|校区|上课时间|课程表?)[：:]?"#,
+        #"^注[一二三四五]?[：:]?"#,
+        #"^(上午|下午|晚上)$"#,
+        #"^学期"#,
+        #"^\d{4}\s*[-—–~～至/]\s*\d{4}\s*年?"#,
+    ]
+    private static let noiseCellPatterns = [
+        #"^(其他课程|说明|备注|打印时间|本学期|内容顺序|专业|节次|校区|上课时间|课程表?)[：:]?"#,
+        #"^注[一二三四五]?[：:]?"#,
+        #"^星期[一二三四五六日天]$"#,
+        #"^(上午|下午|晚上)$"#,
+        #"^学期"#,
+        #"^\d{4}\s*[-—–~～至/]\s*\d{4}\s*年?"#,
+    ]
+    private static let maxCourseNameLength = 40
+
+    /// 整行是否应被当作噪声跳过（不解析为课程）。
+    static func isNoiseLine(_ text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return true }
+        for pattern in noiseLinePatterns where firstMatch(pattern, in: trimmed) != nil { return true }
+        // 兜底：真正的课程行必然带「/」分隔或「节/周」标记
+        let hasCourseMark = trimmed.contains("/") || trimmed.contains("节") || trimmed.contains("周")
+        return !hasCourseMark
+    }
+
+    /// 单元格中的课程名是否像噪声（丢弃）。
+    static func isNoiseCourseName(_ name: String) -> Bool {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return true }
+        if trimmed.count > maxCourseNameLength { return true }
+        for pattern in noiseCellPatterns where firstMatch(pattern, in: trimmed) != nil { return true }
+        return firstMatch(#"^\d{1,2}\s*[:：]\s*\d{2}"#, in: trimmed) != nil
+    }
+
+    /// 分享文本占位符归一化：空字段用 "-" 占位，导入时还原为空。
+    static func normalizePlaceholder(_ value: String) -> String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed == "-" || trimmed == "—" ? "" : trimmed
     }
 
     // MARK: - 正则工具

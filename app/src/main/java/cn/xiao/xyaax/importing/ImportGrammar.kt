@@ -150,14 +150,18 @@ object CellEntryParser {
 
         val courseName = parts.first().trim()
         if (courseName.isEmpty()) return null
+        // 噪声守卫：表头/页脚/说明文字不应成为课程
+        if (ImportNoiseFilter.isNoiseCourseName(courseName)) return null
 
         val sectionAndWeeks = parts.getOrNull(1).orEmpty()
-        val location = parts.getOrNull(2).orEmpty()
+        val locationRaw = parts.getOrNull(2).orEmpty()
         val teacherRaw = parts.drop(3).joinToString("/").trim()
-        val teacher = teacherTailRegex.replace(teacherRaw, "").trim()
+        val teacher = ImportNoiseFilter.normalizePlaceholder(teacherTailRegex.replace(teacherRaw, "").trim())
 
-        val campusAlias = campusRegex.find(location)?.groupValues?.get(1)?.trim()?.takeIf { it.isNotEmpty() }
-        val locationClean = location.replaceFirst(campusRegex, "").trim().ifEmpty { location.trim() }
+        val campusAlias = campusRegex.find(locationRaw)?.groupValues?.get(1)?.trim()?.takeIf { it.isNotEmpty() }
+        val locationClean = ImportNoiseFilter.normalizePlaceholder(
+            locationRaw.replaceFirst(campusRegex, "").trim().ifEmpty { locationRaw.trim() }
+        )
 
         return ParsedCellEntry(
             courseName = courseName,
@@ -174,6 +178,54 @@ object CellEntryParser {
         val end = match.groupValues[2].toInt()
         if (start in 1..12 && end in 1..12) minOf(start, end)..maxOf(start, end) else null
     }
+}
+
+/**
+ * 非课程噪声过滤：识别并丢弃课表图片/文本中「课程之外」的内容，
+ * 例如表头（学期/课表名/专业）、行标签（上午/下午/晚上）、页脚注释（注一/打印时间/本学期）与
+ * 「其他课程：」汇总行，避免它们被当作课程入库。四端（Android/iOS/鸿蒙/小程序）保持一致。
+ */
+object ImportNoiseFilter {
+    /** 行级噪声前缀：整行以这些开头时整行跳过（表格模式与列表模式通用）。 */
+    private val noiseLinePrefix = Regex(
+        "^(其他课程[：:]?|注[一二三四五]?[：:]?|说明[：:]?|备注[：:]?|打印时间|本学期|内容顺序|" +
+            "专业[：:]?|节次[：:]?|校区|上课时间|课程表?[：:]?|星期[一二三四五六日天]?[：:]?|" +
+            "上午|下午|晚上|学期|\\d{4}\\s*[-—–~～至/]\\s*\\d{4}\\s*年?)"
+    )
+
+    /** 单元格级噪声前缀：课程名命中时丢弃该条目。 */
+    private val noiseCellPrefix = Regex(
+        "^(其他课程[：:]?|注[一二三四五]?[：:]?|说明[：:]?|备注[：:]?|打印时间|本学期|内容顺序|" +
+            "专业[：:]?|节次[：:]?|校区|上课时间|课程表?[：:]?|星期[一二三四五六日天]$|上午|下午|晚上|" +
+            "学期|\\d{4}\\s*[-—–~～至/]\\s*\\d{4}\\s*年?)"
+    )
+
+    private const val MAX_COURSE_NAME_LENGTH = 40
+
+    /** 整行是否应被当作噪声跳过（不解析为课程）。 */
+    fun isNoiseLine(text: String): Boolean {
+        val trimmed = text.trim()
+        if (trimmed.isEmpty()) return true
+        if (noiseLinePrefix.containsMatchIn(trimmed)) return true
+        // 兜底：真正的课程行必然带「/」分隔或「节/周」标记；
+        // 纯说明文字（如"2026-2027年第1学期"）不含这些结构，直接跳过。
+        val hasCourseMark = trimmed.contains('/') || trimmed.contains('节') || trimmed.contains('周')
+        return !hasCourseMark
+    }
+
+    /** 单元格中的课程名是否像噪声（丢弃）。 */
+    fun isNoiseCourseName(name: String): Boolean {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) return true
+        if (trimmed.length > MAX_COURSE_NAME_LENGTH) return true
+        if (noiseCellPrefix.containsMatchIn(trimmed)) return true
+        // 课程名不应以时间/日期片段开头
+        return trimmed.matches(Regex("""^\d{1,2}\s*[:：]\s*\d{2}"""))
+    }
+
+    /** 导出占位符归一化：分享文本中空字段用 "-" 占位，解析时还原为空。 */
+    fun normalizePlaceholder(value: String): String =
+        if (value.trim() == "-" || value.trim() == "—") "" else value.trim()
 }
 
 /** 页眉/页脚元数据。 */
