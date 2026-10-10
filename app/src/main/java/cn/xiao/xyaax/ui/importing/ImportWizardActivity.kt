@@ -106,7 +106,7 @@ class ImportWizardActivity : AppCompatActivity() {
     private fun applyParseResult(sourceNote: String, parsed: CourseTableParseResult) {
         result = parsed
         groups.clear()
-        groups.add(ParsedGroup(sourceNote, parsed.courses.toMutableList()))
+        groups.add(ParsedGroup(sourceNote, parsed, parsed.courses.toMutableList()))
         summary.text = buildString {
             append(sourceNote)
             parsed.semester?.let { append(" · ").append(it) }
