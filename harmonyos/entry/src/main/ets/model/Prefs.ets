@@ -60,4 +60,12 @@ export class Prefs {
   static setReminderEnabled(value: boolean): void { Prefs.setBool('daily_reminder_enabled', value); }
   static reminderMinute(): number { return Prefs.getNumber('daily_reminder_minute', 450); }
   static setReminderMinute(value: number): void { Prefs.setNumber('daily_reminder_minute', value); }
+
+  // 个性化（与 Android 对齐）
+  static defaultPage(): string { return Prefs.getString('default_open_page', 'timetable'); }
+  static setDefaultPage(value: string): void { Prefs.setString('default_open_page', value); }
+  static customBackgroundPath(): string { return Prefs.getString('custom_background', ''); }
+  static setCustomBackgroundPath(value: string): void { Prefs.setString('custom_background', value); }
+  static coverImageKey(): string { return Prefs.getString('cover_image_slot', ''); }
+  static setCoverImageKey(value: string): void { Prefs.setString('cover_image_slot', value); }
 }

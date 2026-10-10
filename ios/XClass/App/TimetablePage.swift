@@ -17,9 +17,19 @@ struct TimetablePage: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                header
-                weekPager
+            ZStack {
+                // 自定义背景（设置页选择，存沙箱 custom_background.jpg）
+                if !AppPreferences.customBackgroundPath.isEmpty {
+                    Image(uiImage: (try? UIImage(contentsOfFile: AppPreferences.customBackgroundPath)) ?? UIImage())
+                        .resizable()
+                        .scaledToFill()
+                        .opacity(0.35)
+                        .ignoresSafeArea()
+                }
+                VStack(spacing: 0) {
+                    header
+                    weekPager
+                }
             }
             .background(palette.pageBackground)
             .navigationBarHidden(true)
@@ -213,10 +223,18 @@ struct WeekGridView: View {
                       width: CGFloat) -> some View {
         let height = CGFloat(item.meeting.endSection - item.meeting.startSection + 1) * rowHeight - 2
         let color = cardColors[item.courseIndex % cardColors.count]
+        let isCover = AppPreferences.coverImageKey == "\(item.meeting.weekday.rawValue):\(item.meeting.startSection)"
         return Button {
             onTap(item.course, item.meeting)
         } label: {
             VStack(alignment: .leading, spacing: 1) {
+                if isCover {
+                    Text("封面")
+                        .font(.system(size: 7))
+                        .padding(.horizontal, 3).padding(.vertical, 1)
+                        .background(Capsule().fill(palette.iconTint))
+                        .foregroundColor(palette.buttonText)
+                }
                 if !item.isCurrentWeek {
                     Text("[非本周] 第\(item.nextActiveWeek)周").font(.system(size: 7.5 * fontScale))
                 }
@@ -231,6 +249,7 @@ struct WeekGridView: View {
             .padding(3)
             .frame(width: width, height: height, alignment: .topLeading)
             .background(RoundedRectangle(cornerRadius: 5).fill(color))
+            .overlay(RoundedRectangle(cornerRadius: 5).stroke(isCover ? palette.iconTint : .clear, lineWidth: 2))
             .opacity(item.isCurrentWeek ? 1 : 0.55)
             .shadow(radius: item.isCurrentWeek ? 0 : 1)
         }
@@ -280,11 +299,21 @@ struct CourseDetailSheet: View {
             row("周次：", weekText)
             row("地点：", meeting.location.isEmpty ? "未标注" : meeting.location)
             row("学期：", "\(course.semester)   学分：\(course.credit.map { "\($0)" } ?? "N/A")")
+            Button(isCover ? "取消课表封面" : "设为课表封面") {
+                AppPreferences.coverImageKey = isCover ? "" : coverKey
+                StoreChangeNotifier.shared.notifyChanged()
+            }
+            .font(.system(size: 14, weight: .medium))
+            .foregroundColor(isCover ? palette.textSecondary : palette.iconTint)
+            .frame(maxWidth: .infinity)
             Spacer()
         }
         .padding(20)
         .background(palette.detailBackground)
     }
+
+    private var coverKey: String { "\(meeting.weekday.rawValue):\(meeting.startSection)" }
+    private var isCover: Bool { AppPreferences.coverImageKey == coverKey }
 
     private var detailBackground: Color {
         palette.panelBackground

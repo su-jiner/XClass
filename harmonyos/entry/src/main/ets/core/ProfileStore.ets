@@ -10,6 +10,7 @@ import {
   inferFromCourses, defaultForToday, normalizeToWeekStart,
   decodeBackup, encodeBackup, backupToCourse, courseToBackup, BackupProfile,
   SectionTimeProfile, DEFAULT_PROFILE_ID, defaultTimeProfile, decodeBackupEnvelope,
+  GpaCourse, GradeEntry, ExamEntry, ProgressInfo, ProgressModule,
 } from './Core.ets';
 
 const DEFAULT_PROFILE_NAME = '默认课表';
@@ -126,6 +127,78 @@ export class ProfileStore {
     fs.writeSync(file.fd, content);
     fs.closeSync(file);
     fs.renameSync(tmp, path);
+  }
+
+  // ---- 工具页数据（绩点/成绩/考试/学业，JSON 文件存储） ----
+
+  private toolsPath(name: string): string {
+    return this.dir + '/tools_' + name + '.json';
+  }
+
+  private loadToolsJson<T>(name: string, fallback: T): T {
+    const path = this.toolsPath(name);
+    if (!fs.accessSync(path)) return fallback;
+    try {
+      const file = fs.openSync(path, fs.OpenMode.READ_ONLY);
+      const stat = fs.statSync(path);
+      if (stat.size <= 0) { fs.closeSync(file); return fallback; }
+      const buf = new ArrayBuffer(stat.size);
+      fs.readSync(file.fd, buf);
+      fs.closeSync(file);
+      const text = util.TextDecoder.create('utf-8').decodeToString(new Uint8Array(buf));
+      return JSON.parse(text) as T;
+    } catch {
+      return fallback;
+    }
+  }
+
+  private saveToolsJson(name: string, value: object): void {
+    this.writeTextAtomic(this.toolsPath(name), JSON.stringify(value, null, 2));
+  }
+
+  loadGpaCourses(): GpaCourse[] {
+    return this.loadToolsJson<GpaCourse[]>('gpa', []);
+  }
+
+  saveGpaCourses(list: GpaCourse[]): void {
+    this.saveToolsJson('gpa', list);
+  }
+
+  loadGrades(): GradeEntry[] {
+    return this.loadToolsJson<GradeEntry[]>('grades', []);
+  }
+
+  saveGrades(list: GradeEntry[]): void {
+    this.saveToolsJson('grades', list);
+  }
+
+  loadExams(): ExamEntry[] {
+    return this.loadToolsJson<ExamEntry[]>('exams', []);
+  }
+
+  saveExams(list: ExamEntry[]): void {
+    this.saveToolsJson('exams', list);
+  }
+
+  loadProgress(): ProgressInfo {
+    return this.loadToolsJson<ProgressInfo>('progress', { totalRequired: 160, totalEarned: 0 });
+  }
+
+  saveProgress(info: ProgressInfo): void {
+    this.saveToolsJson('progress', info);
+  }
+
+  loadProgressModules(): ProgressModule[] {
+    return this.loadToolsJson<ProgressModule[]>('progressModules', [
+      { name: '学科基础与专业必修', required: 0, earned: 0 },
+      { name: '专业选修课', required: 0, earned: 0 },
+      { name: '通识教育选修/核心课', required: 0, earned: 0 },
+      { name: '实践教学与毕业设计', required: 0, earned: 0 },
+    ]);
+  }
+
+  saveProgressModules(list: ProgressModule[]): void {
+    this.saveToolsJson('progressModules', list);
   }
 
   private readCoursesFile(fileName: string): CourseSchedule[] {

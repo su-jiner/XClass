@@ -160,6 +160,22 @@ enum AppPreferences {
         }
         set { defaults.set(min(max(newValue, 0), 1439), forKey: "daily_reminder_minute") }
     }
+
+    // 个性化（与 Android 对齐）
+    static var defaultPage: String {
+        get { defaults.string(forKey: "default_open_page") ?? "timetable" }
+        set { defaults.set(newValue, forKey: "default_open_page") }
+    }
+
+    static var customBackgroundPath: String {
+        get { defaults.string(forKey: "custom_background") ?? "" }
+        set { defaults.set(newValue, forKey: "custom_background") }
+    }
+
+    static var coverImageKey: String {
+        get { defaults.string(forKey: "cover_image_slot") ?? "" }
+        set { defaults.set(newValue, forKey: "cover_image_slot") }
+    }
 }
 
 // MARK: - 全局数据版本（对应 Android ScheduleRepository 的 StateFlow 通知机制）

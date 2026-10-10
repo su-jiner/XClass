@@ -91,7 +91,16 @@ export struct TimetablePage {
   }
 
   build() {
-    Column() {
+    Stack({ alignContent: Alignment.TopStart }) {
+      // 自定义背景（设置页选择，存在沙箱 custom_background.jpg）
+      if (Prefs.customBackgroundPath().length > 0) {
+        Image(Prefs.customBackgroundPath())
+          .width('100%')
+          .height('100%')
+          .objectFit(ImageFit.Cover)
+          .opacity(0.35)
+      }
+      Column() {
       // 头部：周次 + 日期 + 操作按钮
       Row() {
         Column() {
@@ -181,6 +190,7 @@ export struct TimetablePage {
       .layoutWeight(1)
       .align(Alignment.Top)
       .scrollable(ScrollDirection.Vertical)
+      }
     }
     .width('100%')
     .height('100%')
@@ -250,6 +260,15 @@ export struct TimetablePage {
   @Builder
   CourseCard(item: CourseMeetingRef) {
     Column() {
+      if (this.isCover(item)) {
+        Text('封面')
+          .fontSize(7)
+          .fontColor(this.palette().buttonText)
+          .padding({ left: 3, right: 3, top: 1, bottom: 1 })
+          .backgroundColor(this.palette().iconTint)
+          .borderRadius(4)
+          .margin({ bottom: 1 })
+      }
       if (!item.isCurrentWeek) {
         Text(`[非本周] 第${item.nextActiveWeek}周`)
           .fontSize(7.5 * Prefs.fontScale())
@@ -270,15 +289,22 @@ export struct TimetablePage {
     .backgroundColor(CARD_COLORS[item.courseIndex % CARD_COLORS.length])
     .borderRadius(5)
     .opacity(item.isCurrentWeek ? 1 : 0.55)
+    .border({ width: this.isCover(item) ? 2 : 0, color: this.palette().iconTint })
     .onClick(() => {
       this.showCourseDetail(item);
     })
+  }
+
+  /** 该课次是否被置顶为课表封面（设置页/课程详情可清除） */
+  isCover(item: CourseMeetingRef): boolean {
+    return Prefs.coverImageKey() === `${item.meeting.weekday}:${item.meeting.startSection}`;
   }
 
   showCourseDetail(item: CourseMeetingRef): void {
     const rangeStart = SECTION_RANGES[item.meeting.startSection - 1]?.split('-')[0] ?? '--:--';
     const rangeEnd = SECTION_RANGES[item.meeting.endSection - 1]?.split('-')[1] ?? '--:--';
     const creditText = item.course.credit === null ? 'N/A' : String(item.course.credit);
+    const slotKey = `${item.meeting.weekday}:${item.meeting.startSection}`;
     this.getUIContext().showAlertDialog({
       title: item.course.courseName,
       message: `教师：${item.course.teacher.length > 0 ? item.course.teacher : '未知'}\n` +
@@ -286,7 +312,16 @@ export struct TimetablePage {
         `地点：${item.meeting.location.length > 0 ? item.meeting.location : '未标注'}\n` +
         `周次：${item.course.rawWeekText}\n` +
         `学期：${item.course.semester}   学分：${creditText}`,
-      buttons: [{ value: '知道了', action: (): void => {} }],
+      buttons: [
+        {
+          value: Prefs.coverImageKey() === slotKey ? '取消课表封面' : '设为课表封面',
+          action: (): void => {
+            Prefs.setCoverImageKey(Prefs.coverImageKey() === slotKey ? '' : slotKey);
+            AppStorage.setOrCreate('dataVersion', Date.now());
+          },
+        },
+        { value: '知道了', action: (): void => {} },
+      ],
     });
   }
 }

@@ -52,6 +52,8 @@
 
 .grid-row {
   display: flex;
+  gap: 8rpx;
+  margin-bottom: 2rpx;
 }
 
 .grid-head .cell {
@@ -61,23 +63,23 @@
 .cell {
   flex: 1;
   min-width: 0;
-  margin: 4rpx;
-  padding: 4rpx;
+  padding: 6rpx 4rpx;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  border-radius: 14rpx;
 }
 
 .cell-time {
-  flex: 0 0 100rpx;
-  border-radius: 16rpx;
+  flex: 0 0 104rpx;
+  border-radius: 14rpx;
 }
 
 .cell-day {
-  border-radius: 16rpx;
+  border-radius: 14rpx;
   min-height: 84rpx;
 }
 
@@ -105,8 +107,9 @@
 }
 
 .cell-course {
-  border-radius: 16rpx;
-  padding: 4rpx;
+  border-radius: 14rpx;
+  padding: 6rpx 4rpx;
+  box-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.08);
 }
 
 .course-name {
@@ -115,6 +118,10 @@
   line-height: 1.15;
   text-align: center;
   word-break: break-all;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
 }
 
 .course-detail {
@@ -123,11 +130,13 @@
   opacity: 0.85;
   text-align: center;
   word-break: break-all;
+  margin-top: 2rpx;
 }
 
 .course-badge {
   font-size: 16rpx;
   opacity: 0.8;
+  margin-top: 2rpx;
 }
 
 .week-hint {

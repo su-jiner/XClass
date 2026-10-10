@@ -36,7 +36,7 @@ struct XClassApp: App {
 struct RootView: View {
     @EnvironmentObject var notifier: StoreChangeNotifier
     @Environment(\.colorScheme) private var systemScheme
-    @State private var tab = 0
+    @State private var tab = AppPreferences.defaultPage == "today" ? 1 : 0
 
     var body: some View {
         TabView(selection: $tab) {
@@ -46,9 +46,12 @@ struct RootView: View {
             TodayPage(palette: palette)
                 .tabItem { Label("日程", systemImage: "clock") }
                 .tag(1)
+            ToolsView(palette: palette)
+                .tabItem { Label("工具", systemImage: "chart.bar.xaxis") }
+                .tag(2)
             SettingsPage(palette: palette)
                 .tabItem { Label("设置", systemImage: "gearshape") }
-                .tag(2)
+                .tag(3)
         }
         .tint(palette.iconTint)
     }
