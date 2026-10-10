@@ -1,8 +1,8 @@
 name: Android checks
 
 on:
-  push:
-  pull_request:
+  push: {}
+  pull_request: {}
 
 permissions:
   contents: read
