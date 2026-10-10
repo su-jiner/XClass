@@ -49,6 +49,8 @@ struct MeetingTime: Codable, Hashable {
     var endSection: Int
     var weekRules: [WeekRule]
     var location: String
+    /// 校区/楼栋时间表 ID；为空表示使用默认 12 节表
+    var campusId: String? = nil
 }
 
 struct CourseSchedule: Codable, Hashable, Identifiable {

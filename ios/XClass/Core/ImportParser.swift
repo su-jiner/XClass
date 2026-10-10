@@ -1,12 +1,21 @@
 import Foundation
 
-// MARK: - 备份文件编解码（格式与 Android ScheduleBackupCodec 一致，version 1）
+// MARK: - 备份文件编解码（格式与 Android ScheduleBackupCodec 一致，version 2）
 
 enum ScheduleBackupCodec {
     struct BackupFile: Codable {
-        var version: Int = 1
+        var version: Int = 2
         var exportedAt: String = ""
         var profiles: [BackupProfile] = []
+        var timeProfiles: [BackupTimeProfile] = []
+        var campusMap: [String: String] = [:]
+        var defaultProfileId: String? = nil
+    }
+
+    struct BackupTimeProfile: Codable {
+        var id: String
+        var name: String
+        var blocks: [SectionBlock]
     }
 
     struct BackupProfile: Codable {
@@ -30,6 +39,7 @@ enum ScheduleBackupCodec {
         var endSection: Int
         var weekRules: [BackupWeekRule] = []
         var location: String = ""
+        var campusId: String? = nil
     }
 
     struct BackupWeekRule: Codable {
@@ -38,8 +48,20 @@ enum ScheduleBackupCodec {
         var parity: String = "ALL"
     }
 
-    static func encode(exportedAt: String, profiles: [BackupProfile]) -> String {
-        let file = BackupFile(exportedAt: exportedAt, profiles: profiles)
+    static func encode(
+        exportedAt: String,
+        profiles: [BackupProfile],
+        timeProfiles: [BackupTimeProfile] = [],
+        campusMap: [String: String] = [:],
+        defaultProfileId: String? = nil
+    ) -> String {
+        let file = BackupFile(
+            exportedAt: exportedAt,
+            profiles: profiles,
+            timeProfiles: timeProfiles.filter { $0.id != TimeProfileResolver.defaultProfileId },
+            campusMap: campusMap,
+            defaultProfileId: defaultProfileId
+        )
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         guard let data = try? encoder.encode(file) else { return "" }
@@ -47,10 +69,15 @@ enum ScheduleBackupCodec {
     }
 
     static func decode(_ content: String) -> [BackupProfile]? {
+        decodeEnvelope(content)?.profiles
+    }
+
+    /// 解码完整信封（v2 含时间表与校区映射；v1 备份仍可读）
+    static func decodeEnvelope(_ content: String) -> BackupFile? {
         guard let data = content.data(using: .utf8),
               let file = try? JSONDecoder().decode(BackupFile.self, from: data),
-              (1...1).contains(file.version) else { return nil }
-        return file.profiles
+              (1...2).contains(file.version) else { return nil }
+        return file
     }
 
     static func toBackupCourse(_ course: CourseSchedule) -> BackupCourse {
@@ -68,7 +95,8 @@ enum ScheduleBackupCodec {
                     weekRules: meeting.weekRules.map {
                         BackupWeekRule(startWeek: $0.startWeek, endWeek: $0.endWeek, parity: $0.parity.rawValue)
                     },
-                    location: meeting.location
+                    location: meeting.location,
+                    campusId: meeting.campusId
                 )
             }
         )
@@ -90,7 +118,8 @@ enum ScheduleBackupCodec {
                         WeekRule(startWeek: $0.startWeek, endWeek: $0.endWeek,
                                  parity: WeekParity(rawValue: $0.parity) ?? .all)
                     },
-                    location: meeting.location
+                    location: meeting.location,
+                    campusId: meeting.campusId
                 )
             }
         )

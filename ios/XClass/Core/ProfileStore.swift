@@ -219,16 +219,33 @@ final class ProfileStore {
             )
         }
         let formatter = ISO8601DateFormatter()
-        return ScheduleBackupCodec.encode(exportedAt: formatter.string(from: Date()), profiles: profiles)
+        let timeProfiles = loadTimeProfiles()
+            .filter { $0.id != TimeProfileResolver.defaultProfileId }
+            .map { ScheduleBackupCodec.BackupTimeProfile(id: $0.id, name: $0.name, blocks: $0.blocks) }
+        return ScheduleBackupCodec.encode(
+            exportedAt: formatter.string(from: Date()),
+            profiles: profiles,
+            timeProfiles: timeProfiles,
+            campusMap: loadCampusMap(),
+            defaultProfileId: loadDefaultProfileId()
+        )
     }
 
     /// 用备份替换全部课表，返回恢复数量
     func importBackup(_ content: String) throws -> Int {
-        guard let backupProfiles = ScheduleBackupCodec.decode(content) else {
+        guard let envelope = ScheduleBackupCodec.decodeEnvelope(content) else {
             throw NSError(domain: "ProfileStore", code: 1,
                           userInfo: [NSLocalizedDescriptionKey: "备份文件格式不正确"])
         }
+        let backupProfiles = envelope.profiles
         lock.lock(); defer { lock.unlock() }
+        if !envelope.timeProfiles.isEmpty {
+            saveTimeProfiles(
+                envelope.timeProfiles.map { SectionTimeProfile(id: $0.id, name: $0.name, blocks: $0.blocks) },
+                campusMap: envelope.campusMap,
+                defaultProfileId: envelope.defaultProfileId
+            )
+        }
         let existing = (try? FileManager.default.contentsOfDirectory(at: rootDir, includingPropertiesForKeys: nil)) ?? []
         for url in existing where url.lastPathComponent.hasPrefix("courses_") && url.pathExtension == "json" {
             try? FileManager.default.removeItem(at: url)
@@ -386,6 +403,68 @@ final class ProfileStore {
         return (try? decoder.decode([PersistedCourse].self, from: data)).map { $0.map { $0.toCourseSchedule() } } ?? []
     }
 
+    // MARK: - 多校区节次时间表（与 Android time_profiles.json 同构）
+
+    private var timeProfilesURL: URL { rootDir.appendingPathComponent("time_profiles.json") }
+
+    private struct PersistedTimeProfiles: Codable {
+        var version: Int = 1
+        var defaultProfileId: String? = nil
+        var profiles: [SectionTimeProfile] = []
+        var campusMap: [String: String] = [:]
+    }
+
+    func loadTimeProfiles() -> [SectionTimeProfile] {
+        guard let data = try? Data(contentsOf: timeProfilesURL),
+              let stored = try? decoder.decode(PersistedTimeProfiles.self, from: data) else {
+            return [TimeProfileResolver.defaultProfile()]
+        }
+        let custom = stored.profiles.filter { !$0.blocks.isEmpty && $0.id != TimeProfileResolver.defaultProfileId }
+        return [TimeProfileResolver.defaultProfile()] + custom
+    }
+
+    func loadCampusMap() -> [String: String] {
+        guard let data = try? Data(contentsOf: timeProfilesURL),
+              let stored = try? decoder.decode(PersistedTimeProfiles.self, from: data) else { return [:] }
+        return stored.campusMap
+    }
+
+    func loadDefaultProfileId() -> String? {
+        guard let data = try? Data(contentsOf: timeProfilesURL),
+              let stored = try? decoder.decode(PersistedTimeProfiles.self, from: data) else { return nil }
+        return stored.defaultProfileId
+    }
+
+    func saveTimeProfiles(_ profiles: [SectionTimeProfile], campusMap: [String: String], defaultProfileId: String?) {
+        let payload = PersistedTimeProfiles(
+            defaultProfileId: defaultProfileId,
+            profiles: profiles.filter { $0.id != TimeProfileResolver.defaultProfileId },
+            campusMap: campusMap
+        )
+        guard let data = try? encoder.encode(payload) else { return }
+        try? FileManager.default.createDirectory(at: rootDir, withIntermediateDirectories: true)
+        try? data.write(to: timeProfilesURL, options: .atomic)
+    }
+
+    /// 导入解析结果入库：保存识别出的时间表并建立「校区简称 → 时间表」映射
+    @discardableResult
+    func saveParsedTimeTables(timeTables: [SectionTimeProfile], campusAliases: [String]) -> [String: String] {
+        var existing = loadTimeProfiles().filter { $0.id != TimeProfileResolver.defaultProfileId }
+        for profile in timeTables {
+            if let index = existing.firstIndex(where: { $0.id == profile.id || $0.name == profile.name }) {
+                existing[index] = profile
+            } else {
+                existing.append(profile)
+            }
+        }
+        var campusMap = loadCampusMap()
+        for alias in campusAliases {
+            if let matched = timeTables.first(where: { $0.name.contains(alias) }) { campusMap[alias] = matched.id }
+        }
+        saveTimeProfiles(existing, campusMap: campusMap, defaultProfileId: loadDefaultProfileId())
+        return campusMap
+    }
+
     private func writeCourses(_ courses: [CourseSchedule], to fileName: String) {
         let persisted = courses.map { PersistedCourse(from: $0) }
         guard let data = try? encoder.encode(persisted) else { return }
@@ -454,6 +533,8 @@ private struct PersistedMeeting: Codable {
     var endSection: Int
     var weekRules: [PersistedWeekRule]
     var location: String
+    /// 校区/楼栋时间表 ID（v2 起）
+    var campusId: String? = nil
 
     init(from meeting: MeetingTime) {
         weekday = meeting.weekday.rawValue.description
@@ -461,6 +542,7 @@ private struct PersistedMeeting: Codable {
         endSection = meeting.endSection
         weekRules = meeting.weekRules.map { PersistedWeekRule(startWeek: $0.startWeek, endWeek: $0.endWeek, parity: $0.parity.rawValue) }
         location = meeting.location
+        campusId = meeting.campusId
     }
 
     func toMeetingTime() -> MeetingTime {
@@ -470,7 +552,8 @@ private struct PersistedMeeting: Codable {
                         WeekRule(startWeek: $0.startWeek, endWeek: $0.endWeek,
                                  parity: WeekParity(rawValue: $0.parity) ?? .all)
                     },
-                    location: location)
+                    location: location,
+                    campusId: campusId)
     }
 }
 
