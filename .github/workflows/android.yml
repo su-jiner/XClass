@@ -106,7 +106,6 @@ jobs:
           PUB_B64=$(keytool -exportcert -alias update-key -keystore "$KEYSTORE_PATH" -storepass "$STORE_PASSWORD" -rfc \
             | openssl x509 -pubkey -noout | sed '1d;$d' | tr -d '\n')
           java -cp tools/update-sign SignManifest verify stable.json "$PUB_B64"
-          echo "--- payload ---"; python3 -c "import json,base64;print(json.dumps(json.loads(base64.urlsafe_b64decode(json.load(open('stable.json'))['payload'])),ensure_ascii=False,indent=2))"
       - name: Upload release APK
         uses: actions/upload-artifact@v4
         with:
