@@ -53,6 +53,8 @@ Page({
   onTextInput(event) {
     this.setData({ text: event.detail.value });
   },
+  /** 弹窗内容区点击占位：阻止冒泡到遮罩层，避免误关弹窗。 */
+  noop() {},
   chooseFile() {
     // 多选：一个文件 = 一个课表（课程时间）
     wx.chooseMessageFile({

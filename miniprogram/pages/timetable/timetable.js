@@ -251,6 +251,8 @@ Page({
       },
     });
   },
+  /** 弹窗内容区点击占位：阻止冒泡到遮罩层，避免误关弹窗。 */
+  noop() {},
   showPasteDialog() {
     this.setData({ showPaste: true, pasteText: '' });
   },
