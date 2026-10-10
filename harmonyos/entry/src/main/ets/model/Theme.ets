@@ -60,6 +60,34 @@ const MINT_DARK: ThemePalette = {
   gridHeader: '#1C362C', gridHeaderToday: '#27493A', gridLeft: '#182B23',
   gridDay: '#14241C', gridDayToday: '#1B3127',
 };
+const SAKURA_LIGHT: ThemePalette = {
+  page: '#FDF2F4', panel: '#FFE4E9', panelAlt: '#FFEEF1',
+  textPrimary: '#5C2E38', textSecondary: '#7A4A54', iconTint: '#B34A5E',
+  buttonBg: '#F5D7DE', buttonText: '#4A222C',
+  gridHeader: '#FFE7EC', gridHeaderToday: '#FFD2DC', gridLeft: '#FFF0F3',
+  gridDay: '#FFF7F9', gridDayToday: '#FFE3E9',
+};
+const SAKURA_DARK: ThemePalette = {
+  page: '#241A1C', panel: '#33262A', panelAlt: '#2B2023',
+  textPrimary: '#F0E2E5', textSecondary: '#C4A8AF', iconTint: '#E0B4BD',
+  buttonBg: '#4A353A', buttonText: '#F0E2E5',
+  gridHeader: '#3A2A2E', gridHeaderToday: '#4A3338', gridLeft: '#2E2124',
+  gridDay: '#281D20', gridDayToday: '#33262A',
+};
+const MIDNIGHT_LIGHT: ThemePalette = {
+  page: '#14161C', panel: '#1F222B', panelAlt: '#2A2D37',
+  textPrimary: '#E6E9F0', textSecondary: '#9AA0B0', iconTint: '#B9C0D4',
+  buttonBg: '#343847', buttonText: '#E6E9F0',
+  gridHeader: '#23262F', gridHeaderToday: '#313549', gridLeft: '#1B1E26',
+  gridDay: '#171A21', gridDayToday: '#23262F',
+};
+const MIDNIGHT_DARK: ThemePalette = {
+  page: '#101117', panel: '#1A1D24', panelAlt: '#22252E',
+  textPrimary: '#E0E4ED', textSecondary: '#8E94A6', iconTint: '#B0B8CC',
+  buttonBg: '#2C303B', buttonText: '#E0E4ED',
+  gridHeader: '#1E2129', gridHeaderToday: '#2A2E39', gridLeft: '#171A20',
+  gridDay: '#13151B', gridDayToday: '#1C1F27',
+};
 
 /** 深色底淡彩卡片上的固定深色文字（对齐 Android CARD_TEXT_COLOR） */
 export const CARD_TEXT = '#37312A';
@@ -74,6 +102,8 @@ export function currentPalette(theme: string, darkMode: string, systemDark: bool
   switch (theme) {
     case 'ocean': return dark ? OCEAN_DARK : OCEAN_LIGHT;
     case 'mint': return dark ? MINT_DARK : MINT_LIGHT;
+    case 'sakura': return dark ? SAKURA_DARK : SAKURA_LIGHT;
+    case 'midnight': return dark ? MIDNIGHT_DARK : MIDNIGHT_LIGHT;
     default: return dark ? WARM_DARK : WARM_LIGHT;
   }
 }

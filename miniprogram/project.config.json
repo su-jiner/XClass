@@ -1,5 +1,5 @@
 {
-  "appid": "wxacf0e9804a8f3962",
+  "appid": "wx71fe9ee9aa858f78",
   "projectname": "XClass",
   "compileType": "miniprogram",
   "libVersion": "3.5.5",
@@ -34,5 +34,6 @@
     "ignore": [],
     "include": []
   },
-  "editorSetting": {}
+  "editorSetting": {},
+  "isGameTourist": false
 }

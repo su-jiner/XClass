@@ -22,6 +22,15 @@ function scoreOf(grade) {
   return Number(grade.score || 0);
 }
 
+let cachedDark = null;
+function systemDark() {
+  if (cachedDark == null) {
+    const info = wx.getSystemInfoSync ? wx.getSystemInfoSync() : {};
+    cachedDark = info.theme === 'dark';
+  }
+  return cachedDark;
+}
+
 Page({
   data: {
     palette: theme.palette('warm', false),
@@ -40,8 +49,9 @@ Page({
     if (this.getTabBar && this.getTabBar()) this.getTabBar().setData({ selected: 2 });
     const info = wx.getSystemInfoSync ? wx.getSystemInfoSync() : {};
     const prefs = store.loadPrefs();
+    const dark = prefs.darkMode === 'dark' || (prefs.darkMode === 'system' && systemDark());
     this.setData({
-      palette: theme.palette(prefs.theme, false),
+      palette: theme.palette(prefs.theme, dark),
       statusBarHeight: info.statusBarHeight || 24,
     });
     this.reload();

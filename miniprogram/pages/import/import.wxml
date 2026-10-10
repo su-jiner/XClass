@@ -2,39 +2,107 @@
   <view class="page-header">
     <view>
       <view class="page-title">导入课表</view>
-      <view class="page-subtitle">纯本地解析：粘贴文本或从聊天记录选 txt/md/csv/tsv 文件（不支持图片/PDF）</view>
+      <view class="page-subtitle">纯本地解析：粘贴文本或从聊天记录选 txt/md/csv/tsv 文件（不支持图片/PDF）。可多选文件，一个文件 = 一个课表</view>
     </view>
   </view>
 
   <view class="card" style="background:{{palette.panel}}">
     <textarea
       class="input"
-      style="background:{{palette.panelAlt}};color:{{palette.text}};width:100%;height:220rpx"
+      style="background:{{palette.panelAlt}};color:{{palette.text}};width:100%;height:200rpx"
       placeholder="粘贴课表文本，例如：信息技术/(1-2节)12-14周(双),15-19周/（乌）E406/刘文杰"
       value="{{text}}"
       bindinput="onTextInput"
     />
     <view class="button" bindtap="parseText" style="background:{{palette.panelAlt}};color:{{palette.icon}}">解析粘贴文本</view>
-    <view class="button secondary" bindtap="chooseFile" style="background:{{palette.panelAlt}};color:{{palette.text}}">从聊天记录选择文件</view>
+    <view class="button secondary" bindtap="chooseFile" style="background:{{palette.panelAlt}};color:{{palette.text}}">从聊天记录选择文件（可多选）</view>
     <view class="button secondary" bindtap="exportShareText" style="background:{{palette.panelAlt}};color:{{palette.text}}">导出课表分享文本（复制给朋友）</view>
   </view>
 
-  <view class="card" wx:if="{{parsed}}" style="background:{{palette.panelAlt}}">
-    <view>识别到 {{preview.length}} 门课</view>
-    <view class="muted" wx:if="{{parsed.semester}}">学期：{{parsed.semester}}</view>
-    <view class="muted" wx:if="{{parsed.totalWeeks}}">总周数：{{parsed.totalWeeks}}</view>
-    <view class="muted" wx:if="{{parsed.timeTables.length}}">节次时间表：{{parsed.timeTables.length}} 套（已保存并建立校区映射）</view>
+  <view wx:if="{{groups.length}}" class="groups-summary" style="color:{{palette.textSecondary}}">
+    已解析 {{groups.length}} 份课表文本，全部可编辑后再保存
+  </view>
+
+  <view class="card" wx:for="{{groups}}" wx:key="index" style="background:{{palette.panelAlt}}">
+    <view class="row">
+      <view style="font-size:28rpx;font-weight:700;color:{{palette.textPrimary}}">{{item.name}}</view>
+      <view class="muted" data-group="{{index}}" bindtap="removeGroup">移除</view>
+    </view>
+    <view class="muted" wx:if="{{item.parsed.semester}}">学期：{{item.parsed.semester}}</view>
+    <view class="muted" wx:if="{{item.parsed.totalWeeks}}">总周数：{{item.parsed.totalWeeks}}</view>
+    <view class="muted" wx:if="{{item.parsed.timeTables.length}}">节次时间表：{{item.parsed.timeTables.length}} 套（已保存并建立校区映射）</view>
     <view class="muted" wx:for="{{warnings}}" wx:key="*this">⚠ {{item}}</view>
   </view>
 
-  <view class="card" wx:for="{{preview}}" wx:key="index" style="background:{{palette.panel}}">
-    <view class="row">
-      <view style="font-size:30rpx;font-weight:600">{{item.courseName}}</view>
-      <view class="muted" data-index="{{index}}" bindtap="removeCourse">删除</view>
+  <view class="card" wx:for="{{groups}}" wx:for-item="group" wx:for-index="groupIndex" wx:key="index" style="background:{{palette.panel}}">
+    <view wx:for="{{group.preview}}" wx:for-item="course" wx:for-index="courseIndex" wx:key="index" class="course-card" style="border-bottom:1rpx solid {{palette.panelAlt}}">
+      <view class="row">
+        <view style="font-size:30rpx;font-weight:600;color:{{palette.textPrimary}}">{{course.courseName}}</view>
+        <view class="muted course-ops">
+          <text data-group="{{groupIndex}}" data-index="{{courseIndex}}" bindtap="openEdit">编辑</text>
+          <text class="course-op-sep" data-group="{{groupIndex}}" data-index="{{courseIndex}}" bindtap="removeCourse">删除</text>
+        </view>
+      </view>
+      <view class="muted">{{course.detail}}</view>
+      <view class="muted" wx:if="{{course.teacher}}">教师：{{course.teacher}}</view>
     </view>
-    <view class="muted">{{item.detail}}</view>
-    <view class="muted" wx:if="{{item.teacher}}">{{item.teacher}}</view>
   </view>
 
-  <view class="button" wx:if="{{preview.length}}" bindtap="save" style="background:{{palette.panelAlt}};color:{{palette.icon}}">保存到课表</view>
+  <view class="button" wx:if="{{groups.length}}" bindtap="save" style="background:{{palette.panelAlt}};color:{{palette.icon}}">保存到课表（{{groups.length}} 份）</view>
+
+  <view class="edit-mask" wx:if="{{editGroupIndex >= 0}}" bindtap="closeEdit">
+    <view class="manual-panel" catchtap="noop" style="background:{{palette.panel}}">
+      <view class="manual-title" style="color:{{palette.textPrimary}}">编辑课程</view>
+
+      <view class="manual-field">
+        <view class="manual-label" style="color:{{palette.textSecondary}}">课程名称</view>
+        <input class="manual-input" style="background:{{palette.panelAlt}};color:{{palette.textPrimary}}"
+          value="{{editForm.courseName}}" data-field="courseName" bindinput="onEditField" />
+      </view>
+
+      <view class="manual-row">
+        <view class="manual-half">
+          <view class="manual-label" style="color:{{palette.textSecondary}}">星期</view>
+          <picker mode="selector" range="{{weekdayNames}}" value="{{editForm.weekdayIndex}}" bindchange="onEditWeekday">
+            <view class="manual-input manual-picker" style="background:{{palette.panelAlt}};color:{{palette.textPrimary}}">{{weekdayNames[editForm.weekdayIndex]}} ▾</view>
+          </picker>
+        </view>
+        <view class="manual-half">
+          <view class="manual-label" style="color:{{palette.textSecondary}}">周次</view>
+          <input class="manual-input" style="background:{{palette.panelAlt}};color:{{palette.textPrimary}}"
+            value="{{editForm.weekText}}" data-field="weekText" bindinput="onEditField" placeholder="如 1-16周 / 3-9周(单)" placeholder-class="manual-ph" />
+        </view>
+      </view>
+
+      <view class="manual-row">
+        <view class="manual-half">
+          <view class="manual-label" style="color:{{palette.textSecondary}}">开始节</view>
+          <input class="manual-input" type="number" style="background:{{palette.panelAlt}};color:{{palette.textPrimary}}"
+            value="{{editForm.startSection}}" data-field="startSection" bindinput="onEditField" />
+        </view>
+        <view class="manual-half">
+          <view class="manual-label" style="color:{{palette.textSecondary}}">结束节</view>
+          <input class="manual-input" type="number" style="background:{{palette.panelAlt}};color:{{palette.textPrimary}}"
+            value="{{editForm.endSection}}" data-field="endSection" bindinput="onEditField" />
+        </view>
+      </view>
+
+      <view class="manual-field">
+        <view class="manual-label" style="color:{{palette.textSecondary}}">上课地点（可留空）</view>
+        <input class="manual-input" style="background:{{palette.panelAlt}};color:{{palette.textPrimary}}"
+          value="{{editForm.location}}" data-field="location" bindinput="onEditField" />
+      </view>
+
+      <view class="manual-field">
+        <view class="manual-label" style="color:{{palette.textSecondary}}">授课教师（可留空）</view>
+        <input class="manual-input" style="background:{{palette.panelAlt}};color:{{palette.textPrimary}}"
+          value="{{editForm.teacher}}" data-field="teacher" bindinput="onEditField" />
+      </view>
+
+      <view class="manual-actions">
+        <view class="manual-btn" style="background:{{palette.panelAlt}};color:{{palette.textPrimary}}" bindtap="closeEdit">取消</view>
+        <view class="manual-btn manual-btn-primary" style="background:{{palette.buttonBackground}};color:{{palette.buttonText}}" bindtap="saveEdit">确认修改</view>
+      </view>
+    </view>
+  </view>
 </view>

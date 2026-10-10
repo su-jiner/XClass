@@ -246,6 +246,8 @@ struct SettingsPage: View {
                 Text("暖色").tag("warm")
                 Text("海蓝").tag("ocean")
                 Text("薄荷").tag("mint")
+                Text("樱粉").tag("sakura")
+                Text("墨夜").tag("midnight")
             }
             .pickerStyle(.segmented)
         }

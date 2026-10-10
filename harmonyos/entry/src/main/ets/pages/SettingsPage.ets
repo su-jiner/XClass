@@ -51,8 +51,8 @@ export struct SettingsPage {
       return '1.0.0-Beta';
     }
   })();
-  private themeOptions: string[] = ['暖色', '海蓝', '薄荷'];
-  private themeValues: string[] = ['warm', 'ocean', 'mint'];
+  private themeOptions: string[] = ['暖色', '海蓝', '薄荷', '樱粉', '墨夜'];
+  private themeValues: string[] = ['warm', 'ocean', 'mint', 'sakura', 'midnight'];
   private appearanceOptions: string[] = ['跟随系统', '浅色', '深色'];
   private appearanceValues: string[] = ['system', 'light', 'dark'];
   private fontOptions: string[] = ['小号', '标准', '大号'];

@@ -23,6 +23,10 @@ struct ThemePalette {
             return dark ? oceanDark : oceanLight
         case "mint":
             return dark ? mintDark : mintLight
+        case "sakura":
+            return dark ? sakuraDark : sakuraLight
+        case "midnight":
+            return dark ? midnightDark : midnightLight
         default:
             return dark ? warmDark : warmLight
         }
@@ -81,6 +85,42 @@ struct ThemePalette {
         gridHeader: Color(hex: 0x1C362C), gridHeaderToday: Color(hex: 0x27493A),
         gridLeftColumn: Color(hex: 0x182B23), gridDayCell: Color(hex: 0x14241C),
         gridDayToday: Color(hex: 0x1B3127))
+
+    static let sakuraLight = ThemePalette(
+        pageBackground: Color(hex: 0xFDF2F4), panelBackground: Color(hex: 0xFFE4E9),
+        panelAltBackground: Color(hex: 0xFFEEF1), textPrimary: Color(hex: 0x5C2E38),
+        textSecondary: Color(hex: 0x7A4A54), iconTint: Color(hex: 0xB34A5E),
+        buttonBackground: Color(hex: 0xF5D7DE), buttonText: Color(hex: 0x4A222C),
+        gridHeader: Color(hex: 0xFFE7EC), gridHeaderToday: Color(hex: 0xFFD2DC),
+        gridLeftColumn: Color(hex: 0xFFF0F3), gridDayCell: Color(hex: 0xFFF7F9),
+        gridDayToday: Color(hex: 0xFFE3E9))
+
+    static let sakuraDark = ThemePalette(
+        pageBackground: Color(hex: 0x241A1C), panelBackground: Color(hex: 0x33262A),
+        panelAltBackground: Color(hex: 0x2B2023), textPrimary: Color(hex: 0xF0E2E5),
+        textSecondary: Color(hex: 0xC4A8AF), iconTint: Color(hex: 0xE0B4BD),
+        buttonBackground: Color(hex: 0x4A353A), buttonText: Color(hex: 0xF0E2E5),
+        gridHeader: Color(hex: 0x3A2A2E), gridHeaderToday: Color(hex: 0x4A3338),
+        gridLeftColumn: Color(hex: 0x2E2124), gridDayCell: Color(hex: 0x281D20),
+        gridDayToday: Color(hex: 0x33262A))
+
+    static let midnightLight = ThemePalette(
+        pageBackground: Color(hex: 0x14161C), panelBackground: Color(hex: 0x1F222B),
+        panelAltBackground: Color(hex: 0x2A2D37), textPrimary: Color(hex: 0xE6E9F0),
+        textSecondary: Color(hex: 0x9AA0B0), iconTint: Color(hex: 0xB9C0D4),
+        buttonBackground: Color(hex: 0x343847), buttonText: Color(hex: 0xE6E9F0),
+        gridHeader: Color(hex: 0x23262F), gridHeaderToday: Color(hex: 0x313549),
+        gridLeftColumn: Color(hex: 0x1B1E26), gridDayCell: Color(hex: 0x171A21),
+        gridDayToday: Color(hex: 0x23262F))
+
+    static let midnightDark = ThemePalette(
+        pageBackground: Color(hex: 0x101117), panelBackground: Color(hex: 0x1A1D24),
+        panelAltBackground: Color(hex: 0x22252E), textPrimary: Color(hex: 0xE0E4ED),
+        textSecondary: Color(hex: 0x8E94A6), iconTint: Color(hex: 0xB0B8CC),
+        buttonBackground: Color(hex: 0x2C303B), buttonText: Color(hex: 0xE0E4ED),
+        gridHeader: Color(hex: 0x1E2129), gridHeaderToday: Color(hex: 0x2A2E39),
+        gridLeftColumn: Color(hex: 0x171A20), gridDayCell: Color(hex: 0x13151B),
+        gridDayToday: Color(hex: 0x1C1F27))
 }
 
 extension Color {

@@ -10,9 +10,17 @@ import { fs } from '@kit.CoreFileKit';
 import { util } from '@kit.ArkTS';
 import { pasteboard } from '@kit.BasicServicesKit';
 import { router } from '@kit.ArkUI';
+import { EditCourseDialog } from './EditCourseDialog.ets';
+
+interface ImportGroup {
+  name: string;
+  parsed: CourseTableParseResult;
+  courses: ImportedCourse[];
+}
 
 /**
- * 课表导入页：粘贴文本 / 选择 txt·md·csv·tsv 文件 → 本地解析 → 预览校对 → 覆盖或新建课表。
+ * 课表导入页：粘贴文本 / 选择 txt·md·csv·tsv 文件（可多选，一个文件 = 一个课表）→
+ * 本地解析 → 预览校对（可逐条编辑/删除）→ 确认后覆盖或新建课表。
  * 与 Android 导入向导、小程序导入页共用同一套解析规则；全程离线。
  */
 @Entry
@@ -22,10 +30,21 @@ struct ImportPage {
   @StorageProp('systemDark') systemDark: boolean = false;
   @State text: string = '';
   @State mode: string = 'paste';
-  @State parsed: CourseTableParseResult | null = null;
+  @State groups: ImportGroup[] = [];
   @State previewCount: number = 0;
   @State toast: string = '';
-  private courses: ImportedCourse[] = [];
+  @State editingCourse: ImportedCourse | null = null;
+
+  editController: CustomDialogController = new CustomDialogController({
+    builder: EditCourseDialog({
+      course: this.editingCourse ?? {
+        courseName: '', teacher: '', semester: '', credit: null, rawWeekText: '', meetings: [],
+      },
+      onSaved: (updated: ImportedCourse): void => {
+        this.commitEdit(updated);
+      },
+    }),
+  });
 
   aboutToAppear(): void {
     const params = router.getParams() as Record<string, string>;
@@ -47,17 +66,24 @@ struct ImportPage {
     options.fileSuffixFilters = ['.txt', '.md', '.csv', '.tsv'];
     picker.select(options).then((urls: Array<string>) => {
       if (urls.length === 0) return;
-      try {
-        const file = fs.openSync(urls[0], fs.OpenMode.READ_ONLY);
-        const stat = fs.statSync(file.fd);
-        const buf = new ArrayBuffer(stat.size);
-        fs.readSync(file.fd, buf);
-        fs.closeSync(file);
-        const content = util.TextDecoder.create('utf-8').decodeToString(new Uint8Array(buf));
-        this.text = content;
-        this.parse(content, urls[0]);
-      } catch {
-        this.toast = '读取文件失败';
+      let total = 0;
+      urls.forEach((url) => {
+        try {
+          const file = fs.openSync(url, fs.OpenMode.READ_ONLY);
+          const stat = fs.statSync(file.fd);
+          const buf = new ArrayBuffer(stat.size);
+          fs.readSync(file.fd, buf);
+          fs.closeSync(file);
+          const content = util.TextDecoder.create('utf-8').decodeToString(new Uint8Array(buf));
+          const name = url.split('/').pop() ?? url;
+          this.parse(content, name);
+          total += this.groups.length > 0 ? this.groups[this.groups.length - 1].courses.length : 0;
+        } catch {
+          this.toast = '读取文件失败';
+        }
+      });
+      if (urls.length > 1) {
+        this.toast = `已解析 ${urls.length} 份课表文件，可逐条编辑后再保存`;
       }
     }).catch(() => {
       this.toast = '未选择文件';
@@ -70,9 +96,10 @@ struct ImportPage {
     if (lower.endsWith('.csv')) rows = this.splitDelimited(content, ',');
     if (lower.endsWith('.tsv')) rows = this.splitDelimited(content, '\t');
     const parsed = parseCourseTableText(content, rows);
-    this.parsed = parsed;
-    this.courses = parsed.courses;
-    this.previewCount = parsed.courses.length;
+    const groups = this.groups.slice();
+    groups.push({ name: sourceName, parsed: parsed, courses: parsed.courses.slice() });
+    this.groups = groups;
+    this.previewCount = this.groups.reduce((sum, group) => sum + group.courses.length, 0);
     if (parsed.courses.length === 0 && parsed.warnings.length > 0) this.toast = parsed.warnings[0];
   }
 
@@ -111,37 +138,96 @@ struct ImportPage {
     }).join('；');
   }
 
-  save(mode: 'overwrite' | 'new'): void {
-    const parsed = this.parsed;
-    if (!parsed || parsed.courses.length === 0) {
-      this.toast = '暂无可导入课程';
-      return;
-    }
-    const campusMap = ProfileStore.instance?.saveParsedTimeTables(parsed.timeTables, parsed.campusAliases) ?? {};
-    const schedules: CourseSchedule[] = parsed.courses.map((course) => ({
+  openEdit(groupIndex: number, courseIndex: number): void {
+    const group = this.groups[groupIndex];
+    if (!group) return;
+    const course = group.courses[courseIndex];
+    if (!course) return;
+    this.editingCourse = {
       courseName: course.courseName,
       teacher: course.teacher,
       semester: course.semester,
       credit: course.credit,
       rawWeekText: course.rawWeekText,
-      meetings: course.meetings.map((meeting) => ({
-        weekday: meeting.weekday,
-        startSection: meeting.startSection,
-        endSection: meeting.endSection,
-        weekRules: meeting.weekRules,
-        location: meeting.location,
-        campusId: meeting.campusAlias ? (campusMap[meeting.campusAlias] ?? null) : null,
+      meetings: course.meetings.map((m) => ({
+        weekday: m.weekday,
+        startSection: m.startSection,
+        endSection: m.endSection,
+        weekRules: m.weekRules.map((r) => ({ startWeek: r.startWeek, endWeek: r.endWeek, parity: r.parity })),
+        location: m.location,
+        campusAlias: m.campusAlias,
       })),
-    }));
-    const name = ProfileStore.instance?.importCourses(
-      schedules,
-      mode,
-      parsed.semester ? `${parsed.semester} 导入` : null,
-      parsed.semesterStartDate,
-      campusMap
-    ) ?? '';
+    };
+    this.editController.open();
+  }
+
+  commitEdit(updated: ImportedCourse): void {
+    const gs = this.groups.slice();
+    const group = gs[this.lastEditGroup];
+    if (!group) return;
+    const courses = group.courses.map((course, index) => index === this.lastEditCourse ? updated : course);
+    gs[this.lastEditGroup] = { ...group, courses: courses };
+    this.groups = gs;
+    this.previewCount = this.groups.reduce((sum, g) => sum + g.courses.length, 0);
+    this.toast = '已更新，保存后生效';
+  }
+
+  lastEditGroup: number = -1;
+  lastEditCourse: number = -1;
+
+  removeCourse(groupIndex: number, courseIndex: number): void {
+    const gs = this.groups.slice();
+    const group = gs[groupIndex];
+    if (!group) return;
+    const courses = group.courses.slice();
+    courses.splice(courseIndex, 1);
+    gs[groupIndex] = { ...group, courses: courses };
+    this.groups = gs;
+    this.previewCount = this.groups.reduce((sum, g) => sum + g.courses.length, 0);
+  }
+
+  save(mode: 'overwrite' | 'new'): void {
+    const valid = this.groups.filter((group) => group.courses.length > 0);
+    if (valid.length === 0) {
+      this.toast = '暂无可导入课程';
+      return;
+    }
+    const store = ProfileStore.instance;
+    if (!store) { this.toast = '课表存储未就绪'; return; }
+    let imported = 0;
+    let firstName = '';
+    valid.forEach((group, index) => {
+      const campusMap = store.saveParsedTimeTables(group.parsed.timeTables, group.parsed.campusAliases) ?? {};
+      const schedules: CourseSchedule[] = group.courses.map((course) => ({
+        courseName: course.courseName,
+        teacher: course.teacher,
+        semester: course.semester,
+        credit: course.credit,
+        rawWeekText: course.rawWeekText,
+        meetings: course.meetings.map((meeting) => ({
+          weekday: meeting.weekday,
+          startSection: meeting.startSection,
+          endSection: meeting.endSection,
+          weekRules: meeting.weekRules,
+          location: meeting.location,
+          campusId: meeting.campusAlias ? (campusMap[meeting.campusAlias] ?? null) : null,
+        })),
+      }));
+      const modeForGroup: 'overwrite' | 'new' = (mode === 'overwrite' && index === 0) ? 'overwrite' : 'new';
+      const semesterName = group.parsed.semester ? `${group.parsed.semester} 导入` : null;
+      const groupName = valid.length > 1 ? (semesterName ?? group.name) : semesterName;
+      const name = store.importCourses(
+        schedules,
+        modeForGroup,
+        modeForGroup === 'new' ? groupName : null,
+        group.parsed.semesterStartDate,
+        campusMap
+      ) ?? '';
+      imported += schedules.length;
+      if (index === 0) firstName = name;
+    });
     AppStorage.setOrCreate('dataVersion', Date.now());
-    this.toast = `已导入 ${schedules.length} 门课到「${name}」`;
+    this.toast = `已导入 ${imported} 门课到「${firstName}」`;
     setTimeout(() => router.back(), 800);
   }
 
@@ -180,7 +266,7 @@ struct ImportPage {
   card() {
     Column() {
       Text('导入课表').fontSize(24).fontWeight(FontWeight.Bold).fontColor(this.palette().text)
-      Text('纯本地解析：粘贴文本或选择 txt/md/csv/tsv 文件（图片与 PDF 暂不支持）')
+      Text('纯本地解析：粘贴文本或选择 txt/md/csv/tsv 文件（可多选，一个文件 = 一个课表）')
         .fontSize(12).fontColor(this.palette().textSecondary).margin({ top: 4 })
     }
     .alignItems(HorizontalAlign.Start)
@@ -194,7 +280,7 @@ struct ImportPage {
       Scroll() {
         Column() {
           TextArea({ text: this.text, placeholder: '粘贴课表文本，例如：信息技术/(1-2节)12-14周(双),15-19周/（乌）E406/刘文杰' })
-            .height(120)
+            .height(110)
             .backgroundColor(this.palette().panelAlt)
             .fontColor(this.palette().text)
             .onChange((value: string) => { this.text = value; })
@@ -203,7 +289,7 @@ struct ImportPage {
             .backgroundColor(this.palette().buttonBackground)
             .fontColor(this.palette().buttonText)
             .onClick(() => this.parse(this.text, 'paste.txt'))
-          Button('从文件选择（txt/md/csv/tsv）')
+          Button('从文件选择（可多选：txt/md/csv/tsv）')
             .width('100%').margin({ top: 8 })
             .backgroundColor(this.palette().panelAlt)
             .fontColor(this.palette().text)
@@ -214,20 +300,25 @@ struct ImportPage {
             .fontColor(this.palette().text)
             .onClick(() => this.exportShareText())
 
-          if (this.parsed !== null) {
+          if (this.groups.length > 0) {
+            Text(`已解析 ${this.groups.length} 份课表文本，全部可编辑后再保存`)
+              .fontSize(12).fontColor(this.palette().textSecondary).margin({ top: 8 })
+          }
+
+          ForEach(this.groups, (group: ImportGroup, groupIndex: number) => {
             Column() {
-              Text(`识别到 ${this.previewCount} 门课`).fontSize(14).fontColor(this.palette().text)
-              if (this.parsed.semester !== null && this.parsed.semester.length > 0) {
-                Text(`学期：${this.parsed.semester}`).fontSize(12).fontColor(this.palette().textSecondary)
+              Text(group.name).fontSize(14).fontWeight(FontWeight.Bold).fontColor(this.palette().text)
+              if (group.parsed.semester !== null && group.parsed.semester.length > 0) {
+                Text(`学期：${group.parsed.semester}`).fontSize(12).fontColor(this.palette().textSecondary)
               }
-              if (this.parsed.totalWeeks !== null) {
-                Text(`总周数：${this.parsed.totalWeeks}`).fontSize(12).fontColor(this.palette().textSecondary)
+              if (group.parsed.totalWeeks !== null) {
+                Text(`总周数：${group.parsed.totalWeeks}`).fontSize(12).fontColor(this.palette().textSecondary)
               }
-              if (this.parsed.timeTables.length > 0) {
-                Text(`节次时间表：${this.parsed.timeTables.length} 套（已保存并建立校区映射）`)
+              if (group.parsed.timeTables.length > 0) {
+                Text(`节次时间表：${group.parsed.timeTables.length} 套（已保存并建立校区映射）`)
                   .fontSize(12).fontColor(this.palette().textSecondary)
               }
-              ForEach(this.parsed.warnings, (warning: string) => {
+              ForEach(group.parsed.warnings, (warning: string) => {
                 Text(`⚠ ${warning}`).fontSize(12).fontColor(this.palette().textSecondary)
               })
             }
@@ -237,34 +328,49 @@ struct ImportPage {
             .margin({ top: 8 })
             .backgroundColor(this.palette().panelAlt)
             .borderRadius(14)
-          }
 
-          ForEach(this.courses, (course: ImportedCourse) => {
-            Column() {
-              Text(course.courseName).fontSize(15).fontWeight(FontWeight.Medium).fontColor(this.palette().text)
-              Text(this.meetingText(course)).fontSize(12).fontColor(this.palette().textSecondary)
-              if (course.teacher.length > 0) {
-                Text(course.teacher).fontSize(12).fontColor(this.palette().textSecondary)
+            ForEach(group.courses, (course: ImportedCourse, courseIndex: number) => {
+              Column() {
+                Row() {
+                  Text(course.courseName).fontSize(15).fontWeight(FontWeight.Medium).fontColor(this.palette().text)
+                    .layoutWeight(1)
+                  Text('编辑').fontSize(12).fontColor(this.palette().iconTint)
+                    .onClick(() => {
+                      this.lastEditGroup = groupIndex;
+                      this.lastEditCourse = courseIndex;
+                      this.openEdit(groupIndex, courseIndex);
+                    })
+                  Text('删除').fontSize(12).fontColor(this.palette().textSecondary)
+                    .margin({ left: 10 })
+                    .onClick(() => this.removeCourse(groupIndex, courseIndex))
+                }
+                .width('100%')
+                Text(this.meetingText(course)).fontSize(12).fontColor(this.palette().textSecondary)
+                if (course.teacher.length > 0) {
+                  Text(course.teacher).fontSize(12).fontColor(this.palette().textSecondary)
+                }
               }
-            }
-            .alignItems(HorizontalAlign.Start)
-            .width('100%')
-            .padding(12)
-            .margin({ top: 8 })
-            .backgroundColor(this.palette().panel)
-            .borderRadius(14)
-          }, (course: ImportedCourse) => course.courseName + course.meetings.length)
+              .alignItems(HorizontalAlign.Start)
+              .width('100%')
+              .padding(12)
+              .margin({ top: 8 })
+              .backgroundColor(this.palette().panel)
+              .borderRadius(14)
+            }, (course: ImportedCourse) => course.courseName + course.meetings.length + groupIndex + courseIndex)
+          }, (group: ImportGroup) => group.name + group.courses.length)
 
           if (this.previewCount > 0) {
             Row() {
-              Button('覆盖当前课表')
+              if (this.groups.length === 1) {
+                Button('覆盖当前课表')
+                  .layoutWeight(1)
+                  .backgroundColor(this.palette().buttonBackground)
+                  .fontColor(this.palette().buttonText)
+                  .onClick(() => this.save('overwrite'))
+              }
+              Button(`保存（${this.previewCount} 门课）`)
                 .layoutWeight(1)
-                .backgroundColor(this.palette().buttonBackground)
-                .fontColor(this.palette().buttonText)
-                .onClick(() => this.save('overwrite'))
-              Button('新建课表导入')
-                .layoutWeight(1)
-                .margin({ left: 8 })
+                .margin({ left: this.groups.length === 1 ? 8 : 0 })
                 .backgroundColor(this.palette().panelAlt)
                 .fontColor(this.palette().text)
                 .onClick(() => this.save('new'))

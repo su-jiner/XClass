@@ -62,6 +62,46 @@
     <color name="mint_detail_body">#325E4C</color>
     <color name="mint_detail_meta">#5E7F72</color>
 
+    <!-- 樱粉（浅色） -->
+    <color name="sakura_page_background">#FDF2F4</color>
+    <color name="sakura_nav_background">#D9FFF0F3</color>
+    <color name="sakura_panel_background">#FFE4E9</color>
+    <color name="sakura_panel_alt_background">#FFEEF1</color>
+    <color name="sakura_text_primary">#5C2E38</color>
+    <color name="sakura_text_secondary">#7A4A54</color>
+    <color name="sakura_icon_tint">#B34A5E</color>
+    <color name="sakura_button_background">#F5D7DE</color>
+    <color name="sakura_button_text">#4A222C</color>
+    <color name="sakura_grid_header">#FFE7EC</color>
+    <color name="sakura_grid_header_today">#FFD2DC</color>
+    <color name="sakura_grid_left_column">#FFF0F3</color>
+    <color name="sakura_grid_day_cell">#FFF7F9</color>
+    <color name="sakura_grid_day_today">#FFE3E9</color>
+    <color name="sakura_detail_card">#FFF0F3</color>
+    <color name="sakura_detail_title">#5C2E38</color>
+    <color name="sakura_detail_body">#73404A</color>
+    <color name="sakura_detail_meta">#92606A</color>
+
+    <!-- 墨夜（深色主题，浅色模式亦为深色 UI） -->
+    <color name="midnight_page_background">#14161C</color>
+    <color name="midnight_nav_background">#E614161C</color>
+    <color name="midnight_panel_background">#1F222B</color>
+    <color name="midnight_panel_alt_background">#2A2D37</color>
+    <color name="midnight_text_primary">#E6E9F0</color>
+    <color name="midnight_text_secondary">#9AA0B0</color>
+    <color name="midnight_icon_tint">#B9C0D4</color>
+    <color name="midnight_button_background">#343847</color>
+    <color name="midnight_button_text">#E6E9F0</color>
+    <color name="midnight_grid_header">#23262F</color>
+    <color name="midnight_grid_header_today">#313549</color>
+    <color name="midnight_grid_left_column">#1B1E26</color>
+    <color name="midnight_grid_day_cell">#171A21</color>
+    <color name="midnight_grid_day_today">#23262F</color>
+    <color name="midnight_detail_card">#22252E</color>
+    <color name="midnight_detail_title">#E6E9F0</color>
+    <color name="midnight_detail_body">#C2C8D6</color>
+    <color name="midnight_detail_meta">#8F96A8</color>
+
     <!-- 弹窗与通用输入框/面板组件色（浅色） -->
     <color name="dialog_input_background">#FFFDF8</color>
     <color name="dialog_input_stroke">#E8D8BF</color>

@@ -36,6 +36,8 @@ object ThemePaletteProvider {
         val prefix = when (theme) {
             AppPreferences.THEME_OCEAN -> "ocean"
             AppPreferences.THEME_MINT -> "mint"
+            AppPreferences.THEME_SAKURA -> "sakura"
+            AppPreferences.THEME_MIDNIGHT -> "midnight"
             else -> "warm"
         }
         fun color(suffix: String): Int {
@@ -73,6 +75,8 @@ object ThemePaletteProvider {
         return when (theme) {
             AppPreferences.THEME_OCEAN -> R.style.Theme_XClass_Ocean
             AppPreferences.THEME_MINT -> R.style.Theme_XClass_Mint
+            AppPreferences.THEME_SAKURA -> R.style.Theme_XClass_Sakura
+            AppPreferences.THEME_MIDNIGHT -> R.style.Theme_XClass_Midnight
             else -> R.style.Theme_XClass_Warm
         }
     }

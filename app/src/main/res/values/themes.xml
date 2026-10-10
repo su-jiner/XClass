@@ -35,6 +35,28 @@
         <item name="android:windowBackground">@color/mint_page_background</item>
     </style>
 
+    <style name="Theme.XClass.Sakura">
+        <item name="android:textColorPrimary">@color/sakura_text_primary</item>
+        <item name="android:textColorSecondary">@color/sakura_text_secondary</item>
+        <item name="android:textColorHint">@color/sakura_text_secondary</item>
+        <item name="colorPrimary">@color/sakura_icon_tint</item>
+        <item name="colorAccent">@color/sakura_icon_tint</item>
+        <item name="colorControlNormal">@color/sakura_icon_tint</item>
+        <item name="colorControlActivated">@color/sakura_icon_tint</item>
+        <item name="android:windowBackground">@color/sakura_page_background</item>
+    </style>
+
+    <style name="Theme.XClass.Midnight">
+        <item name="android:textColorPrimary">@color/midnight_text_primary</item>
+        <item name="android:textColorSecondary">@color/midnight_text_secondary</item>
+        <item name="android:textColorHint">@color/midnight_text_secondary</item>
+        <item name="colorPrimary">@color/midnight_icon_tint</item>
+        <item name="colorAccent">@color/midnight_icon_tint</item>
+        <item name="colorControlNormal">@color/midnight_icon_tint</item>
+        <item name="colorControlActivated">@color/midnight_icon_tint</item>
+        <item name="android:windowBackground">@color/midnight_page_background</item>
+    </style>
+
     <!-- 设置页卡片分组样式（颜色在代码中按主题色板动态着色） -->
     <style name="SettingsCard">
         <item name="android:layout_width">match_parent</item>

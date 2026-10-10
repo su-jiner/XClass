@@ -34,6 +34,19 @@ Page({
     touchStartX: 0,
     rowHeight: 96,
     scale: 1,
+    showManual: false,
+    showPaste: false,
+    pasteText: '',
+    weekdayNames: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
+    manualForm: {
+      name: '',
+      weekdayIndex: 0,
+      startSection: '1',
+      endSection: '2',
+      weekText: '1-16周',
+      location: '',
+      teacher: '',
+    },
   },
   onShow() {
     if (this.getTabBar && this.getTabBar()) this.getTabBar().setData({ selected: 0 });
@@ -234,37 +247,76 @@ Page({
       success: (result) => {
         if (result.tapIndex === 0) this.showManualDialog();
         if (result.tapIndex === 1) wx.navigateTo({ url: '/pages/import/import?mode=file' });
-        if (result.tapIndex === 2) wx.navigateTo({ url: '/pages/import/import?mode=paste' });
+        if (result.tapIndex === 2) this.showPasteDialog();
       },
     });
   },
+  showPasteDialog() {
+    this.setData({ showPaste: true, pasteText: '' });
+  },
+  closePaste() {
+    this.setData({ showPaste: false });
+  },
+  onPasteInput(event) {
+    this.setData({ pasteText: event.detail.value });
+  },
+  doPasteParse() {
+    const text = (this.data.pasteText || '').trim();
+    if (!text) {
+      wx.showToast({ title: '请先粘贴课表文本', icon: 'none' });
+      return;
+    }
+    getApp().globalData.pendingImportText = text;
+    this.setData({ showPaste: false });
+    wx.navigateTo({ url: '/pages/import/import?mode=paste&auto=1' });
+  },
   showManualDialog() {
-    wx.showActionSheet({
-      itemList: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
-      success: (result) => {
-        const weekday = core.WEEKDAYS[result.tapIndex];
-        wx.showModal({
-          title: '手动添加课程',
-          editable: true,
-          placeholderText: '课程名/节次/地点/教师，如：高等数学/1-2/教三302/张三',
-          success: (modal) => {
-            if (!modal.confirm || !modal.content) return;
-            const parts = modal.content.split(/[\/|｜]/).map((item) => item.trim());
-            const sections = core.sectionRangeFromLabel(parts[1] || '1-2') || { startSection: 1, endSection: 2 };
-            store.addManualCourse({
-              courseName: parts[0] || '未命名课程',
-              teacher: parts[3] || '',
-              location: parts[2] || '',
-              weekday: weekday,
-              startSection: sections.startSection,
-              endSection: sections.endSection,
-              weekText: '1-16周',
-            });
-            this.reload();
-            wx.showToast({ title: '已添加到当前课表', icon: 'none' });
-          },
-        });
+    this.setData({
+      showManual: true,
+      manualForm: {
+        name: '',
+        weekdayIndex: 0,
+        startSection: '1',
+        endSection: '2',
+        weekText: '1-16周',
+        location: '',
+        teacher: '',
       },
     });
+  },
+  onManualField(event) {
+    const field = event.currentTarget.dataset.field;
+    const value = event.detail.value;
+    this.setData({ ['manualForm.' + field]: value });
+  },
+  onManualWeekday(event) {
+    this.setData({ 'manualForm.weekdayIndex': Number(event.detail.value) });
+  },
+  closeManual() {
+    this.setData({ showManual: false });
+  },
+  saveManual() {
+    const form = this.data.manualForm;
+    const name = (form.name || '').trim();
+    if (!name) {
+      wx.showToast({ title: '课程名不能为空', icon: 'none' });
+      return;
+    }
+    const startSection = Math.max(1, Math.min(12, Number(form.startSection) || 1));
+    const endSection = Math.max(startSection, Math.min(12, Number(form.endSection) || startSection));
+    const sections = core.sectionRangeFromLabel(startSection + '-' + endSection)
+      || { startSection: startSection, endSection: endSection };
+    store.addManualCourse({
+      courseName: name,
+      teacher: (form.teacher || '').trim(),
+      location: (form.location || '').trim(),
+      weekday: core.WEEKDAYS[form.weekdayIndex],
+      startSection: sections.startSection,
+      endSection: sections.endSection,
+      weekText: (form.weekText || '').trim() || '1-16周',
+    });
+    this.setData({ showManual: false });
+    this.reload();
+    wx.showToast({ title: '已添加到当前课表', icon: 'none' });
   },
 });

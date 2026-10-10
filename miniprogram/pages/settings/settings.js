@@ -7,7 +7,7 @@ Page({
     palette: theme.palette('warm', false),
     statusBarHeight: 24,
     prefs: {},
-    themes: [['warm', '暖色'], ['ocean', '海蓝'], ['mint', '薄荷']],
+    themes: [['warm', '暖色'], ['ocean', '海蓝'], ['mint', '薄荷'], ['sakura', '樱粉'], ['midnight', '墨夜']],
     darkModes: [['system', '跟随系统'], ['light', '浅色'], ['dark', '深色']],
     fontScales: [['small', '小号'], ['normal', '标准'], ['large', '大号']],
     defaultPages: [['timetable', '课表'], ['today', '日程']],

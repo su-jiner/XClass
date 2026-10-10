@@ -70,4 +70,73 @@
     <text class="week-current">第 {{week}} / {{totalWeeks}} 周（左右滑动切周）</text>
     <text bindtap="goNextWeek" class="week-arrow">下一周 ›</text>
   </view>
+
+  <view class="manual-mask" wx:if="{{showPaste}}" bindtap="closePaste">
+    <view class="manual-panel" catchtap="noop" style="background:{{palette.panel}}">
+      <view class="manual-title" style="color:{{palette.textPrimary}}">粘贴文本导入</view>
+      <view class="manual-label" style="color:{{palette.textSecondary}}">粘贴朋友分享的 XClass 课表文本（仅本软件可识别），解析后可预览编辑再确认导入。</view>
+      <textarea class="paste-area" style="background:{{palette.panelAlt}};color:{{palette.textPrimary}}"
+        value="{{pasteText}}" bindinput="onPasteInput" placeholder="在此粘贴课表分享文本…" placeholder-class="manual-ph" />
+      <view class="manual-actions">
+        <view class="manual-btn" style="background:{{palette.panelAlt}};color:{{palette.textPrimary}}" bindtap="closePaste">取消</view>
+        <view class="manual-btn manual-btn-primary" style="background:{{palette.buttonBackground}};color:{{palette.buttonText}}" bindtap="doPasteParse">解析预览</view>
+      </view>
+    </view>
+  </view>
+
+  <view class="manual-mask" wx:if="{{showManual}}" bindtap="closeManual">
+    <view class="manual-panel" catchtap="noop" style="background:{{palette.panel}}">
+      <view class="manual-title" style="color:{{palette.textPrimary}}">手动添加课程</view>
+
+      <view class="manual-field">
+        <view class="manual-label" style="color:{{palette.textSecondary}}">课程名称</view>
+        <input class="manual-input" style="background:{{palette.panelAlt}};color:{{palette.textPrimary}}"
+          value="{{manualForm.name}}" data-field="name" bindinput="onManualField" placeholder="课程名称" placeholder-class="manual-ph" />
+      </view>
+
+      <view class="manual-row">
+        <view class="manual-half">
+          <view class="manual-label" style="color:{{palette.textSecondary}}">星期</view>
+          <picker mode="selector" range="{{weekdayNames}}" value="{{manualForm.weekdayIndex}}" bindchange="onManualWeekday">
+            <view class="manual-input manual-picker" style="background:{{palette.panelAlt}};color:{{palette.textPrimary}}">{{weekdayNames[manualForm.weekdayIndex]}} ▾</view>
+          </picker>
+        </view>
+        <view class="manual-half">
+          <view class="manual-label" style="color:{{palette.textSecondary}}">周次</view>
+          <input class="manual-input" style="background:{{palette.panelAlt}};color:{{palette.textPrimary}}"
+            value="{{manualForm.weekText}}" data-field="weekText" bindinput="onManualField" placeholder="如 1-16周 / 3-9周(单)" placeholder-class="manual-ph" />
+        </view>
+      </view>
+
+      <view class="manual-row">
+        <view class="manual-half">
+          <view class="manual-label" style="color:{{palette.textSecondary}}">开始节</view>
+          <input class="manual-input" type="number" style="background:{{palette.panelAlt}};color:{{palette.textPrimary}}"
+            value="{{manualForm.startSection}}" data-field="startSection" bindinput="onManualField" />
+        </view>
+        <view class="manual-half">
+          <view class="manual-label" style="color:{{palette.textSecondary}}">结束节</view>
+          <input class="manual-input" type="number" style="background:{{palette.panelAlt}};color:{{palette.textPrimary}}"
+            value="{{manualForm.endSection}}" data-field="endSection" bindinput="onManualField" />
+        </view>
+      </view>
+
+      <view class="manual-field">
+        <view class="manual-label" style="color:{{palette.textSecondary}}">上课地点（可留空）</view>
+        <input class="manual-input" style="background:{{palette.panelAlt}};color:{{palette.textPrimary}}"
+          value="{{manualForm.location}}" data-field="location" bindinput="onManualField" placeholder="如 教三302" placeholder-class="manual-ph" />
+      </view>
+
+      <view class="manual-field">
+        <view class="manual-label" style="color:{{palette.textSecondary}}">授课教师（可留空）</view>
+        <input class="manual-input" style="background:{{palette.panelAlt}};color:{{palette.textPrimary}}"
+          value="{{manualForm.teacher}}" data-field="teacher" bindinput="onManualField" placeholder="如 张三" placeholder-class="manual-ph" />
+      </view>
+
+      <view class="manual-actions">
+        <view class="manual-btn" style="background:{{palette.panelAlt}};color:{{palette.textPrimary}}" bindtap="closeManual">取消</view>
+        <view class="manual-btn manual-btn-primary" style="background:{{palette.buttonBackground}};color:{{palette.buttonText}}" bindtap="saveManual">保存</view>
+      </view>
+    </view>
+  </view>
 </view>

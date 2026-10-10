@@ -147,6 +147,14 @@
                     android:id="@+id/themeMint"
                     style="@style/SettingsSegmentButton"
                     android:text="@string/settings_theme_mint" />
+                <TextView
+                    android:id="@+id/themeSakura"
+                    style="@style/SettingsSegmentButton"
+                    android:text="@string/settings_theme_sakura" />
+                <TextView
+                    android:id="@+id/themeMidnight"
+                    style="@style/SettingsSegmentButton"
+                    android:text="@string/settings_theme_midnight" />
             </LinearLayout>
 
             <LinearLayout style="@style/SettingsFieldLabel">

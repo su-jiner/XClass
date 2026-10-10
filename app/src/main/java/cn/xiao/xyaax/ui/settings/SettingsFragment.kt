@@ -222,6 +222,8 @@ class SettingsFragment : Fragment() {
             when (AppPreferences.getThemeColor(requireContext())) {
                 AppPreferences.THEME_OCEAN -> R.id.themeOcean
                 AppPreferences.THEME_MINT -> R.id.themeMint
+                AppPreferences.THEME_SAKURA -> R.id.themeSakura
+                AppPreferences.THEME_MIDNIGHT -> R.id.themeMidnight
                 else -> R.id.themeWarm
             }
         ) { id ->
@@ -230,6 +232,8 @@ class SettingsFragment : Fragment() {
                 when (id) {
                     R.id.themeOcean -> AppPreferences.THEME_OCEAN
                     R.id.themeMint -> AppPreferences.THEME_MINT
+                    R.id.themeSakura -> AppPreferences.THEME_SAKURA
+                    R.id.themeMidnight -> AppPreferences.THEME_MIDNIGHT
                     else -> AppPreferences.THEME_WARM
                 }
             )

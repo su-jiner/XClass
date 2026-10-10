@@ -21,6 +21,8 @@ object AppPreferences {
     const val THEME_WARM = "warm"
     const val THEME_OCEAN = "ocean"
     const val THEME_MINT = "mint"
+    const val THEME_SAKURA = "sakura"
+    const val THEME_MIDNIGHT = "midnight"
     const val DARK_SYSTEM = "system"
     const val DARK_LIGHT = "light"
     const val DARK_DARK = "dark"
@@ -77,14 +79,14 @@ object AppPreferences {
         val raw = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .getString(KEY_THEME_COLOR, THEME_WARM)
         return when (raw) {
-            THEME_OCEAN, THEME_MINT -> raw
+            THEME_OCEAN, THEME_MINT, THEME_SAKURA, THEME_MIDNIGHT -> raw ?: THEME_WARM
             else -> THEME_WARM
         }
     }
 
     fun setThemeColor(context: Context, theme: String) {
         val safe = when (theme) {
-            THEME_OCEAN, THEME_MINT -> theme
+            THEME_OCEAN, THEME_MINT, THEME_SAKURA, THEME_MIDNIGHT -> theme
             else -> THEME_WARM
         }
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)

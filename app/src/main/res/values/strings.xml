@@ -34,6 +34,8 @@
     <string name="import_empty">未识别到课程，可尝试更换文件或改用粘贴文本</string>
     <string name="import_pick_file">重新选择文件（PDF / 图片 / 文本 / Word / Excel）</string>
     <string name="import_save_to_timetable">保存到课表</string>
+    <string name="import_save_multiple_message">共 %1$d 份课表，将分别新建为独立课表（一个文件 = 一个课表）</string>
+    <string name="action_confirm">确认</string>
     <string name="import_edit_course">编辑课程</string>
     <string name="import_delete_course">删除课程</string>
     <string name="import_delete_message">确定不导入「%1$s」吗？</string>
@@ -77,6 +79,8 @@
     <string name="settings_theme_warm">暖色</string>
     <string name="settings_theme_ocean">海蓝</string>
     <string name="settings_theme_mint">薄荷</string>
+    <string name="settings_theme_sakura">樱粉</string>
+    <string name="settings_theme_midnight">墨夜</string>
     <string name="settings_font_scale">课表字号</string>
     <string name="settings_font_small">小号</string>
     <string name="settings_font_normal">标准</string>

@@ -313,7 +313,7 @@ function saveParsedTimeTables(parsed) {
 
 const DEFAULT_PREFS = {
   theme: 'warm',
-  darkMode: 'system',
+  darkMode: 'light',
   fontScale: 'normal',
   defaultPage: 'timetable',
   showNonCurrent: true,
