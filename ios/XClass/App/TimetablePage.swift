@@ -99,7 +99,7 @@ struct TimetablePage: View {
                     today: SimpleDate.today(),
                     weekStart: semesterStart.adding(days: (week - 1) * 7),
                     items: WeekScheduleCalculator.displayMeetings(of: courses, week: week,
-                                                                  showNonCurrent: AppPreferences.showNonCurrent),
+                                                                  showNonCurrent: false),
                     fontScale: AppPreferences.fontScale,
                     currentSection: currentSection,
                     onTap: { course, meeting in detailItem = (course, meeting) }

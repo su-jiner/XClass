@@ -85,8 +85,6 @@
     <string name="settings_font_small">小号</string>
     <string name="settings_font_normal">标准</string>
     <string name="settings_font_large">大号</string>
-    <string name="settings_non_current">非本周课程</string>
-    <string name="settings_show_non_current">显示非本周课程</string>
     <string name="settings_appearance">外观</string>
     <string name="settings_dark_mode">深浅模式</string>
     <string name="settings_dark_follow_system">跟随系统</string>

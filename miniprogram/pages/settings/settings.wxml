@@ -78,20 +78,18 @@
         style="{{prefs.fontScale === item[0] ? 'background:' + palette.panel + ';font-weight:600' : ''}}"
       >{{item[1]}}</view>
     </view>
-    <view class="muted">启动默认页面</view>
-    <view class="segment" style="background:{{palette.panelAlt}}">
-      <view
-        wx:for="{{defaultPages}}"
-        wx:key="*this"
-        class="segment-item"
-        data-value="{{item[0]}}"
-        bindtap="updateDefaultPage"
-        style="{{prefs.defaultPage === item[0] ? 'background:' + palette.panel + ';font-weight:600' : ''}}"
-      >{{item[1]}}</view>
-    </view>
     <view class="row">
-      <view class="row-label">显示非本周课程</view>
-      <switch checked="{{prefs.showNonCurrent}}" bindchange="toggleNonCurrent" />
+      <view class="row-label">启动默认页面</view>
+      <view class="segment" style="background:{{palette.panelAlt}}">
+        <view
+          wx:for="{{defaultPages}}"
+          wx:key="*this"
+          class="segment-item"
+          data-value="{{item[0]}}"
+          bindtap="updateDefaultPage"
+          style="{{prefs.defaultPage === item[0] ? 'background:' + palette.panel + ';font-weight:600' : ''}}"
+        >{{item[1]}}</view>
+      </view>
     </view>
   </view>
 

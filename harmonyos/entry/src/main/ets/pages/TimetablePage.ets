@@ -235,7 +235,7 @@ export struct TimetablePage {
             .offset({ x: 0, y: ((this.currentSection() ?? 1) - 1) * ROW_HEIGHT })
         }
         ForEach(
-          resolveOverlaps(displayMeetings(this.courses, this.selectedWeek, Prefs.showNonCurrent())
+          resolveOverlaps(displayMeetings(this.courses, this.selectedWeek, false)
             .filter((item: CourseMeetingRef) => item.meeting.weekday === dayIndex + 1)),
           (item: CourseMeetingRef) => {
             this.CourseCard(item)

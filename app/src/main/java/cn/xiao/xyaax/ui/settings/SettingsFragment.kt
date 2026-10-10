@@ -158,7 +158,6 @@ class SettingsFragment : Fragment() {
         val semesterStartDateText = view.findViewById<TextView>(R.id.semesterStartDateText)
         val reminderTimeText = view.findViewById<TextView>(R.id.reminderTimeText)
         val reminderSwitch = view.findViewById<SwitchCompat>(R.id.reminderSwitch)
-        val showNonCurrentSwitch = view.findViewById<SwitchCompat>(R.id.showNonCurrentSwitch)
 
         view.findViewById<View>(R.id.rowManageTimetable).setOnClickListener {
             manageProfilesLauncher.launch(Intent(requireContext(), TimetableManageActivity::class.java))
@@ -293,13 +292,6 @@ class SettingsFragment : Fragment() {
             }
         }
         ScheduleRepository.refresh(requireContext())
-
-        // 非本周课程开关
-        showNonCurrentSwitch.isChecked = AppPreferences.isShowNonCurrentCourses(requireContext())
-        showNonCurrentSwitch.setOnCheckedChangeListener { _, isChecked ->
-            AppPreferences.setShowNonCurrentCourses(requireContext(), isChecked)
-            activity?.recreate()
-        }
 
         // 每日提醒
         reminderSwitch.isChecked = AppPreferences.isReminderEnabled(requireContext())

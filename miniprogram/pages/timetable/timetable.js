@@ -64,7 +64,6 @@ Page({
     this.semesterStart = store.getActiveSemesterStart();
     this.profiles = store.loadTimeProfiles();
     this.dark = dark;
-    this.showNonCurrent = prefs.showNonCurrent !== false;
     const totalWeeks = core.totalWeeks(this.courses);
     const currentWeek = core.guessCurrentWeek(this.semesterStart, store.todayIso(), totalWeeks);
     const keepWeek = this.data.week ? Math.min(this.data.week, totalWeeks) : currentWeek;
@@ -137,18 +136,8 @@ Page({
       (course.meetings || []).forEach((meeting) => {
         const weekday = core.WEEKDAYS.indexOf(meeting.weekday);
         if (weekday < 0) return;
-        let active = core.isActiveInWeek(meeting, week);
-        let badge = '';
-        let dimmed = false;
-        if (!active && this.showNonCurrent && week === this.data.currentWeek) {
-          const nextWeek = this.nextActiveWeek(meeting, week);
-          if (nextWeek) {
-            active = true;
-            badge = '非本周·第' + nextWeek + '周';
-            dimmed = true;
-          }
-        }
-        if (!active) return;
+        // 只显示本周课程：非本周课程一律不渲染
+        if (!core.isActiveInWeek(meeting, week)) return;
         const start = Math.max(1, meeting.startSection);
         const end = Math.min(12, meeting.endSection);
         columns[weekday].courses.push({
@@ -158,8 +147,8 @@ Page({
           courseIndex: courseIndex,
           name: course.courseName,
           location: [this.campusName(meeting.campusId), meeting.location || ''].filter(Boolean).join(' '),
-          badge: badge,
-          dimmed: dimmed,
+          badge: '',
+          dimmed: false,
           color: theme.courseColor(courseIndex, dark),
           textColor: theme.courseTextColor(courseIndex, dark),
         });

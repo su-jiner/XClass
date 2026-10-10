@@ -183,11 +183,6 @@ enum AppPreferences {
         }
     }
 
-    static var showNonCurrent: Bool {
-        get { defaults.object(forKey: "show_non_current") as? Bool ?? true }
-        set { defaults.set(newValue, forKey: "show_non_current") }
-    }
-
     static var reminderEnabled: Bool {
         get { defaults.bool(forKey: "daily_reminder_enabled") }
         set { defaults.set(newValue, forKey: "daily_reminder_enabled") }

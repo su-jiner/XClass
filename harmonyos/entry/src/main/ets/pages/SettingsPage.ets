@@ -354,21 +354,6 @@ export struct SettingsPage {
         }
         .width('100%')
 
-        this.sectionLabel('非本周课程')
-        Row() {
-          Text('显示非本周课程')
-            .fontSize(14)
-            .fontColor(this.palette().textPrimary)
-            .layoutWeight(1)
-          Toggle({ type: ToggleType.Switch, isOn: Prefs.showNonCurrent() })
-            .selectedColor(this.palette().iconTint)
-            .onChange((isOn: boolean) => {
-              Prefs.setShowNonCurrent(isOn);
-              this.bumpData();
-            })
-        }
-        .width('100%')
-
         this.sectionLabel('上课提醒')
         Row() {
           Text('每天早上发送今日课程提醒')

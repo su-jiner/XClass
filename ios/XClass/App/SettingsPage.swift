@@ -27,7 +27,6 @@ struct SettingsPage: View {
                 appearanceSection
                 backgroundSection
                 fontSection
-                displaySection
                 reminderSection
                 dataSection
                 aboutSection
@@ -279,15 +278,6 @@ struct SettingsPage: View {
                 Text("大号").tag(1.14)
             }
             .pickerStyle(.segmented)
-        }
-    }
-
-    private var displaySection: some View {
-        Section("非本周课程") {
-            Toggle("显示非本周课程", isOn: Binding(
-                get: { AppPreferences.showNonCurrent },
-                set: { AppPreferences.showNonCurrent = $0; notifier.notifyChanged() }
-            ))
         }
     }
 

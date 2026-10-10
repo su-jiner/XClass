@@ -139,7 +139,6 @@ class TimetableFragment : Fragment() {
         val fontScale = AppPreferences.getTimetableFontScale(ctx)
         val palette = ThemePaletteProvider.fromContext(ctx)
         val hasCustomBackground = !AppPreferences.getCustomBackgroundUri(ctx).isNullOrBlank()
-        val showNonCurrent = AppPreferences.isShowNonCurrentCourses(ctx)
 
         // 左侧时间列与详情时间跟随「当前显示时间表」（多校区）
         val timeProfiles = cn.xiao.xyaax.data.TimeProfileStore.load(ctx.filesDir)
@@ -161,7 +160,7 @@ class TimetableFragment : Fragment() {
             currentSection = currentSection,
             semesterStart = data.semesterStart,
             baseWeek = currentWeekIndex,
-            showNonCurrent = showNonCurrent,
+            showNonCurrent = false,
             fontScale = fontScale,
             palette = palette,
             hasCustomBackground = hasCustomBackground,

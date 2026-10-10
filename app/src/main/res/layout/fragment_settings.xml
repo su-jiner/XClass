@@ -202,19 +202,6 @@
                     style="@style/SettingsSegmentButton"
                     android:text="@string/settings_font_large" />
             </LinearLayout>
-
-            <View
-                android:id="@+id/dividerAppearance"
-                style="@style/SettingsDivider" />
-
-            <LinearLayout style="@style/SettingsRow">
-                <TextView
-                    style="@style/SettingsRowLabel"
-                    android:text="@string/settings_show_non_current" />
-                <androidx.appcompat.widget.SwitchCompat
-                    android:id="@+id/showNonCurrentSwitch"
-                    style="@style/SettingsRowSwitch" />
-            </LinearLayout>
         </LinearLayout>
 
         <!-- 上课提醒 -->

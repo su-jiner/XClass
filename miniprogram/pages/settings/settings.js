@@ -52,10 +52,6 @@ Page({
     store.savePrefs({ defaultPage: event.currentTarget.dataset.value });
     this.reload();
   },
-  toggleNonCurrent(event) {
-    store.savePrefs({ showNonCurrent: event.detail.value });
-    this.reload();
-  },
   toggleReminder(event) {
     store.savePrefs({ reminderEnabled: event.detail.value });
     this.reload();
