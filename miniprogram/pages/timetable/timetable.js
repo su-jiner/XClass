@@ -139,7 +139,9 @@ Page({
       });
     });
 
-    const displayProfile = core.resolveProfile(this.profiles, null);
+    // 左侧时间列跟随「当前显示时间表」（设置页可切换）
+    const displayId = wx.getStorageSync('xclass.defaultTimeProfile') || null;
+    const displayProfile = core.resolveProfile(this.profiles, displayId);
     const rows = cells.map((rowCells, rowIndex) => {
       const range = core.timeRangeOf(displayProfile, rowIndex + 1, rowIndex + 1);
       const rendered = rowCells.map((cell, columnIndex) => {

@@ -22,7 +22,22 @@
 
   <view class="card" style="background:{{palette.panel}}">
     <view style="font-size:30rpx;font-weight:600">节次时间表（多校区）</view>
-    <view class="muted" wx:for="{{timeProfiles}}" wx:key="id">{{item.name}}（{{item.blocks.length}} 段）</view>
+    <view class="row" wx:for="{{timeProfiles}}" wx:key="id">
+      <view>
+        <view>{{item.name}}</view>
+        <view class="muted">{{item.blocks.length}} 段{{item.id === defaultTimeProfileId ? ' · 当前显示' : ''}}</view>
+      </view>
+      <view>
+        <text class="muted" data-id="{{item.id}}" bindtap="setDefaultTimeProfile">设为当前显示</text>
+        <text
+          wx:if="{{item.id !== 'default'}}"
+          class="muted"
+          style="margin-left:24rpx"
+          data-id="{{item.id}}"
+          bindtap="deleteTimeProfile"
+        >删除</text>
+      </view>
+    </view>
     <view class="button secondary" bindtap="addTimeProfileByText" style="background:{{palette.panelAlt}};color:{{palette.text}}">从文本识别时间表</view>
   </view>
 

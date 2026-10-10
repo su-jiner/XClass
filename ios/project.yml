@@ -1,0 +1,62 @@
+# XcodeGen 工程描述：可确定性重建 App + Widget/Live Activity 扩展（含 App Group）。
+# 用法：brew install xcodegen && cd ios && xcodegen generate
+# 说明：仓库里已有的 XClass.xcodeproj 可直接使用；用本文件可一键补出 Widget Extension target。
+name: XClass
+options:
+  bundleIdPrefix: cn.xiao.xyaax
+  deploymentTarget:
+    iOS: "16.2"
+settings:
+  base:
+    MARKETING_VERSION: "1.0.0-Beta"
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_VERSION: "5.0"
+    DEVELOPMENT_TEAM: ""            # 在 Xcode 里选你的 Team，或在此填 Team ID
+targets:
+  XClass:
+    type: application
+    platform: iOS
+    sources:
+      - XClass
+    settings:
+      base:
+        INFOPLIST_KEY_CFBundleDisplayName: XClass
+        INFOPLIST_KEY_NSSupportsLiveActivities: "YES"
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: "YES"
+        INFOPLIST_KEY_UILaunchScreen_Generation: "YES"
+        GENERATE_INFOPLIST_FILE: "YES"
+        TARGETED_DEVICE_FAMILY: "1,2"
+    entitlements:
+      path: XClass/XClass.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.cn.xiao.xyaax
+  XClassWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - XClassWidgets
+    dependencies:
+      - target: XClass
+        embed: false
+    settings:
+      base:
+        INFOPLIST_KEY_CFBundleDisplayName: XClass 组件
+        GENERATE_INFOPLIST_FILE: "YES"
+        PRODUCT_BUNDLE_IDENTIFIER: cn.xiao.xyaax.ios.widgets
+    info:
+      path: XClassWidgets/Info.plist
+      properties:
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    entitlements:
+      path: XClassWidgets/XClassWidgets.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.cn.xiao.xyaax
+schemes:
+  XClass:
+    build:
+      targets:
+        XClass: all
+        XClassWidgets: all

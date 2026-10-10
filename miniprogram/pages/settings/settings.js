@@ -12,6 +12,7 @@ Page({
     fontScales: [['small', '小号'], ['normal', '标准'], ['large', '大号']],
     profiles: [],
     timeProfiles: [],
+    defaultTimeProfileId: 'default',
     version: '1.0.0-Beta',
   },
   onShow() {
@@ -31,6 +32,7 @@ Page({
       prefs: prefs,
       profiles: store.listProfiles(),
       timeProfiles: store.loadTimeProfiles(),
+      defaultTimeProfileId: wx.getStorageSync('xclass.defaultTimeProfile') || 'default',
     });
   },
   updatePrefs(event) {
@@ -125,6 +127,12 @@ Page({
     const id = event.currentTarget.dataset.id;
     const profiles = store.loadTimeProfiles().filter((profile) => profile.id !== id);
     store.saveTimeProfiles(profiles, store.loadCampusMap(), null);
+    this.reload();
+  },
+  setDefaultTimeProfile(event) {
+    const id = event.currentTarget.dataset.id;
+    wx.setStorageSync('xclass.defaultTimeProfile', id);
+    wx.showToast({ title: '已设为当前显示', icon: 'none' });
     this.reload();
   },
   addTimeProfileByText() {

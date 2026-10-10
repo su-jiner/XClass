@@ -171,5 +171,6 @@ final class StoreChangeNotifier: ObservableObject {
 
     func notifyChanged() {
         version += 1
+        WidgetRefresher.reload()
     }
 }
