@@ -1,6 +1,7 @@
 package cn.xiao.xyaax.ui.timetable
 
 import android.graphics.Color
+import androidx.activity.result.contract.ActivityResultContracts
 import android.content.res.ColorStateList
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
@@ -51,9 +52,17 @@ class TimetableFragment : Fragment() {
     private lateinit var dateText: TextView
     private lateinit var weekPager: ViewPager2
     private lateinit var addCourseButton: ImageButton
+    private lateinit var importScheduleButton: ImageButton
     private var currentWeekIndex: Int = 1
     private var pageChangeCallback: ViewPager2.OnPageChangeCallback? = null
     private var pageChangeRegistered: Boolean = false
+
+    private val importLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            UiFeedback.showMessage(view, "课表导入完成", ThemePaletteProvider.fromContext(requireContext()))
+        }
+        ScheduleRepository.refresh(requireContext())
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -69,14 +78,22 @@ class TimetableFragment : Fragment() {
         dateText = view.findViewById(R.id.currentDateText)
         weekPager = view.findViewById(R.id.weekPager)
         addCourseButton = view.findViewById(R.id.addCourseButton)
+        importScheduleButton = view.findViewById(R.id.importScheduleButton)
 
         val palette = ThemePaletteProvider.fromContext(requireContext())
         addCourseButton.imageTintList = ColorStateList.valueOf(palette.iconTint)
+        importScheduleButton.imageTintList = ColorStateList.valueOf(palette.iconTint)
 
         observeTimetable()
 
         addCourseButton.setOnClickListener {
             showManualAddDialog()
+        }
+
+        importScheduleButton.setOnClickListener {
+            importLauncher.launch(
+                android.content.Intent(requireContext(), cn.xiao.xyaax.ui.importing.ImportWizardActivity::class.java)
+            )
         }
     }
 

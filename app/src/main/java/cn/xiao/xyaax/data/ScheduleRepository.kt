@@ -61,6 +61,16 @@ object ScheduleRepository {
         ImportedScheduleStorage.addManualCourseToActive(context.filesDir, input)
     }
 
+    suspend fun importCourses(
+        context: Context,
+        courses: List<CourseSchedule>,
+        mode: ImportedScheduleStorage.ImportMode,
+        newProfileName: String? = null,
+        semesterStartDate: LocalDate? = null
+    ): Result<String> = mutate(context) {
+        ImportedScheduleStorage.importCourses(context.filesDir, courses, mode, newProfileName, semesterStartDate)
+    }
+
     suspend fun deleteCourse(
         context: Context,
         courseIndex: Int,

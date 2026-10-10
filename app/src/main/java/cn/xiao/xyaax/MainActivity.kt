@@ -9,6 +9,7 @@ import android.provider.MediaStore
 import android.widget.FrameLayout
 import android.widget.ImageView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.fragment.app.Fragment
 import androidx.core.view.WindowInsetsControllerCompat
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import cn.xiao.xyaax.data.AppPreferences
@@ -23,6 +24,38 @@ class MainActivity : AppCompatActivity() {
     private lateinit var rootContainer: FrameLayout
     private lateinit var backgroundImage: ImageView
     private lateinit var bottomNav: BottomNavigationView
+    private var currentNavId = 0
+
+    /** 底栏顺序，用于判断切页方向（往右的 Tab 从右侧滑入）。 */
+    private val navOrder = listOf(R.id.nav_today, R.id.nav_timetable, R.id.nav_tools, R.id.nav_settings)
+
+    private var cachedFragments = mutableMapOf<Int, Fragment>()
+
+    private fun fragmentFor(navId: Int): Fragment = cachedFragments.getOrPut(navId) {
+        when (navId) {
+            R.id.nav_today -> TodayScheduleFragment()
+            R.id.nav_tools -> ToolsFragment()
+            R.id.nav_settings -> SettingsFragment()
+            else -> TimetableFragment()
+        }
+    }
+
+    private fun switchTo(navId: Int) {
+        if (navId == currentNavId) return
+        val fromIndex = navOrder.indexOf(currentNavId)
+        val toIndex = navOrder.indexOf(navId)
+        val forward = fromIndex < 0 || toIndex >= fromIndex
+        val transaction = supportFragmentManager.beginTransaction()
+            .setCustomAnimations(
+                if (forward) R.anim.nav_enter_right else R.anim.nav_enter_left,
+                if (forward) R.anim.nav_exit_left else R.anim.nav_exit_right
+            )
+        cachedFragments[currentNavId]?.takeIf { it.isAdded }?.let { transaction.hide(it) }
+        val target = fragmentFor(navId)
+        if (target.isAdded) transaction.show(target) else transaction.add(R.id.mainContainer, target, navId.toString())
+        transaction.commit()
+        currentNavId = navId
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         ThemePaletteProvider.applyNightMode(this)
@@ -37,53 +70,34 @@ class MainActivity : AppCompatActivity() {
         refreshCustomBackground()
         ScheduleRepository.refresh(this)
 
+        if (savedInstanceState != null) {
+            navOrder.forEach { navId ->
+                supportFragmentManager.findFragmentByTag(navId.toString())?.let { cachedFragments[navId] = it }
+            }
+            currentNavId = bottomNav.selectedItemId.takeIf { it in navOrder } ?: R.id.nav_timetable
+        }
+
         if (savedInstanceState == null) {
             val defaultPage = AppPreferences.getDefaultOpenPage(this)
             if (defaultPage == AppPreferences.PAGE_TODAY) {
+                currentNavId = R.id.nav_today
                 supportFragmentManager.beginTransaction()
-                    .replace(R.id.mainContainer, TodayScheduleFragment())
+                    .add(R.id.mainContainer, fragmentFor(R.id.nav_today), R.id.nav_today.toString())
                     .commit()
                 bottomNav.selectedItemId = R.id.nav_today
             } else {
+                currentNavId = R.id.nav_timetable
                 supportFragmentManager.beginTransaction()
-                    .replace(R.id.mainContainer, TimetableFragment())
+                    .add(R.id.mainContainer, fragmentFor(R.id.nav_timetable), R.id.nav_timetable.toString())
                     .commit()
                 bottomNav.selectedItemId = R.id.nav_timetable
             }
         }
 
         bottomNav.setOnItemSelectedListener { item ->
-            when (item.itemId) {
-                R.id.nav_timetable -> {
-                    supportFragmentManager.beginTransaction()
-                        .replace(R.id.mainContainer, TimetableFragment())
-                        .commit()
-                    true
-                }
-
-                R.id.nav_today -> {
-                    supportFragmentManager.beginTransaction()
-                        .replace(R.id.mainContainer, TodayScheduleFragment())
-                        .commit()
-                    true
-                }
-
-                R.id.nav_tools -> {
-                    supportFragmentManager.beginTransaction()
-                        .replace(R.id.mainContainer, ToolsFragment())
-                        .commit()
-                    true
-                }
-
-                R.id.nav_settings -> {
-                    supportFragmentManager.beginTransaction()
-                        .replace(R.id.mainContainer, SettingsFragment())
-                        .commit()
-                    true
-                }
-
-                else -> false
-            }
+            if (item.itemId !in navOrder) return@setOnItemSelectedListener false
+            switchTo(item.itemId)
+            true
         }
     }
 

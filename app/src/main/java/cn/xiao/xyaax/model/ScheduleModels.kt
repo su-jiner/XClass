@@ -27,7 +27,9 @@ data class MeetingTime(
     val startSection: Int,
     val endSection: Int,
     val weekRules: List<WeekRule>,
-    val location: String
+    val location: String,
+    /** 校区/楼栋时间表 ID；为空表示使用默认节次时间表 */
+    val campusId: String? = null
 )
 
 data class CourseSchedule(

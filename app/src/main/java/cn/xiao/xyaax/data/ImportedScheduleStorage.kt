@@ -57,6 +57,61 @@ object ImportedScheduleStorage {
         val semester: String = "手动添加"
     )
 
+    enum class ImportMode { OVERWRITE_ACTIVE, CREATE_NEW }
+
+    /** 导入向导解析结果入库：覆盖当前课表或新建课表，返回最终课表名。 */
+    fun importCourses(
+        filesDir: File,
+        courses: List<CourseSchedule>,
+        mode: ImportMode,
+        newProfileName: String? = null,
+        semesterStartDate: LocalDate? = null
+    ): String = synchronized(lock) {
+        val merged = mergeDuplicateCourses(courses)
+        val meta = ensureInitialized(filesDir)
+        val now = System.currentTimeMillis()
+        val start = semesterStartDate ?: SemesterStartDatePolicy.inferFromCourses(merged)
+
+        when (mode) {
+            ImportMode.OVERWRITE_ACTIVE -> {
+                val active = meta.profiles.firstOrNull { it.id == meta.activeId } ?: meta.profiles.first()
+                writeCoursesFile(filesDir, active.coursesFile, merged)
+                saveMeta(
+                    filesDir,
+                    meta.copy(
+                        activeId = active.id,
+                        profiles = meta.profiles.map {
+                            if (it.id == active.id) it.copy(updatedAt = now, semesterStartDate = start.toString()) else it
+                        }
+                    )
+                )
+                active.name
+            }
+
+            ImportMode.CREATE_NEW -> {
+                val id = UUID.randomUUID().toString()
+                val name = newProfileName?.ifBlank { null } ?: "课表${timestampLabel()}"
+                val fileName = coursesFileName(id)
+                writeCoursesFile(filesDir, fileName, merged)
+                saveMeta(
+                    filesDir,
+                    meta.copy(
+                        activeId = id,
+                        profiles = meta.profiles + StoredProfileMeta(
+                            id = id,
+                            name = name,
+                            coursesFile = fileName,
+                            createdAt = now,
+                            updatedAt = now,
+                            semesterStartDate = start.toString()
+                        )
+                    )
+                )
+                name
+            }
+        }
+    }
+
     fun listProfiles(filesDir: File): List<TimetableProfile> = synchronized(lock) {
         val meta = ensureInitialized(filesDir)
         meta.profiles.map {
@@ -617,7 +672,8 @@ object ImportedScheduleStorage {
         val startSection: Int,
         val endSection: Int,
         val weekRules: List<PersistedWeekRule>,
-        val location: String
+        val location: String,
+        val campusId: String? = null
     ) {
         fun toMeetingTime(): MeetingTime {
             return MeetingTime(
@@ -625,7 +681,8 @@ object ImportedScheduleStorage {
                 startSection = startSection,
                 endSection = endSection,
                 weekRules = weekRules.map { it.toWeekRule() },
-                location = location
+                location = location,
+                campusId = campusId
             )
         }
 
@@ -636,7 +693,8 @@ object ImportedScheduleStorage {
                     startSection = meeting.startSection,
                     endSection = meeting.endSection,
                     weekRules = meeting.weekRules.map { PersistedWeekRule.fromWeekRule(it) },
-                    location = meeting.location
+                    location = meeting.location,
+                    campusId = meeting.campusId
                 )
             }
         }
