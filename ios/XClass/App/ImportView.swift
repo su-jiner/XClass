@@ -321,7 +321,8 @@ struct ImportView: View {
         var seen = Set<String>()
         var result: [String] = []
         for course in courses {
-            for note in course.notes where !note.isEmpty && !seen.contains(note) {
+            for note in CourseTableImporter.sanitizeStoredNotes(course.notes)
+                where !note.isEmpty && !seen.contains(note) {
                 seen.insert(note)
                 result.append(note)
             }

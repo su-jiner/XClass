@@ -83,16 +83,17 @@ final class CoreTests: XCTestCase {
         XCTAssertTrue(notes.contains("入学教育（张爽）1-19周"))
     }
 
-    func testExtractNotesRuleB() {
+    func testExtractNotesSemesterTimeExcluded() {
+        // 学期时间行（本学期…至…，共N周）不属于备注，不再收录显示
         let text = "学期时间：2026-08-31至2027-01-22，共21周"
         let notes = CourseTableImporter.extractNotes(from: text)
-        XCTAssertEqual(notes, ["学期时间：2026-08-31至2027-01-22，共21周"])
+        XCTAssertEqual(notes, [])
     }
 
-    func testExtractNotesRuleC() {
+    func testExtractNotesTotalWeeksOnlyExcluded() {
         let text = "本学期共21周"
         let notes = CourseTableImporter.extractNotes(from: text)
-        XCTAssertEqual(notes, ["本学期共21周"])
+        XCTAssertEqual(notes, [])
     }
 
     func testExtractNotesDedupe() {
@@ -109,12 +110,12 @@ final class CoreTests: XCTestCase {
         XCTAssertEqual(notes.count, 10)
     }
 
-    func testExtractNotesSkipsCourseAndOtherCourseLines() {
-        // 课程行（带星期+节次）不进 notes；「其他课程：」汇总行进 warnings 不进 notes
+    func testExtractNotesSkipsCourseKeepsOtherCourseLine() {
+        // 课程行（带星期+节次）不进 notes；「其他课程：」汇总行为备注内容（用户指定备注=其他课程）
         let text = "星期一 1-2节 高等数学/1-16周/教室/老师\n其他课程：军事技能张爽(共19周)/1-19周\n军事技能（张爽）1-19周"
         let notes = CourseTableImporter.extractNotes(from: text)
         XCTAssertFalse(notes.contains { $0.contains("高等数学") })
-        XCTAssertFalse(notes.contains { $0.hasPrefix("其他课程") })
+        XCTAssertTrue(notes.contains { $0.hasPrefix("其他课程") })
         XCTAssertTrue(notes.contains("军事技能（张爽）1-19周"))
     }
 

@@ -706,17 +706,11 @@ export function sectionRangeFromLabel(text: string): number[] | null {
 }
 
 /**
- * 课表级底部备注提取：从原始文本中挑出独立备注行。
- * 规则：不含星期与节次标记的行（现有解析器不会判为课程行），且不是「其他课程：」汇总行，
- * 命中以下任一模式即入 notes：
- *  (a) `名称（教师）N-N周`：\S+[（(][^）)]{1,6}[）)]\s*\d{1,2}\s*[-—–~～至]\s*\d{1,2}\s*周
- *  (b) 含「学期时间」或「学期：」且后跟 YYYY-MM-DD 至 YYYY-MM-DD
- *  (c) 含「共N周」
+ * 课表级底部备注提取：备注 = 「其他课程：」汇总行 + 独立「名称（教师）N-N周」类备注行。
+ * 学期时间行（本学期…至…，共N周）不属于备注，不再收录显示。
  * 按原样字符串去重、最多 10 条、原样保留；无匹配返回空数组。
  */
 const NOTE_LINE_RE_A = /\S+[（(][^）)]{1,6}[）)]\s*\d{1,2}\s*[-—–~～至]\s*\d{1,2}\s*周/;
-const NOTE_LINE_RE_DATE_RANGE = /\d{4}\s*[-/]\s*\d{1,2}\s*[-/]\s*\d{1,2}\s*[-—–~～至]\s*\d{4}\s*[-/]\s*\d{1,2}\s*[-/]\s*\d{1,2}/;
-const NOTE_LINE_RE_TOTAL_WEEKS = /共\s*\d{1,2}\s*周/;
 /** 显式节次标记：含「节」字的 N-M节 / 第N节；不得把 1-19周、节假日 误判为节次 */
 const NOTE_LINE_SECTION_MARK = /\d{1,2}\s*[-—–~～至]\s*\d{1,2}\s*节|第\s*\d{1,2}\s*节/;
 export const NOTE_MAX_COUNT = 10;
@@ -727,24 +721,35 @@ export function extractNotesFromText(rawText: string): string[] {
   rawText.split(/\r?\n/).forEach((lineRaw) => {
     const line = lineRaw.trim();
     if (line.length === 0) return;
-    // 「其他课程：」汇总行仍进 warnings，不入 notes
-    if (/^其他课程[：:]/.test(line)) return;
+    // 「其他课程」汇总行（含 OCR 变体）→ 规范为「其他课程：」备注内容（备注 = 其他课程）
+    if (OTHER_COURSE_LINE_RE.test(line)) {
+      const normalized = line.replace(OTHER_COURSE_LINE_RE, '其他课程：');
+      if (seen.indexOf(normalized) < 0) { seen.push(normalized); notes.push(normalized); }
+      return;
+    }
     // 课程行（含星期标记 或 显式节次标记）不入 notes
     if (weekdayIndexOfText(line) !== null || NOTE_LINE_SECTION_MARK.test(line)) return;
-    let matched = false;
+    // 独立备注行：名称（教师）N-N周
     if (NOTE_LINE_RE_A.test(line)) {
-      matched = true;
-    } else if ((line.indexOf('学期时间') >= 0 || /学期[：:]/.test(line)) && NOTE_LINE_RE_DATE_RANGE.test(line)) {
-      matched = true;
-    } else if (NOTE_LINE_RE_TOTAL_WEEKS.test(line)) {
-      matched = true;
+      if (seen.indexOf(line) < 0) { seen.push(line); notes.push(line); }
     }
-    if (!matched) return;
-    if (seen.indexOf(line) >= 0) return;
-    seen.push(line);
-    notes.push(line);
   });
   return notes.slice(0, NOTE_MAX_COUNT);
+}
+
+/** 已存旧课表数据兜底清洗：仅保留「其他课程」汇总行（含 OCR 变体如「淇他课程」「其它课程」，
+ *  统一规范为「其他课程：」）与「名称（教师）N-N周」类备注行，
+ *  丢弃旧版本误收的学期时间行（本学期…至…共N周）等，保证旧数据也符合新备注口径。 */
+const OTHER_COURSE_LINE_RE = /^.{0,2}课程[：:]/;
+
+export function sanitizeStoredNotesText(notes: string[]): string[] {
+  return (notes || []).map((raw) => {
+    const line = String(raw || '').trim();
+    if (line.length === 0) return null;
+    if (OTHER_COURSE_LINE_RE.test(line)) return line.replace(OTHER_COURSE_LINE_RE, '其他课程：');
+    if (NOTE_LINE_RE_A.test(line)) return line;
+    return null;
+  }).filter((item) => item !== null) as string[];
 }
 
 /** 页眉页脚：学期、开学日期、总周数、其他课程、课表级备注 */

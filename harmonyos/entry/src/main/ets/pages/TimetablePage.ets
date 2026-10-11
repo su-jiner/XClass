@@ -1,7 +1,7 @@
 import {
   CourseSchedule, SimpleDate, CourseMeetingRef, ImportedCourse, ImportedMeeting,
   displayMeetings, guessCurrentWeek, totalWeeks, resolveOverlaps, SECTION_RANGES,
-  SectionTimeProfile, resolveProfile, defaultTimeProfile,
+  SectionTimeProfile, resolveProfile, defaultTimeProfile, sanitizeStoredNotesText,
 } from '../core/Core.ets';
 import { ProfileStore } from '../core/ProfileStore.ets';
 import { currentPalette, CARD_COLORS, ThemePalette } from '../model/Theme.ets';
@@ -79,7 +79,7 @@ export struct TimetablePage {
       const end = this.sectionRangeText(i, false);
       this.sectionRanges.push(`${start}-${end}`);
     }
-    this.notes = ProfileStore.instance?.listProfiles().find((p) => p.isActive)?.notes ?? [];
+    this.notes = sanitizeStoredNotesText(ProfileStore.instance?.listProfiles().find((p) => p.isActive)?.notes ?? []);
   }
 
   /** 当前时间表下第 section 节的开始/结束时刻 */
@@ -242,6 +242,12 @@ export struct TimetablePage {
       // 底部课表级备注栏（非空才显示：小字、次级色、圆角卡片）
       if (this.notes.length > 0) {
         Column() {
+          // 备注标签（与课表一致的方框 + 左侧「备注」）
+          Text('备注')
+            .fontSize(12).fontWeight(FontWeight.Bold)
+            .fontColor(this.palette().textPrimary)
+            .width('100%')
+            .margin({ bottom: 4 })
           ForEach(this.notes, (note: string) => {
             Text(note)
               .fontSize(11)
@@ -254,9 +260,10 @@ export struct TimetablePage {
         }
         .alignItems(HorizontalAlign.Start)
         .width('100%')
-        .padding({ left: 12, right: 12, top: 8, bottom: 8 })
+        .padding({ left: 12, right: 12, top: 9, bottom: 9 })
         .margin({ left: 12, right: 12, bottom: 8 })
         .backgroundColor(this.palette().panelAlt)
+        .border({ width: 1, color: this.palette().gridLeft })
         .borderRadius(12)
       }
       }

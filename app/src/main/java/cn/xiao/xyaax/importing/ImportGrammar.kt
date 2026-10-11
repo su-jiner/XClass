@@ -246,6 +246,8 @@ object PageMetadataParser {
     private val noteTotalWeeksRegex = Regex("""共\s*\d{1,2}\s*周""")
     // 显式节次标记：仅 N-M节 / 第N节 才算节次行，不误伤"1-19周"或"节假日调休"
     private val sectionMarkRegex = Regex("""\d{1,2}\s*[-—–~～至]\s*\d{1,2}\s*节|第\s*\d{1,2}\s*节""")
+    // 「其他课程」汇总行（含 OCR 变体：淇/奇/期/其它/其她 + 课程：）
+    private val otherCourseLineRegex = Regex(""".{0,2}课程[：:]""")
     private const val MAX_NOTES = 10
 
     data class Metadata(
@@ -289,8 +291,8 @@ object PageMetadataParser {
     }
 
     /**
-     * 提取课表级底部备注行：不含星期与节次标记（现有解析器不会判为课程行）、
-     * 且不是「其他课程：」汇总行（该行仍进 warnings）的独立行，命中 a/b/c 任一模式即收。
+     * 提取课表底部备注行：备注 = 「其他课程：」汇总行 + 独立「名称（教师）1-19周」类备注行。
+     * 学期时间行（本学期…至…，共N周）不属于备注，不再收录显示。
      * 按原样字符串去重、最多 [MAX_NOTES] 条、原样保留。
      */
     internal fun extractNotes(text: String): List<String> {
@@ -298,18 +300,36 @@ object PageMetadataParser {
         text.lines().forEach { raw ->
             val line = raw.trim()
             if (line.isEmpty()) return@forEach
-            // 「其他课程：」汇总行仍走 warnings，不进备注
-            if (line.startsWith("其他课程")) return@forEach
+            // 「其他课程」汇总行（含 OCR 变体）→ 规范为「其他课程：」备注内容（用户指定：备注 = 其他课程）
+            if (otherCourseLineRegex.containsMatchIn(line)) {
+                collected += line.replaceFirst(otherCourseLineRegex, "其他课程：")
+                return@forEach
+            }
             // 课程行必带星期或节次标记，跳过，避免把单元格里的「(1-2节)7-19周」误收为备注
             if (ImportLabels.weekdayIndex(line) != null) return@forEach
             if (sectionMarkRegex.containsMatchIn(line)) return@forEach
-            val matches = noteParenWeekRegex.containsMatchIn(line) ||
-                noteSemesterDateRegex.containsMatchIn(line) ||
-                noteTotalWeeksRegex.containsMatchIn(line)
-            if (matches) collected += line
+            // 独立备注行：名称（教师）1-19周
+            if (noteParenWeekRegex.containsMatchIn(line)) collected += line
         }
         return collected.take(MAX_NOTES)
     }
+
+    /**
+     * 已存旧课表数据兜底清洗：仅保留「其他课程」汇总行（含 OCR 变体如「淇他课程」「其它课程」，
+     * 统一规范为「其他课程：」）与「名称（教师）1-19周」类备注行，
+     * 丢弃旧版本误收的学期时间行（本学期…至…共N周）等，保证旧数据也符合新备注口径。
+     */
+    internal fun sanitizeStoredNotes(notes: List<String>): List<String> =
+        notes.mapNotNull { line ->
+            val trimmed = line.trim()
+            when {
+                // 「X课程：」汇总行（其他/其它/淇他/奇他…）→ 规范为「其他课程：」备注内容
+                otherCourseLineRegex.containsMatchIn(trimmed) ->
+                    trimmed.replaceFirst(otherCourseLineRegex, "其他课程：")
+                noteParenWeekRegex.containsMatchIn(trimmed) -> trimmed
+                else -> null
+            }
+        }
 
     private fun termLabel(raw: String): String = when (raw) {
         "一", "1" -> "第1学期"

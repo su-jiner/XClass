@@ -145,17 +145,28 @@ struct TimetablePage: View {
     }
 
     private var notesBar: some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("备注")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundColor(palette.textPrimary)
             ForEach(notes, id: \.self) { note in
-                Text("• \(note)")
+                Text(note)
                     .font(.system(size: 10))
+                    .lineSpacing(2)
                     .foregroundColor(palette.textSecondary)
             }
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.vertical, 9)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 10).fill(palette.panelAlt))
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(palette.panelAlt)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(palette.gridLeft, lineWidth: 1)
+                )
+        )
         .padding(.horizontal, 12)
         .padding(.bottom, 4)
     }

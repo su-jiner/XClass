@@ -302,8 +302,8 @@ test('share text round-trips back into courses', () => {
   assert.equal(study.meetings[0].location, '');
 });
 
-// ---------------- 课表级 notes 提取（规则 a/b/c） ----------------
-test('extracts schedule-level notes by rules a/b/c', () => {
+// ---------------- 课表级 notes 提取（备注 = 其他课程 + 名称（教师）周次行） ----------------
+test('extracts schedule-level notes by new rules', () => {
   const text = [
     '2026-2027年第1学期 云计算261课表',
     '其他课程：军训技能张爽(共19周)/1-19周； 入学教育张爽(共19周)/1-19周；',
@@ -314,8 +314,11 @@ test('extracts schedule-level notes by rules a/b/c', () => {
   const meta = core.parsePageMetadata(text);
   assert.ok(meta.notes.includes('军事技能（张爽）1-19周'), '规则a：教师括号+周次范围');
   assert.ok(meta.notes.includes('入学教育（张爽）1-19周'), '规则a 第二条');
-  assert.ok(meta.notes.includes('学期时间：2026-08-31至2027-01-22，共21周'), '规则b：学期时间+日期范围');
-  assert.ok(!meta.notes.some((n) => n.indexOf('其他课程') >= 0), '其他课程汇总行不得入 notes（仍进 warnings）');
+  // 备注 = 其他课程：汇总行进入备注
+  assert.ok(meta.notes.some((n) => n.indexOf('其他课程') >= 0), '其他课程汇总行为备注内容');
+  // 学期时间行不属于备注，不再收录
+  assert.ok(!meta.notes.some((n) => n.indexOf('学期时间') >= 0), '学期时间行不得入 notes');
+  assert.ok(!meta.notes.some((n) => n.indexOf('共21周') >= 0), '共N周行不得入 notes');
 });
 
 test('notes default to empty array without note lines', () => {

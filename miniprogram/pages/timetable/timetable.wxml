@@ -70,7 +70,8 @@
     <text bindtap="goNextWeek" class="week-arrow">下一周 ›</text>
   </view>
 
-  <view class="notes-bar" wx:if="{{notes.length}}" style="background:{{palette.panel}}">
+  <view class="notes-bar" wx:if="{{notes.length}}" style="background:{{palette.panelAlt}};border:1rpx solid {{palette.gridLeft}}">
+    <view class="notes-title" style="color:{{palette.textPrimary}}">备注</view>
     <view class="notes-item" wx:for="{{notes}}" wx:key="*this" style="color:{{palette.textSecondary}}">{{item}}</view>
   </view>
 

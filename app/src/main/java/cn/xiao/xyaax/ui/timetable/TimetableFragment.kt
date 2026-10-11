@@ -226,7 +226,7 @@ class TimetableFragment : Fragment() {
         renderNotesBar(data.activeNotes, palette)
     }
 
-    /** 课表底部公共备注栏：notes 非空才显示，小字、次级色、圆角卡片。 */
+    /** 课表底部备注栏：与课表一致的方框 + 左侧「备注」标签；notes 非空才显示。 */
     private fun renderNotesBar(notes: List<String>, palette: cn.xiao.xyaax.ui.theme.ThemePalette) {
         val bar = view?.findViewById<LinearLayout>(R.id.notesBar) ?: return
         bar.removeAllViews()
@@ -235,22 +235,55 @@ class TimetableFragment : Fragment() {
             return
         }
         val density = resources.displayMetrics.density
-        notes.forEach { note ->
-            bar.addView(TextView(requireContext()).apply {
+        val strokeColor = android.graphics.Color.argb(
+            (0.18f * 255).toInt(),
+            android.graphics.Color.red(palette.textSecondary),
+            android.graphics.Color.green(palette.textSecondary),
+            android.graphics.Color.blue(palette.textSecondary)
+        )
+
+        // 方框容器：圆角卡片 + 边框（与课表网格一致的样式）
+        val box = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            background = GradientDrawable().apply {
+                cornerRadius = 12f * density
+                setColor(palette.panelAltBackground)
+                setStroke((1f * density).toInt(), strokeColor)
+            }
+            setPadding((12 * density).toInt(), (10 * density).toInt(), (12 * density).toInt(), (10 * density).toInt())
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        }
+
+        // 左侧「备注」标签行
+        box.addView(TextView(requireContext()).apply {
+            text = "备注"
+            setTextColor(palette.textPrimary)
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            textSize = 13f
+            includeFontPadding = false
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = (6 * density).toInt() }
+        })
+
+        // 备注内容：其他课程等（每条一行，次级色小字）
+        notes.forEachIndexed { index, note ->
+            box.addView(TextView(requireContext()).apply {
                 text = note
                 setTextColor(palette.textSecondary)
                 textSize = 11.5f
-                background = GradientDrawable().apply {
-                    cornerRadius = 10f * density
-                    setColor(palette.panelAltBackground)
-                }
-                setPadding((12 * density).toInt(), (7 * density).toInt(), (12 * density).toInt(), (7 * density).toInt())
+                setLineSpacing(0f, 1.15f)
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { topMargin = (6 * density).toInt() }
+                ).apply { topMargin = if (index == 0) 0 else (3 * density).toInt() }
             })
         }
+        bar.addView(box)
         bar.visibility = View.VISIBLE
     }
 

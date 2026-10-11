@@ -182,11 +182,9 @@ enum CourseTableImporter {
     }
 
     /// 底部备注提取：从原始文本中挑出独立备注行。
-    /// 规则（满足任一即入 notes）：
-    ///  (a) `\S+（教师）\d{1,2}-\d{1,2}周`，如「军事技能（张爽）1-19周」
-    ///  (b) 含「学期时间」或「学期：」且后跟 YYYY-MM-DD 至 YYYY-MM-DD
-    ///  (c) 含「共N周」
-    /// 过滤掉：带星期/节次标记的课程行、「其他课程：」汇总行（仍进 warnings）。
+    /// 备注 = 「其他课程：」汇总行 + 独立「名称（教师）1-19周」类备注行。
+    /// 学期时间行（本学期…至…，共N周）不属于备注，不再收录显示。
+    /// 过滤掉：带星期/节次标记的课程行。
     /// 另识别分享文本里的「# 备注：xxx」行并剥前缀收录。
     static func extractNotes(from text: String) -> [String] {
         var collected: [String] = []
@@ -206,22 +204,38 @@ enum CourseTableImporter {
             }
             // 排除条件 = 星期标记存在 OR 显式节次标记存在（含"节"字的 N-M节/第N节）。
             // 注意：不得用 sectionRangeFromLabel（其宽松回退会把 "1-19周" 误判为节次）。
-            // 这样 "1-19周"、"共21周（含节假日调休）" 不会被误排除。
             if weekdayIndex(line) != nil { continue }
             if firstMatch(#"\d{1,2}\s*[-—–~～至]\s*\d{1,2}\s*节|第\s*\d{1,2}\s*节"#, in: line) != nil { continue }
-            // 「其他课程：」汇总行仍进 warnings，不入 notes
-            if firstMatch(#"^其他课程[：:]"#, in: line) != nil { continue }
-
+            // 「其他课程」汇总行（含 OCR 变体）→ 规范为「其他课程：」备注内容（备注 = 其他课程）
+            let otherLine = #"^.{0,2}课程[：:]"#
+            if let range = line.range(of: otherLine, options: .regularExpression) {
+                append(line.replacingCharacters(in: range, with: "其他课程："))
+                continue
+            }
+            // 独立备注行：名称（教师）1-19周
             let matchesA = firstMatch(#"\S+[（(][^）)]{1,6}[）)]\s*\d{1,2}\s*[-—–~～至]\s*\d{1,2}\s*周"#, in: line) != nil
-            let hasSemesterLabel = line.contains("学期时间") || line.contains("学期：") || line.contains("学期:")
-            let matchesDateRange = firstMatch(#"\d{4}-\d{2}-\d{2}\s*[-—–~～至]\s*\d{4}-\d{2}-\d{2}"#, in: line) != nil
-            let matchesB = hasSemesterLabel && matchesDateRange
-            let matchesC = firstMatch(#"共\s*\d{1,2}\s*周"#, in: line) != nil
-            if matchesA || matchesB || matchesC {
+            if matchesA {
                 append(line)
             }
         }
         return collected
+    }
+
+    /// 已存旧课表数据兜底清洗：仅保留「其他课程」汇总行（含 OCR 变体如「淇他课程」「其它课程」，
+    /// 统一规范为「其他课程：」）与「名称（教师）1-19周」类备注行，
+    /// 丢弃旧版本误收的学期时间行（本学期…至…共N周）等，保证旧数据也符合新备注口径。
+    static func sanitizeStoredNotes(_ notes: [String]) -> [String] {
+        let teacherWeek = #"\S+[（(][^）)]{1,6}[）)]\s*\d{1,2}\s*[-—–~～至]\s*\d{1,2}\s*周"#
+        let otherLine = #"^.{0,2}课程[：:]"#
+        return notes.compactMap { raw -> String? in
+            let line = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !line.isEmpty else { return nil }
+            if let range = line.range(of: otherLine, options: .regularExpression) {
+                return line.replacingCharacters(in: range, with: "其他课程：")
+            }
+            if firstMatch(teacherWeek, in: line) != nil { return line }
+            return nil
+        }
     }
 
     static func parsePageMetadata(_ text: String) -> Metadata {

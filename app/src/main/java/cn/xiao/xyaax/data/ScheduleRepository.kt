@@ -53,7 +53,9 @@ object ScheduleRepository {
             semesterStart = semesterStart,
             totalWeeks = totalWeeks,
             currentWeek = currentWeek,
-            activeNotes = profiles.firstOrNull { it.isActive }?.notes.orEmpty()
+            activeNotes = cn.xiao.xyaax.importing.PageMetadataParser.sanitizeStoredNotes(
+                profiles.firstOrNull { it.isActive }?.notes.orEmpty()
+            )
         )
     }
 

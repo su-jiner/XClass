@@ -208,12 +208,26 @@ function sectionRangeFromLabel(text) {
   return null;
 }
 
-/** 课表级公共备注（非课程）提取：不含星期/节次标记、非「其他课程」汇总行，命中以下任一模式即入 notes。 */
+/** 课表级公共备注（非课程）提取：备注 = 「其他课程：」汇总行 + 独立「名称（教师）1-19周」行；
+ *  学期时间行（本学期…至…，共N周）不属于备注，不再收录显示。 */
 const NOTE_TEACHER_WEEK_RE = /\S+[（(][^）)]{1,6}[）)]\s*\d{1,2}\s*[-—–~～至]\s*\d{1,2}\s*周/;
-const NOTE_DATE_RANGE_RE = /\d{4}\s*[-/年]\s*\d{1,2}\s*[-/月]\s*\d{1,2}\s*[-—–~～至]\s*\d{4}\s*[-/年]\s*\d{1,2}\s*[-/月]\s*\d{1,2}/;
 const NOTE_SECTION_MARK_RE = /\d{1,2}\s*[-—–~～至]\s*\d{1,2}\s*节|第\s*\d{1,2}\s*节/;
-const NOTE_TOTAL_WEEKS_RE = /共\s*\d{1,2}\s*周/;
 const MAX_NOTES = 10;
+
+/** 已存旧课表数据兜底清洗：仅保留「其他课程」汇总行（含 OCR 变体如「淇他课程」「其它课程」，
+ *  统一规范为「其他课程：」）与「名称（教师）1-19周」类备注行，
+ *  丢弃旧版本误收的学期时间行（本学期…至…共N周）等，保证旧数据也符合新备注口径。 */
+const OTHER_COURSE_LINE_RE = /^.{0,2}课程[：:]/;
+
+function sanitizeStoredNotes(notes) {
+  return (Array.isArray(notes) ? notes : []).map(function (line) {
+    const trimmed = String(line || '').trim();
+    if (!trimmed) return null;
+    if (OTHER_COURSE_LINE_RE.test(trimmed)) return trimmed.replace(OTHER_COURSE_LINE_RE, '其他课程：');
+    if (NOTE_TEACHER_WEEK_RE.test(trimmed)) return trimmed;
+    return null;
+  }).filter(function (item) { return item !== null; });
+}
 
 function extractNotes(source) {
   const notes = [];
@@ -221,17 +235,17 @@ function extractNotes(source) {
   String(source || '').split(/\r?\n/).forEach(function (line) {
     const trimmed = line.trim();
     if (!trimmed) return;
-    if (/^其他课程[：:]/.test(trimmed)) return;
+    // 「其他课程」汇总行（含 OCR 变体）→ 规范为「其他课程：」备注内容（备注 = 其他课程）
+    if (OTHER_COURSE_LINE_RE.test(trimmed)) {
+      const normalized = trimmed.replace(OTHER_COURSE_LINE_RE, '其他课程：');
+      if (!seen[normalized]) { seen[normalized] = true; notes.push(normalized); }
+      return;
+    }
     if (weekdayIndex(trimmed) != null) return;
     if (NOTE_SECTION_MARK_RE.test(trimmed)) return;
-    let hit = false;
-    if (NOTE_TEACHER_WEEK_RE.test(trimmed)) hit = true;
-    if ((trimmed.indexOf('学期时间') >= 0 || /学期[：:]/.test(trimmed)) && NOTE_DATE_RANGE_RE.test(trimmed)) hit = true;
-    if (NOTE_TOTAL_WEEKS_RE.test(trimmed)) hit = true;
-    if (!hit) return;
-    if (seen[trimmed]) return;
-    seen[trimmed] = true;
-    notes.push(trimmed);
+    if (NOTE_TEACHER_WEEK_RE.test(trimmed)) {
+      if (!seen[trimmed]) { seen[trimmed] = true; notes.push(trimmed); }
+    }
   });
   return notes.slice(0, MAX_NOTES);
 }
@@ -711,5 +725,6 @@ module.exports = {
   timeToSections: timeToSections,
   weekRulesOverlap: weekRulesOverlap,
   parseCourseTable: parseCourseTable,
-  encodeShareText: encodeShareText
+  encodeShareText: encodeShareText,
+  sanitizeStoredNotes: sanitizeStoredNotes
 };

@@ -201,9 +201,17 @@
   flex: 0 0 auto;
   margin: 8rpx 8rpx 0;
   border-radius: 12rpx;
-  padding: 12rpx 20rpx;
-  max-height: 200rpx;
+  padding: 14rpx 20rpx;
+  max-height: 220rpx;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.notes-title {
+  font-size: 24rpx;
+  font-weight: bold;
+  margin-bottom: 6rpx;
 }
 
 .notes-item {

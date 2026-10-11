@@ -296,7 +296,8 @@ function loadProfileNotes(profileId) {
     ? meta.profiles.find((item) => item.id === profileId)
     : (meta.profiles.find((item) => item.id === meta.activeId) || meta.profiles[0]);
   if (!profile) return [];
-  return Array.isArray(profile.notes) ? profile.notes.slice() : [];
+  // 兜底清洗旧数据：仅保留「其他课程」汇总行与「名称（教师）周次」备注行
+  return core.sanitizeStoredNotes(profile.notes);
 }
 
 // ---------------------------------------------------------------- 节次时间表
