@@ -29,7 +29,7 @@
             class="time-cell"
             wx:for="{{sections}}"
             wx:key="section"
-            style="height:{{rowHeight}}rpx;background:{{palette.gridLeft}}"
+            style="height:{{item.height}}rpx;background:{{palette.gridLeft}}"
           >
             <view class="section-no" style="color:{{palette.textPrimary}};font-size:{{24 * scale}}rpx">{{item.section}}</view>
             <view class="section-time" wx:if="{{item.startTime}}" style="color:{{palette.textSecondary}};font-size:{{18 * scale}}rpx">{{item.startTime}}</view>

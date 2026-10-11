@@ -101,7 +101,9 @@ Page({
     const reservedPx = statusBar + 8 + 62 + 44 + 46 + 56 + 12;
     const availablePx = windowHeight - reservedPx;
     const rowHeight = Math.max(88, Math.min(130, Math.floor((availablePx * rpxPerPx) / 12)));
-    this.setData({ rowHeight: rowHeight });
+    // 最后一节（第 12 节）额外加长：多行课程内容（如「教室待定」）完整显示，而非靠间距留白
+    const lastRowExtra = Math.round(rowHeight * 0.38);
+    this.setData({ rowHeight: rowHeight, lastRowExtra: lastRowExtra });
   },
   weekStartDate(week) {
     const start = new Date(this.semesterStart + 'T00:00:00');
@@ -117,6 +119,7 @@ Page({
     const todayIndex = (today.getDay() === 0 ? 7 : today.getDay()) - 1;
     const showToday = week === this.data.currentWeek;
     const rowHeight = this.data.rowHeight;
+    const lastRowExtra = this.data.lastRowExtra || 0;
 
     const dayHeaders = WEEK_LABELS.map((label, index) => {
       const date = new Date(weekStart);
@@ -137,7 +140,7 @@ Page({
       columns.push({
         isTodayColumn: isTodayColumn,
         panelBg: isTodayColumn ? palette.gridDayToday : palette.gridDay,
-        panelHeight: 12 * rowHeight,
+        panelHeight: 12 * rowHeight + lastRowExtra,
         courses: [],
       });
     }
@@ -151,7 +154,7 @@ Page({
         const end = Math.min(12, meeting.endSection);
         columns[weekday].courses.push({
           top: (start - 1) * rowHeight + 2,
-          height: (end - start + 1) * rowHeight - 4,
+          height: (end - start + 1) * rowHeight - 4 + (end >= 12 ? lastRowExtra : 0),
           startSection: start,
           courseIndex: courseIndex,
           name: course.courseName,
@@ -174,6 +177,7 @@ Page({
         section: i + 1,
         startTime: range ? range.startTime : '',
         endTime: range ? range.endTime : '',
+        height: (i === 11 ? rowHeight + lastRowExtra : rowHeight),
       });
     }
 

@@ -11,6 +11,8 @@ import { EditCourseDialog } from './EditCourseDialog.ets';
 import { router } from '@kit.ArkUI';
 
 const ROW_HEIGHT = 46;
+/** 最后一节（第 12 节）额外加长：多行课程内容（如「教室待定」）完整显示，而非靠间距留白 */
+const LAST_ROW_EXTRA = 18;
 const HEADER_HEIGHT = 34;
 const LEFT_COLUMN_WIDTH = 44;
 const WEEKDAY_LABELS = ['一', '二', '三', '四', '五', '六', '日'];
@@ -220,7 +222,7 @@ export struct TimetablePage {
                 }
                 .fontColor(this.palette().textSecondary)
                 .width(LEFT_COLUMN_WIDTH - 6)
-                .height(ROW_HEIGHT)
+                .height(index === this.sectionRanges.length - 1 ? ROW_HEIGHT + LAST_ROW_EXTRA : ROW_HEIGHT)
                 .textAlign(TextAlign.Center)
               }, (range: string) => range)
             }
@@ -256,7 +258,7 @@ export struct TimetablePage {
             .alignItems(HorizontalAlign.Start)
             .width('100%')
             .padding({ left: 12, right: 12, top: 9, bottom: 9 })
-            .margin({ left: 12, right: 12, top: 8, bottom: 16 })
+            .margin({ left: 12, right: 12, top: 22, bottom: 16 })
             .backgroundColor(this.palette().panelAlt)
             .border({ width: 1, color: this.palette().gridLeft })
             .borderRadius(12)
@@ -332,7 +334,7 @@ export struct TimetablePage {
         )
       }
       .width(46)
-      .height(ROW_HEIGHT * this.sectionCount)
+      .height(ROW_HEIGHT * this.sectionCount + LAST_ROW_EXTRA)
       .clip(true)
     }
   }
@@ -372,7 +374,8 @@ export struct TimetablePage {
     }
     .alignItems(HorizontalAlign.Start)
     .width(44)
-    .height((item.meeting.endSection - item.meeting.startSection + 1) * ROW_HEIGHT - 2)
+    .height((item.meeting.endSection - item.meeting.startSection + 1) * ROW_HEIGHT - 2 +
+      (item.meeting.endSection >= this.sectionCount ? LAST_ROW_EXTRA : 0))
     .padding(3)
     .backgroundColor(CARD_COLORS[item.courseIndex % CARD_COLORS.length])
     .borderRadius(5)

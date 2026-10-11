@@ -199,7 +199,7 @@
 
 .notes-bar {
   flex: 0 0 auto;
-  margin: 8rpx 8rpx 0;
+  margin: 30rpx 8rpx 0;
   border-radius: 12rpx;
   padding: 14rpx 20rpx;
   max-height: 220rpx;

@@ -205,6 +205,8 @@ struct WeekGridView: View {
 
     private let leftColumnWidth: CGFloat = 44
     private let rowHeight: CGFloat = 46
+    /// 最后一节（第 12 节）额外加长：多行课程内容完整显示，而非靠间距留白
+    private let lastRowExtra: CGFloat = 18
 
     private var sectionCount: Int { max(sectionRanges.count, 1) }
 
@@ -230,7 +232,8 @@ struct WeekGridView: View {
                                 }
                             }
                             .foregroundColor(palette.textSecondary)
-                            .frame(width: leftColumnWidth - 6, height: rowHeight)
+                            .frame(width: leftColumnWidth - 6,
+                                   height: section == sectionCount ? rowHeight + lastRowExtra : rowHeight)
                         }
                     }
                     .background(palette.gridLeftColumn)
@@ -243,7 +246,7 @@ struct WeekGridView: View {
                     .padding(.horizontal, 4)
                 }
             }
-            .frame(height: 34 + CGFloat(sectionCount) * rowHeight + 24)
+            .frame(height: 34 + CGFloat(sectionCount) * rowHeight + lastRowExtra + 24)
             if !notes.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("备注")
@@ -268,7 +271,7 @@ struct WeekGridView: View {
                         )
                 )
                 .padding(.horizontal, 12)
-                .padding(.top, 6)
+                .padding(.top, 22)
                 .padding(.bottom, 16)
             }
         }
@@ -309,14 +312,17 @@ struct WeekGridView: View {
                         .offset(y: CGFloat(item.meeting.startSection - 1) * rowHeight + 1)
                 }
             }
-            .frame(width: width, height: rowHeight * CGFloat(sectionCount))
+            .frame(width: width,
+                   height: rowHeight * CGFloat(sectionCount) +
+                       (sectionCount > 0 ? lastRowExtra : 0))
             .clipShape(RoundedRectangle(cornerRadius: 4))
         }
     }
 
     private func card(for item: (courseIndex: Int, course: CourseSchedule, meeting: MeetingTime, isCurrentWeek: Bool, nextActiveWeek: Int),
                       width: CGFloat) -> some View {
-        let height = CGFloat(item.meeting.endSection - item.meeting.startSection + 1) * rowHeight - 2
+        let height = CGFloat(item.meeting.endSection - item.meeting.startSection + 1) * rowHeight - 2 +
+            (item.meeting.endSection >= sectionCount ? lastRowExtra : 0)
         let color = cardColors[item.courseIndex % cardColors.count]
         let isCover = AppPreferences.coverImageKey == "\(item.meeting.weekday.rawValue):\(item.meeting.startSection)"
         return Button {
