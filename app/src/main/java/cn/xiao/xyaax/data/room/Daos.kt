@@ -48,6 +48,9 @@ interface TimeProfileDao {
     @Query("DELETE FROM time_profiles WHERE id = :id")
     suspend fun deleteById(id: String)
 
+    @Query("DELETE FROM time_profiles")
+    suspend fun clearAll()
+
     @Query("UPDATE time_profiles SET isDefault = 0")
     suspend fun clearDefaultFlag()
 

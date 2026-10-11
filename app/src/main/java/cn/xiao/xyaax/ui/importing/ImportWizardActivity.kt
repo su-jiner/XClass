@@ -75,6 +75,14 @@ class ImportWizardActivity : AppCompatActivity() {
         ActivityResultContracts.OpenMultipleDocuments()
     ) { uris -> uris.takeIf { it.isNotEmpty() }?.let { addPending(it) } }
 
+    private val webImportLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            result.data?.getStringExtra(EXTRA_PASTE_TEXT)?.takeIf { it.isNotBlank() }?.let { parsePastedText(it) }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         ThemePaletteProvider.applyNightMode(this)
         setTheme(ThemePaletteProvider.themeStyleFor(AppPreferences.getThemeColor(this)))
@@ -92,6 +100,7 @@ class ImportWizardActivity : AppCompatActivity() {
 
         findViewById<ImageView>(R.id.importBackBtn).setOnClickListener { finish() }
         findViewById<Button>(R.id.importPickBtn).setOnClickListener { openPicker() }
+        findViewById<Button>(R.id.importWebBtn).setOnClickListener { openWebImport() }
         recognizeButton.setOnClickListener { parsePending() }
         saveButton.setOnClickListener { confirmSave() }
         saveButton.isEnabled = false
@@ -152,6 +161,11 @@ class ImportWizardActivity : AppCompatActivity() {
                 "*/*"
             )
         )
+    }
+
+    /** 教务网页导入：WebImportActivity 提取页面课表文本后回传，复用统一解析管线。 */
+    private fun openWebImport() {
+        webImportLauncher.launch(Intent(this, WebImportActivity::class.java))
     }
 
     /** 选择阶段：只把文件收集进待识别列表（按 Uri 去重、可重复累加、可移除），不解析。 */

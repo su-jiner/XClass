@@ -36,6 +36,16 @@
     <string name="import_recognize_all">识别全部</string>
     <string name="import_pending_hint">一个文件 = 一个课表，选完点识别全部，可预览编辑后再保存</string>
     <string name="import_pending_empty">尚未添加文件，点上方「添加文件」选择课表文件</string>
+    <string name="import_web_entry">教务网页导入</string>
+    <string name="import_web_entry_desc">打开教务系统网页，提取课表文本导入</string>
+    <string name="web_import_url_hint">输入教务系统网址</string>
+    <string name="web_import_go">打开</string>
+    <string name="web_import_hint">以桌面视口打开教务系统；登录后在课表页点「提取本页课表文本」导入</string>
+    <string name="web_import_loading">加载中…</string>
+    <string name="web_import_ready">页面加载完成，可在课表页提取文本</string>
+    <string name="web_import_extract">提取本页课表文本并导入</string>
+    <string name="web_import_empty">本页未提取到课表内容，请先登录并打开课表页面</string>
+    <string name="web_import_back">返回</string>
     <string name="import_pending_item_size">%1$d KB</string>
     <string name="import_remove_file">移除</string>
     <string name="import_save_to_timetable">保存到课表</string>

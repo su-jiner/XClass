@@ -1,5 +1,8 @@
 package cn.xiao.xyaax.model
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 enum class Weekday(val displayName: String) {
     MONDAY("Monday"),
     TUESDAY("Tuesday"),
@@ -10,18 +13,21 @@ enum class Weekday(val displayName: String) {
     SUNDAY("Sunday")
 }
 
+@Serializable
 enum class WeekParity {
     ALL,
     ODD,
     EVEN
 }
 
+@Serializable
 data class WeekRule(
     val startWeek: Int,
     val endWeek: Int,
     val parity: WeekParity = WeekParity.ALL
 )
 
+@Serializable
 data class MeetingTime(
     val weekday: Weekday,
     val startSection: Int,
@@ -32,6 +38,7 @@ data class MeetingTime(
     val campusId: String? = null
 )
 
+@Serializable
 data class CourseSchedule(
     val courseName: String,
     val teacher: String,

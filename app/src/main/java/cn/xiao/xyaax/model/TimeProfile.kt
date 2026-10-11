@@ -1,9 +1,12 @@
 package cn.xiao.xyaax.model
 
+import kotlinx.serialization.Serializable
+
 /**
  * 一个「节次段 → 上课时间」映射块，例如 1-2 节 08:00-09:40。
  * 同一套时间表内的段互不重叠，允许 9-12 节这种一个段覆盖多小节。
  */
+@Serializable
 data class SectionBlock(
     val startSection: Int,
     val endSection: Int,
@@ -12,6 +15,7 @@ data class SectionBlock(
 )
 
 /** 一套节次时间表，可对应校区或校区内的某个楼栋（如「真理道·实训楼」）。 */
+@Serializable
 data class SectionTimeProfile(
     val id: String,
     val name: String,
