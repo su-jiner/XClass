@@ -88,7 +88,11 @@ jobs:
             "versionName": os.environ["VERSION_NAME"],
             "minSdk": 26,
             "publishedAt": os.environ["PUBLISHED_AT"],
-            "notes": ["XClass " + os.environ["VERSION_NAME"] + " 正式发布：签名构建 APK，GitHub Release 提供应用内更新检测。"],
+            "notes": [
+              "XClass " + os.environ["VERSION_NAME"] + " 正式发布：签名构建 APK，GitHub Release 提供应用内更新检测。",
+              "课表页：恢复左侧固定编码时间列（1-12 节标准起止时间）；第 12 节行加长完整显示课程内容；底部备注随课表滚动出现、非悬浮、无大空白。",
+              "四端（Android/小程序/iOS/鸿蒙）同步上述课表展示修复。"
+            ],
             "apk": {
               "size": int(os.environ["SIZE"]),
               "sha256": os.environ["SHA256"],
