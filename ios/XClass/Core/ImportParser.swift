@@ -31,6 +31,37 @@ enum ScheduleBackupCodec {
         var credit: Double?
         var rawWeekText: String = ""
         var meetings: [BackupMeeting]
+        /// 课表级公共备注（v2 备份起写入；旧备份无此字段解码为 []）
+        var notes: [String] = []
+
+        enum CodingKeys: String, CodingKey {
+            case courseName, teacher, semester, credit, rawWeekText, meetings, notes
+        }
+
+        // 宽松解码：旧备份无 notes 字段时默认 []，不报错
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            courseName = try c.decodeIfPresent(String.self, forKey: .courseName) ?? ""
+            teacher = try c.decodeIfPresent(String.self, forKey: .teacher) ?? ""
+            semester = try c.decodeIfPresent(String.self, forKey: .semester) ?? ""
+            credit = try c.decodeIfPresent(Double.self, forKey: .credit)
+            rawWeekText = try c.decodeIfPresent(String.self, forKey: .rawWeekText) ?? ""
+            meetings = try c.decodeIfPresent([BackupMeeting].self, forKey: .meetings) ?? []
+            notes = try c.decodeIfPresent([String].self, forKey: .notes) ?? []
+        }
+
+        // 保留 Memberwise 风格的构造（encode 用）
+        init(courseName: String, teacher: String = "", semester: String = "",
+             credit: Double?, rawWeekText: String = "", meetings: [BackupMeeting],
+             notes: [String] = []) {
+            self.courseName = courseName
+            self.teacher = teacher
+            self.semester = semester
+            self.credit = credit
+            self.rawWeekText = rawWeekText
+            self.meetings = meetings
+            self.notes = notes
+        }
     }
 
     struct BackupMeeting: Codable {
@@ -98,7 +129,8 @@ enum ScheduleBackupCodec {
                     location: meeting.location,
                     campusId: meeting.campusId
                 )
-            }
+            },
+            notes: course.notes
         )
     }
 
@@ -121,7 +153,8 @@ enum ScheduleBackupCodec {
                     location: meeting.location,
                     campusId: meeting.campusId
                 )
-            }
+            },
+            notes: backup.notes
         )
     }
 }

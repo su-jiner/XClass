@@ -60,11 +60,41 @@ struct CourseSchedule: Codable, Hashable, Identifiable {
     var credit: Double?
     var rawWeekText: String
     var meetings: [MeetingTime]
+    /// 课表级公共备注（非课程级）：每行原样保留，默认空数组。
+    /// 旧数据无该字段时解码为 []，不报错。
+    var notes: [String] = []
 
     var id: String {
         "\(courseName)|\(semester)|" + meetings.map {
             "\($0.weekday.rawValue):\($0.startSection)-\($0.endSection)@\($0.location)"
         }.joined(separator: ";")
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case courseName, teacher, semester, credit, rawWeekText, meetings, notes
+    }
+
+    init(courseName: String, teacher: String, semester: String, credit: Double?,
+         rawWeekText: String, meetings: [MeetingTime], notes: [String] = []) {
+        self.courseName = courseName
+        self.teacher = teacher
+        self.semester = semester
+        self.credit = credit
+        self.rawWeekText = rawWeekText
+        self.meetings = meetings
+        self.notes = notes
+    }
+
+    // 宽松解码：旧数据无 notes 字段时默认 []，避免整体解码失败导致课表"消失"
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        courseName = try c.decodeIfPresent(String.self, forKey: .courseName) ?? ""
+        teacher = try c.decodeIfPresent(String.self, forKey: .teacher) ?? ""
+        semester = try c.decodeIfPresent(String.self, forKey: .semester) ?? ""
+        credit = try c.decodeIfPresent(Double.self, forKey: .credit)
+        rawWeekText = try c.decodeIfPresent(String.self, forKey: .rawWeekText) ?? ""
+        meetings = try c.decodeIfPresent([MeetingTime].self, forKey: .meetings) ?? []
+        notes = try c.decodeIfPresent([String].self, forKey: .notes) ?? []
     }
 }
 

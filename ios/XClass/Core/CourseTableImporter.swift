@@ -26,6 +26,8 @@ enum CourseTableImporter {
         var timeTables: [SectionTimeProfile]
         var campusAliases: [String]
         var warnings: [String]
+        /// 课表级公共备注（独立备注行，原样保留，去重后最多 10 条）
+        var notes: [String] = []
     }
 
     private static let weekdayAliases: [[String]] = [
@@ -175,6 +177,51 @@ enum CourseTableImporter {
         var startDay: Int?
         var totalWeeks: Int?
         var otherCourseLines: [String]
+        /// 课表级公共备注行（去重后最多 10 条，原样保留）
+        var notes: [String] = []
+    }
+
+    /// 底部备注提取：从原始文本中挑出独立备注行。
+    /// 规则（满足任一即入 notes）：
+    ///  (a) `\S+（教师）\d{1,2}-\d{1,2}周`，如「军事技能（张爽）1-19周」
+    ///  (b) 含「学期时间」或「学期：」且后跟 YYYY-MM-DD 至 YYYY-MM-DD
+    ///  (c) 含「共N周」
+    /// 过滤掉：带星期/节次标记的课程行、「其他课程：」汇总行（仍进 warnings）。
+    /// 另识别分享文本里的「# 备注：xxx」行并剥前缀收录。
+    static func extractNotes(from text: String) -> [String] {
+        var collected: [String] = []
+        var seen = Set<String>()
+        func append(_ line: String) {
+            guard collected.count < 10, !seen.contains(line) else { return }
+            seen.insert(line)
+            collected.append(line)
+        }
+        for rawLine in text.components(separatedBy: .newlines) {
+            let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !line.isEmpty else { continue }
+            // 分享文本备注行：「# 备注：军事技能（张爽）1-19周」→ 剥前缀
+            if let shareNote = firstMatch(#"^#\s*备注[：:]\s*(.+)$"#, in: line)?.first {
+                append(shareNote.trimmingCharacters(in: .whitespaces))
+                continue
+            }
+            // 排除条件 = 星期标记存在 OR 显式节次标记存在（含"节"字的 N-M节/第N节）。
+            // 注意：不得用 sectionRangeFromLabel（其宽松回退会把 "1-19周" 误判为节次）。
+            // 这样 "1-19周"、"共21周（含节假日调休）" 不会被误排除。
+            if weekdayIndex(line) != nil { continue }
+            if firstMatch(#"\d{1,2}\s*[-—–~～至]\s*\d{1,2}\s*节|第\s*\d{1,2}\s*节"#, in: line) != nil { continue }
+            // 「其他课程：」汇总行仍进 warnings，不入 notes
+            if firstMatch(#"^其他课程[：:]"#, in: line) != nil { continue }
+
+            let matchesA = firstMatch(#"\S+[（(][^）)]{1,6}[）)]\s*\d{1,2}\s*[-—–~～至]\s*\d{1,2}\s*周"#, in: line) != nil
+            let hasSemesterLabel = line.contains("学期时间") || line.contains("学期：") || line.contains("学期:")
+            let matchesDateRange = firstMatch(#"\d{4}-\d{2}-\d{2}\s*[-—–~～至]\s*\d{4}-\d{2}-\d{2}"#, in: line) != nil
+            let matchesB = hasSemesterLabel && matchesDateRange
+            let matchesC = firstMatch(#"共\s*\d{1,2}\s*周"#, in: line) != nil
+            if matchesA || matchesB || matchesC {
+                append(line)
+            }
+        }
+        return collected
     }
 
     static func parsePageMetadata(_ text: String) -> Metadata {
@@ -198,7 +245,8 @@ enum CourseTableImporter {
             startMonth: startMatch.flatMap { Int($0[1]) },
             startDay: startMatch.flatMap { Int($0[2]) },
             totalWeeks: weekMatches.max(),
-            otherCourseLines: others
+            otherCourseLines: others,
+            notes: extractNotes(from: text)
         )
     }
 
@@ -369,7 +417,8 @@ enum CourseTableImporter {
             totalWeeks: metadata.totalWeeks,
             timeTables: timeTables,
             campusAliases: aliases,
-            warnings: warnings
+            warnings: warnings,
+            notes: metadata.notes
         )
     }
 

@@ -542,6 +542,25 @@ final class ProfileStore {
         return stored.defaultProfileId
     }
 
+    /// 当前用于展示的节次时间表（左侧时间列）。优先 defaultProfileId 指向的校区时间表，
+    /// 否则回落到默认 12 节表。
+    func currentDisplayTimeProfile() -> SectionTimeProfile {
+        let all = loadTimeProfiles()
+        if let id = loadDefaultProfileId(),
+           let matched = all.first(where: { $0.id == id }),
+           !matched.blocks.isEmpty {
+            return matched
+        }
+        return TimeProfileResolver.resolve(all, campusId: nil)
+    }
+
+    /// 设置"当前显示时间表"（导入解析出校区时间表后自动调用）。
+    func setDefaultTimeProfileId(_ id: String?) {
+        let profiles = loadTimeProfiles()
+        let campusMap = loadCampusMap()
+        saveTimeProfiles(profiles, campusMap: campusMap, defaultProfileId: id)
+    }
+
     func saveTimeProfiles(_ profiles: [SectionTimeProfile], campusMap: [String: String], defaultProfileId: String?) {
         let payload = PersistedTimeProfiles(
             defaultProfileId: defaultProfileId,
@@ -617,6 +636,12 @@ private struct PersistedCourse: Codable {
     var credit: Double?
     var rawWeekText: String
     var meetings: [PersistedMeeting]
+    /// 课表级公共备注（v3 起写入；旧文件无此字段时解码为 []）
+    var notes: [String]
+
+    enum CodingKeys: String, CodingKey {
+        case courseName, teacher, semester, credit, rawWeekText, meetings, notes
+    }
 
     init(from course: CourseSchedule) {
         courseName = course.courseName
@@ -625,12 +650,26 @@ private struct PersistedCourse: Codable {
         credit = course.credit
         rawWeekText = course.rawWeekText
         meetings = course.meetings.map { PersistedMeeting(from: $0) }
+        notes = course.notes
+    }
+
+    // 宽松解码：旧课程文件无 notes 字段时默认 []
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        courseName = try c.decodeIfPresent(String.self, forKey: .courseName) ?? ""
+        teacher = try c.decodeIfPresent(String.self, forKey: .teacher) ?? ""
+        semester = try c.decodeIfPresent(String.self, forKey: .semester) ?? ""
+        credit = try c.decodeIfPresent(Double.self, forKey: .credit)
+        rawWeekText = try c.decodeIfPresent(String.self, forKey: .rawWeekText) ?? ""
+        meetings = try c.decodeIfPresent([PersistedMeeting].self, forKey: .meetings) ?? []
+        notes = try c.decodeIfPresent([String].self, forKey: .notes) ?? []
     }
 
     func toCourseSchedule() -> CourseSchedule {
         CourseSchedule(courseName: courseName, teacher: teacher, semester: semester,
                        credit: credit, rawWeekText: rawWeekText,
-                       meetings: meetings.map { $0.toMeetingTime() })
+                       meetings: meetings.map { $0.toMeetingTime() },
+                       notes: notes)
     }
 }
 

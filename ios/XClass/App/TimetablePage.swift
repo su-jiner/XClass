@@ -16,6 +16,8 @@ struct TimetablePage: View {
     @State private var showAddChooser = false
     @State private var showEditSheet = false
     @State private var editingItem: (index: Int, course: CourseSchedule, meeting: MeetingTime)?
+    @State private var sectionRanges: [String] = SectionTimes.ranges
+    @State private var notes: [String] = []
 
     var body: some View {
         NavigationStack {
@@ -31,6 +33,7 @@ struct TimetablePage: View {
                 VStack(spacing: 0) {
                     header
                     weekPager
+                    if !notes.isEmpty { notesBar }
                 }
             }
             .background(palette.pageBackground)
@@ -116,6 +119,7 @@ struct TimetablePage: View {
                     fontScale: AppPreferences.fontScale,
                     currentSection: currentSection,
                     showDates: true,
+                    sectionRanges: sectionRanges,
                     onTap: { courseIndex, course, meeting in
                         detailItem = CourseDetailItem(courseIndex: courseIndex, course: course, meeting: meeting)
                     }
@@ -130,13 +134,29 @@ struct TimetablePage: View {
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm"
         let now = formatter.string(from: Date())
-        for (index, range) in SectionTimes.ranges.enumerated() {
+        for (index, range) in sectionRanges.enumerated() {
             let parts = range.components(separatedBy: "-")
             if parts.count == 2, parts[0] <= now, now < parts[1] {
                 return index + 1
             }
         }
         return nil
+    }
+
+    private var notesBar: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            ForEach(notes, id: \.self) { note in
+                Text("• \(note)")
+                    .font(.system(size: 10))
+                    .foregroundColor(palette.textSecondary)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 10).fill(palette.panelAlt))
+        .padding(.horizontal, 12)
+        .padding(.bottom, 4)
     }
 
     private func reload() {
@@ -147,6 +167,11 @@ struct TimetablePage: View {
         if selectedWeek < 1 || selectedWeek > totalWeeks {
             selectedWeek = currentWeek
         }
+        // 左侧时间列动态跟随当前显示时间表（导入含校区时间表时已自动切换）
+        let profile = ProfileStore.shared.currentDisplayTimeProfile()
+        let maxSection = max(profile.blocks.map(\.endSection).max() ?? 12, 12)
+        sectionRanges = (1...maxSection).map { profile.sectionRange($0) ?? "--:--" }
+        notes = ImportView.displayNotes(of: courses)
     }
 }
 
@@ -161,10 +186,13 @@ struct WeekGridView: View {
     let fontScale: Double
     let currentSection: Int?
     var showDates: Bool = true
+    var sectionRanges: [String] = SectionTimes.ranges
     let onTap: (Int, CourseSchedule, MeetingTime) -> Void
 
     private let leftColumnWidth: CGFloat = 44
     private let rowHeight: CGFloat = 46
+
+    private var sectionCount: Int { max(sectionRanges.count, 1) }
 
     var body: some View {
         GeometryReader { geo in
@@ -175,12 +203,18 @@ struct WeekGridView: View {
                         .font(.system(size: 10, weight: .bold))
                         .foregroundColor(palette.textPrimary)
                         .frame(height: 34)
-                    ForEach(1...12, id: \.self) { section in
+                    ForEach(1...sectionCount, id: \.self) { section in
                         VStack(spacing: 0) {
                             Text("\(section)").font(.system(size: 11 * fontScale, weight: .bold))
-                            let range = SectionTimes.ranges[section - 1]
-                            Text(String(range.prefix(5))).font(.system(size: 8 * fontScale))
-                            Text(String(range.suffix(5))).font(.system(size: 8 * fontScale))
+                            let parts = sectionRanges.indices.contains(section - 1)
+                                ? sectionRanges[section - 1].components(separatedBy: "-") : []
+                            if parts.count == 2 {
+                                Text(parts[0]).font(.system(size: 8 * fontScale))
+                                Text(parts[1]).font(.system(size: 8 * fontScale))
+                            } else {
+                                Text("--:--").font(.system(size: 8 * fontScale))
+                                Text("--:--").font(.system(size: 8 * fontScale))
+                            }
                         }
                         .foregroundColor(palette.textSecondary)
                         .frame(width: leftColumnWidth - 6, height: rowHeight)
@@ -233,7 +267,7 @@ struct WeekGridView: View {
                         .offset(y: CGFloat(item.meeting.startSection - 1) * rowHeight + 1)
                 }
             }
-            .frame(width: width, height: rowHeight * 12)
+            .frame(width: width, height: rowHeight * CGFloat(sectionCount))
             .clipShape(RoundedRectangle(cornerRadius: 4))
         }
     }

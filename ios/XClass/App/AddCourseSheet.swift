@@ -128,13 +128,15 @@ struct AddCourseSheet: View {
                 case .odd: rawWeekText = "单周 \(startWeek)-\(endWeek)周"
                 case .even: rawWeekText = "双周 \(startWeek)-\(endWeek)周"
                 }
+                // 课表级备注不受单课编辑影响：保留原课程的 notes
                 let updated = CourseSchedule(
                     courseName: name,
                     teacher: teacher.trimmingCharacters(in: .whitespaces),
                     semester: old.semester,
                     credit: old.credit,
                     rawWeekText: rawWeekText,
-                    meetings: meetings
+                    meetings: meetings,
+                    notes: old.notes
                 )
                 try ProfileStore.shared.updateCourse(index: editing.index, newCourse: updated, profileId: editingProfileId)
             } else {

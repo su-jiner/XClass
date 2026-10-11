@@ -11,6 +11,8 @@ struct FullSchedulePage: View {
     @State private var courses: [CourseSchedule] = []
     @State private var showEditSheet = false
     @State private var editingItem: (index: Int, course: CourseSchedule, meeting: MeetingTime)?
+    @State private var sectionRanges: [String] = SectionTimes.ranges
+    @State private var notes: [String] = []
 
     var body: some View {
         let items = WeekScheduleCalculator.allMeetings(of: courses)
@@ -30,13 +32,29 @@ struct FullSchedulePage: View {
                     fontScale: AppPreferences.fontScale,
                     currentSection: nil,
                     showDates: false,
+                    sectionRanges: sectionRanges,
                     onTap: { courseIndex, course, meeting in
                         editingItem = (courseIndex, course, meeting)
                         showEditSheet = true
                     }
                 )
-                .frame(height: 34 + 46 * 12)
+                .frame(height: 34 + 46 * CGFloat(max(sectionRanges.count, 1)))
                 .padding(.horizontal, 8)
+
+                if !notes.isEmpty {
+                    VStack(alignment: .leading, spacing: 3) {
+                        ForEach(notes, id: \.self) { note in
+                            Text("• \(note)")
+                                .font(.system(size: 10))
+                                .foregroundColor(palette.textSecondary)
+                        }
+                    }
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(RoundedRectangle(cornerRadius: 10).fill(palette.panelAlt))
+                    .padding(.horizontal, 8)
+                    .padding(.bottom, 12)
+                }
             }
         }
         .background(palette.pageBackground)
@@ -54,5 +72,9 @@ struct FullSchedulePage: View {
 
     private func reload() {
         courses = ProfileStore.shared.loadCourses(profileId: profileId)
+        let profile = ProfileStore.shared.currentDisplayTimeProfile()
+        let maxSection = max(profile.blocks.map(\.endSection).max() ?? 12, 12)
+        sectionRanges = (1...maxSection).map { profile.sectionRange($0) ?? "--:--" }
+        notes = ImportView.displayNotes(of: courses)
     }
 }

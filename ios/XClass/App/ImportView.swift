@@ -5,7 +5,7 @@ import PDFKit
 import UIKit
 
 /// 课表导入：粘贴文本 / 选择 txt·md·csv·tsv 文件 / 选择图片走 Vision 离线识别 / PDF 走文本层。
-/// 支持多选文件：一个文件 = 一个课表；导入前可逐条预览编辑/删除，确认后再写入。
+/// 多文件累加选择：一个文件 = 一个课表；选完点「识别全部」统一解析，预览可逐课编辑/删除后再保存。
 /// 也可把当前课表导出为 XClass 分享文本（朋友粘贴/打开即可导入）。
 struct ImportView: View {
     let palette: ThemePalette
@@ -18,7 +18,21 @@ struct ImportView: View {
         var courses: [CourseTableImporter.ParsedCourse]
     }
 
+    /// 待识别文件：选择阶段只收集内容（安全作用域 URL 可能随后失效，故当场读入内存）。
+    private struct PendingFile: Identifiable {
+        let id: String      // URL 去重键
+        let name: String
+        let size: Int64
+        enum Content {
+            case text(content: String, rows: [[String]]?)
+            case pdf(data: Data)
+            case image(data: Data)
+        }
+        let content: Content
+    }
+
     @State private var text = ""
+    @State private var pendingFiles: [PendingFile] = []
     @State private var groups: [ImportGroup] = []
     @State private var message = ""
     @State private var showFileImporter = false
@@ -41,9 +55,12 @@ struct ImportView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
-                    Text("纯本地解析：粘贴文本、选择 txt/md/csv/tsv，或选择图片/PDF 走离线识别。可多选文件，一个文件 = 一个课表")
+                    Text("纯本地解析：粘贴文本、选择 txt/md/csv/tsv，或选择图片/PDF 走离线识别。")
                         .font(.system(size: 12))
                         .foregroundColor(palette.textSecondary)
+                    Text("一个文件 = 一个课表，选完点识别全部，可预览编辑后再保存")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(palette.iconTint)
 
                     Button("导出课表分享文本") { exportShareText() }
                         .frame(maxWidth: .infinity)
@@ -57,20 +74,49 @@ struct ImportView: View {
                         .background(RoundedRectangle(cornerRadius: 12).fill(palette.panelAlt))
                         .font(.system(size: 13))
 
-                    Button("解析粘贴文本") { parse(rawText: text, fileName: "paste.txt") }
+                    Button("解析粘贴文本") { parsePaste() }
                         .frame(maxWidth: .infinity)
                         .padding(10)
                         .background(RoundedRectangle(cornerRadius: 12).fill(palette.buttonBackground))
                         .foregroundColor(palette.buttonText)
 
-                    Button("选择文件（可多选：txt/md/csv/tsv/图片/PDF）") { showFileImporter = true }
+                    Button("添加文件（可多选累加：txt/md/csv/tsv/图片/PDF）") { showFileImporter = true }
                         .frame(maxWidth: .infinity)
                         .padding(10)
                         .background(RoundedRectangle(cornerRadius: 12).fill(palette.panelAlt))
                         .foregroundColor(palette.textPrimary)
 
+                    // 待识别文件列表
+                    if !pendingFiles.isEmpty {
+                        Text("待识别文件 \(pendingFiles.count) 个（可多次添加、可移除）")
+                            .font(.system(size: 12))
+                            .foregroundColor(palette.textSecondary)
+                        ForEach(pendingFiles) { file in
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(file.name).font(.system(size: 13))
+                                    Text("\(fileSizeLabel(file.size))").font(.system(size: 11))
+                                        .foregroundColor(palette.textSecondary)
+                                }
+                                Spacer()
+                                Button("移除") { pendingFiles.removeAll { $0.id == file.id } }
+                                    .font(.system(size: 12))
+                                    .foregroundColor(palette.textSecondary)
+                            }
+                            .padding(10)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(RoundedRectangle(cornerRadius: 12).fill(palette.panelBackground))
+                            .foregroundColor(palette.textPrimary)
+                        }
+                        Button("识别全部（\(pendingFiles.count) 个文件 → \(pendingFiles.count) 份课表）") { recognizeAll() }
+                            .frame(maxWidth: .infinity)
+                            .padding(10)
+                            .background(RoundedRectangle(cornerRadius: 12).fill(palette.buttonBackground))
+                            .foregroundColor(palette.buttonText)
+                    }
+
                     if !groups.isEmpty {
-                        Text("已解析 \(groups.count) 份课表文本，全部可编辑后再保存")
+                        Text("已识别 \(groups.count) 份课表文本，全部可编辑后再保存")
                             .font(.system(size: 12))
                             .foregroundColor(palette.textSecondary)
                     }
@@ -82,8 +128,17 @@ struct ImportView: View {
                                 if let semester = group.parsed?.semester { Text("学期：\(semester)").font(.system(size: 12)) }
                                 if let weeks = group.parsed?.totalWeeks { Text("总周数：\(weeks)").font(.system(size: 12)) }
                                 if let timeTables = group.parsed?.timeTables, !timeTables.isEmpty {
-                                    Text("节次时间表：\(timeTables.count) 套（已保存并建立校区映射）")
+                                    Text("节次时间表：\(timeTables.count) 套（已保存并建立校区映射，已设为首套为当前显示）")
                                         .font(.system(size: 12))
+                                }
+                                if let notes = group.parsed?.notes, !notes.isEmpty {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        ForEach(notes, id: \.self) { note in
+                                            Text("• \(note)").font(.system(size: 11))
+                                        }
+                                    }
+                                    .padding(8)
+                                    .background(RoundedRectangle(cornerRadius: 8).fill(palette.panelBackground))
                                 }
                                 ForEach(group.parsed?.warnings ?? [], id: \.self) { warning in
                                     Text("⚠ \(warning)").font(.system(size: 12))
@@ -154,7 +209,7 @@ struct ImportView: View {
                 allowedContentTypes: [.plainText, .commaSeparatedText, .pdf, .image, .data],
                 allowsMultipleSelection: true
             ) { result in
-                handleFileSelection(result)
+                collectFiles(result)
             }
             .sheet(isPresented: Binding(
                 get: { editing != nil },
@@ -248,15 +303,30 @@ struct ImportView: View {
         let idToAlias = Dictionary(uniqueKeysWithValues: campusMap.map { ($0.value, $0.key) })
         let semester = courses.first(where: { !$0.semester.isEmpty })?.semester
         let totalWeeks = courses.flatMap { $0.meetings }.flatMap { $0.weekRules }.map(\.endWeek).max()
+        let notes = Self.displayNotes(of: courses)
         shareText = ShareTextCodec.encode(
             courses: courses,
             profileName: active?.name,
             semester: semester,
             semesterStart: store.getActiveSemesterStartDate(),
             totalWeeks: totalWeeks,
-            campusIdToAlias: idToAlias
+            campusIdToAlias: idToAlias,
+            notes: notes
         )
         showShareSheet = true
+    }
+
+    /// 汇总一份课表内全部备注（导入时同组课程携带相同备注，去重保序）。
+    static func displayNotes(of courses: [CourseSchedule]) -> [String] {
+        var seen = Set<String>()
+        var result: [String] = []
+        for course in courses {
+            for note in course.notes where !note.isEmpty && !seen.contains(note) {
+                seen.insert(note)
+                result.append(note)
+            }
+        }
+        return result
     }
 
     private func meetingText(_ course: CourseTableImporter.ParsedCourse) -> String {
@@ -268,39 +338,69 @@ struct ImportView: View {
         }.joined(separator: "；")
     }
 
-    private func parse(rawText: String, fileName: String, rows: [[String]]? = nil) {
-        let result = CourseTableImporter.parse(rawText: rawText, rows: rows)
-        groups = [ImportGroup(name: fileName, parsed: result, courses: result.courses)]
+    // MARK: - 解析
+
+    private func parsePaste() {
+        let result = CourseTableImporter.parse(rawText: text)
+        groups = [ImportGroup(name: "粘贴文本", parsed: result, courses: result.courses)]
+        pendingFiles.removeAll()
         if result.courses.isEmpty, let warning = result.warnings.first { message = warning }
     }
 
-    private func handleFileSelection(_ result: Result<[URL], Error>) {
+    /// 选择文件阶段：只收集待识别列表（按 URL 去重、可多次累加），不立即解析。
+    private func collectFiles(_ result: Result<[URL], Error>) {
         guard case let .success(urls) = result, !urls.isEmpty else { return }
-        groups.removeAll()
         for url in urls {
             let secured = url.startAccessingSecurityScopedResource()
             defer { if secured { url.stopAccessingSecurityScopedResource() } }
+            let id = url.absoluteString
+            if pendingFiles.contains(where: { $0.id == id }) { continue }
             let name = url.lastPathComponent.lowercased()
+            guard let values = try? url.resourceValues(forKeys: [.fileSizeKey]),
+                  let size = values.fileSize else { continue }
+            var content: PendingFile.Content?
             if name.hasSuffix(".pdf") {
-                if let content = pdfText(url), !content.isEmpty {
-                    parse(rawText: content, fileName: name)
-                } else {
-                    message = "PDF 未取到文本层，请改用截图并选择图片识别"
-                }
-                continue
+                if let data = try? Data(contentsOf: url) { content = .pdf(data: data) }
+            } else if name.hasSuffix(".png") || name.hasSuffix(".jpg") || name.hasSuffix(".jpeg") || name.hasSuffix(".webp") {
+                if let data = try? Data(contentsOf: url) { content = .image(data: data) }
+            } else if let text = try? String(contentsOf: url, encoding: .utf8) {
+                let rows: [[String]]? = name.hasSuffix(".csv") ? splitDelimited(text, ",")
+                    : (name.hasSuffix(".tsv") ? splitDelimited(text, "\t") : nil)
+                content = .text(content: text, rows: rows)
             }
-            if name.hasSuffix(".png") || name.hasSuffix(".jpg") || name.hasSuffix(".jpeg") || name.hasSuffix(".webp") {
-                recognizeImage(url, fileName: name)
-                continue
-            }
-            guard let content = try? String(contentsOf: url, encoding: .utf8) else {
-                message = "读取文件失败"
-                continue
-            }
-            let rows: [[String]]? = name.hasSuffix(".csv") ? splitDelimited(content, ",")
-                : (name.hasSuffix(".tsv") ? splitDelimited(content, "\t") : nil)
-            parse(rawText: content, fileName: name, rows: rows)
+            guard let content else { continue }
+            pendingFiles.append(PendingFile(id: id, name: url.lastPathComponent, size: Int64(size), content: content))
         }
+        message = pendingFiles.isEmpty ? "未读取到有效文件" : "已添加 \(pendingFiles.count) 个待识别文件"
+    }
+
+    /// 识别全部：逐文件解析进入预览。
+    private func recognizeAll() {
+        groups.removeAll()
+        for file in pendingFiles {
+            switch file.content {
+            case .text(let content, let rows):
+                let result = CourseTableImporter.parse(rawText: content, rows: rows)
+                groups.append(ImportGroup(name: file.name, parsed: result, courses: result.courses))
+            case .pdf(let data):
+                let result = CourseTableImporter.parse(rawText: pdfText(from: data))
+                groups.append(ImportGroup(name: file.name, parsed: result, courses: result.courses))
+            case .image(let data):
+                recognizeImageData(data, fileName: file.name)
+            }
+        }
+        let withCourses = groups.filter { !$0.courses.isEmpty }
+        if withCourses.isEmpty {
+            message = "未识别到课表结构，请确认内容或改用粘贴文本导入"
+        } else {
+            message = "已识别 \(withCourses.count) 份课表，可预览编辑后再保存"
+        }
+    }
+
+    private func fileSizeLabel(_ bytes: Int64) -> String {
+        if bytes >= 1024 * 1024 { return String(format: "%.1f MB", Double(bytes) / 1024.0 / 1024.0) }
+        if bytes >= 1024 { return String(format: "%.0f KB", Double(bytes) / 1024.0) }
+        return "\(bytes) B"
     }
 
     private func splitDelimited(_ text: String, _ delimiter: Character) -> [[String]] {
@@ -323,28 +423,27 @@ struct ImportView: View {
         }
     }
 
-    /// 图片：Vision 离线中文识别（不联网）。与 Android 相同——用行包围盒重建表格（行/列坐标聚类），
-    /// 走「表格解析」而不是逐行找星期词，才能正确识别教务课表图片。
-    private func recognizeImage(_ url: URL, fileName: String) {
-        guard let image = UIImage(contentsOfFile: url.path)?.cgImage else {
+    /// 图片：Vision 离线中文识别（不联网）。与 Android 相同——用行包围盒重建表格（行/列坐标聚类）。
+    private func recognizeImageData(_ data: Data, fileName: String) {
+        guard let cgImage = UIImage(data: data)?.cgImage else {
             message = "图片读取失败"
             return
         }
-        let size = CGSize(width: image.width, height: image.height)
+        let size = CGSize(width: cgImage.width, height: cgImage.height)
         let request = VNRecognizeTextRequest { request, _ in
             let observations = (request.results as? [VNRecognizedTextObservation] ?? [])
             let rows = self.visionRows(observations, imageSize: size)
             let content = observations.compactMap { $0.topCandidates(1).first?.string }.joined(separator: "\n")
             DispatchQueue.main.async {
-                self.message = "图片 OCR（离线识别，\(rows.count) 行表格）"
-                self.parse(rawText: content, fileName: fileName, rows: rows)
+                let result = CourseTableImporter.parse(rawText: content, rows: rows)
+                self.groups.append(ImportGroup(name: fileName, parsed: result, courses: result.courses))
             }
         }
         request.recognitionLanguages = ["zh-Hans", "en-US"]
         request.recognitionLevel = .accurate
         request.usesLanguageCorrection = true
         DispatchQueue.global(qos: .userInitiated).async {
-            let handler = VNImageRequestHandler(cgImage: image, options: [:])
+            let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
             try? handler.perform([request])
         }
     }
@@ -407,8 +506,8 @@ struct ImportView: View {
         }
     }
 
-    private func pdfText(_ url: URL) -> String? {
-        guard let document = PDFDocument(url: url) else { return nil }
+    private func pdfText(from data: Data) -> String {
+        guard let document = PDFDocument(data: data) else { return "" }
         var content = ""
         for index in 0..<document.pageCount {
             content += (document.page(at: index)?.string ?? "") + "\n"
@@ -422,15 +521,21 @@ struct ImportView: View {
         var imported = 0
         var firstName = ""
         for (index, group) in valid.enumerated() {
+            let parsed = group.parsed
             let campusMap = ProfileStore.shared.saveParsedTimeTables(
-                timeTables: group.parsed?.timeTables ?? [],
-                campusAliases: group.parsed?.campusAliases ?? []
+                timeTables: parsed?.timeTables ?? [],
+                campusAliases: parsed?.campusAliases ?? []
             )
+            // 导入含校区时间表时：自动把首个校区时间表设为当前显示时间表
+            if let timeTables = parsed?.timeTables, let first = timeTables.first {
+                ProfileStore.shared.setDefaultTimeProfileId(first.id)
+            }
+            let notes = parsed?.notes ?? []
             let schedules = group.courses.map { course -> CourseSchedule in
                 CourseSchedule(
                     courseName: course.courseName,
                     teacher: course.teacher,
-                    semester: group.parsed?.semester ?? "",
+                    semester: parsed?.semester ?? "",
                     credit: nil,
                     rawWeekText: CourseTableImporter.weekRulesText(course.meetings.first?.weekRules ?? []),
                     meetings: course.meetings.map { meeting in
@@ -442,17 +547,18 @@ struct ImportView: View {
                             location: meeting.location,
                             campusId: meeting.campusAlias.flatMap { campusMap[$0] }
                         )
-                    }
+                    },
+                    notes: notes
                 )
             }
             let modeForGroup: ProfileStore.ImportMode = (mode == .overwriteActive && index == 0) ? .overwriteActive : .createNew
-            let semesterName = group.parsed?.semester.map { "\($0) 导入" }
+            let semesterName = parsed?.semester.map { "\($0) 导入" }
             let groupName = valid.count > 1 ? (semesterName ?? group.name) : semesterName
             let name = ProfileStore.shared.importCourses(
                 schedules,
                 mode: modeForGroup,
                 newProfileName: modeForGroup == .createNew ? groupName : nil,
-                semesterStartDate: group.parsed?.semesterStartDate.flatMap { SimpleDate.parse($0) },
+                semesterStartDate: parsed?.semesterStartDate.flatMap { SimpleDate.parse($0) },
                 campusMap: campusMap
             )
             imported += schedules.count

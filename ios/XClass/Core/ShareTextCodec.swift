@@ -20,7 +20,8 @@ enum ShareTextCodec {
         semester: String? = nil,
         semesterStart: SimpleDate? = nil,
         totalWeeks: Int? = nil,
-        campusIdToAlias: [String: String] = [:]
+        campusIdToAlias: [String: String] = [:],
+        notes: [String] = []
     ) -> String {
         var lines: [String] = []
         lines.append(header)
@@ -28,6 +29,7 @@ enum ShareTextCodec {
         if let semester, !semester.isEmpty { lines.append("# 学期：\(semester)") }
         if let semesterStart { lines.append("# 学期开始：\(semesterStart.isoString)") }
         if let totalWeeks, (1...60).contains(totalWeeks) { lines.append("# 总周数：\(totalWeeks)") }
+        for note in notes where !note.isEmpty { lines.append("# 备注：\(note)") }
 
         var rows: [String] = []
         for course in courses {
