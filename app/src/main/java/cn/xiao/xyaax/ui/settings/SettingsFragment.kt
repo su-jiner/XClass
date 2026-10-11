@@ -321,6 +321,29 @@ class SettingsFragment : Fragment() {
                 applyReminderSchedule()
             }
         }
+
+        // 液态主题：玻璃效果开关 + 模糊强度
+        val glassSwitch = view.findViewById<androidx.appcompat.widget.SwitchCompat>(R.id.glassSwitch)
+        val glassBlurSeek = view.findViewById<android.widget.SeekBar>(R.id.glassBlurSeek)
+        glassSwitch.isChecked = AppPreferences.getGlassEnabled(requireContext())
+        glassBlurSeek.progress = (AppPreferences.getGlassBlur(requireContext()) * 100).toInt()
+        glassBlurSeek.isEnabled = glassSwitch.isChecked
+        glassSwitch.setOnCheckedChangeListener { _, isChecked ->
+            AppPreferences.setGlassEnabled(requireContext(), isChecked)
+            glassBlurSeek.isEnabled = isChecked
+            (activity as? cn.xiao.xyaax.MainActivity)?.applyUserAppearance()
+        }
+        glassBlurSeek.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: android.widget.SeekBar?, progress: Int, fromUser: Boolean) {
+                if (fromUser) {
+                    AppPreferences.setGlassBlur(requireContext(), progress / 100f)
+                    (activity as? cn.xiao.xyaax.MainActivity)?.applyUserAppearance()
+                }
+            }
+
+            override fun onStartTrackingTouch(seekBar: android.widget.SeekBar?) = Unit
+            override fun onStopTrackingTouch(seekBar: android.widget.SeekBar?) = Unit
+        })
     }
 
     private fun paletteForFeedback(): ThemePalette = ThemePaletteProvider.fromContext(requireContext())

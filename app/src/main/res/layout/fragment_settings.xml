@@ -202,6 +202,30 @@
                     style="@style/SettingsSegmentButton"
                     android:text="@string/settings_font_large" />
             </LinearLayout>
+
+            <!-- 液态主题（玻璃效果） -->
+            <View style="@style/SettingsDivider" />
+            <LinearLayout style="@style/SettingsRow">
+                <TextView
+                    style="@style/SettingsRowLabel"
+                    android:text="@string/settings_glass_effect" />
+                <androidx.appcompat.widget.SwitchCompat
+                    android:id="@+id/glassSwitch"
+                    style="@style/SettingsRowSwitch" />
+            </LinearLayout>
+
+            <LinearLayout style="@style/SettingsRow">
+                <TextView
+                    style="@style/SettingsRowLabel"
+                    android:text="@string/settings_glass_blur" />
+                <SeekBar
+                    android:id="@+id/glassBlurSeek"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:max="100"
+                    android:progress="100" />
+            </LinearLayout>
         </LinearLayout>
 
         <!-- 上课提醒 -->

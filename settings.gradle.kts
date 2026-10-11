@@ -17,3 +17,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "XClass"
 include(":app")
+include(":benchmark")

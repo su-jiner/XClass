@@ -2,7 +2,6 @@ package cn.xiao.xyaax
 
 import android.graphics.ImageDecoder
 import android.graphics.BitmapFactory
-import android.content.res.ColorStateList
 import android.net.Uri
 import android.os.Bundle
 import android.provider.MediaStore
@@ -11,9 +10,9 @@ import android.widget.ImageView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import androidx.core.view.WindowInsetsControllerCompat
-import com.google.android.material.bottomnavigation.BottomNavigationView
 import cn.xiao.xyaax.data.AppPreferences
 import cn.xiao.xyaax.data.ScheduleRepository
+import cn.xiao.xyaax.ui.compose.LiquidBottomTabs
 import cn.xiao.xyaax.ui.settings.SettingsFragment
 import cn.xiao.xyaax.ui.timetable.TimetableFragment
 import cn.xiao.xyaax.ui.theme.ThemePaletteProvider
@@ -23,8 +22,8 @@ import cn.xiao.xyaax.ui.tools.ToolsFragment
 class MainActivity : AppCompatActivity() {
     private lateinit var rootContainer: FrameLayout
     private lateinit var backgroundImage: ImageView
-    private lateinit var bottomNav: BottomNavigationView
     private var currentNavId = 0
+    private var composeBar: androidx.compose.ui.platform.ComposeView? = null
 
     /** 底栏顺序，用于判断切页方向（往右的 Tab 从右侧滑入）。 */
     private val navOrder = listOf(R.id.nav_today, R.id.nav_timetable, R.id.nav_tools, R.id.nav_settings)
@@ -65,7 +64,6 @@ class MainActivity : AppCompatActivity() {
 
         rootContainer = findViewById(R.id.rootContainer)
         backgroundImage = findViewById(R.id.backgroundImage)
-        bottomNav = findViewById(R.id.bottomNav)
         applyUserAppearance()
         refreshCustomBackground()
         ScheduleRepository.refresh(this)
@@ -74,31 +72,47 @@ class MainActivity : AppCompatActivity() {
             navOrder.forEach { navId ->
                 supportFragmentManager.findFragmentByTag(navId.toString())?.let { cachedFragments[navId] = it }
             }
-            currentNavId = bottomNav.selectedItemId.takeIf { it in navOrder } ?: R.id.nav_timetable
+            currentNavId = savedInstanceState.getInt(KEY_NAV_ID, R.id.nav_timetable)
         }
 
         if (savedInstanceState == null) {
             val defaultPage = AppPreferences.getDefaultOpenPage(this)
-            if (defaultPage == AppPreferences.PAGE_TODAY) {
-                currentNavId = R.id.nav_today
-                supportFragmentManager.beginTransaction()
-                    .add(R.id.mainContainer, fragmentFor(R.id.nav_today), R.id.nav_today.toString())
-                    .commit()
-                bottomNav.selectedItemId = R.id.nav_today
-            } else {
-                currentNavId = R.id.nav_timetable
-                supportFragmentManager.beginTransaction()
-                    .add(R.id.mainContainer, fragmentFor(R.id.nav_timetable), R.id.nav_timetable.toString())
-                    .commit()
-                bottomNav.selectedItemId = R.id.nav_timetable
-            }
+            currentNavId = if (defaultPage == AppPreferences.PAGE_TODAY) R.id.nav_today else R.id.nav_timetable
+            supportFragmentManager.beginTransaction()
+                .add(R.id.mainContainer, fragmentFor(currentNavId), currentNavId.toString())
+                .commit()
         }
 
-        bottomNav.setOnItemSelectedListener { item ->
-            if (item.itemId !in navOrder) return@setOnItemSelectedListener false
-            switchTo(item.itemId)
-            true
+        // 液态胶囊底栏（Compose）
+        val composeView = findViewById<androidx.compose.ui.platform.ComposeView>(R.id.composeBottomBar)
+        composeBar = composeView
+        bindComposeBar()
+    }
+
+    private fun bindComposeBar() {
+        val composeView = composeBar ?: return
+        composeView.setContent {
+            LiquidBottomTabs(
+                selectedNavId = currentNavId,
+                onSelect = { navId ->
+                    if (navId != currentNavId) {
+                        switchTo(navId)
+                    }
+                },
+                palette = ThemePaletteProvider.fromContext(this),
+                glassEnabled = AppPreferences.getGlassEnabled(this),
+                blurStrength = AppPreferences.getGlassBlur(this),
+            )
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putInt(KEY_NAV_ID, currentNavId)
+    }
+
+    companion object {
+        private const val KEY_NAV_ID = "xclass_current_nav_id"
     }
 
     fun refreshCustomBackground() {
@@ -148,15 +162,6 @@ class MainActivity : AppCompatActivity() {
             isAppearanceLightNavigationBars = !palette.isDark
         }
         rootContainer.setBackgroundColor(palette.pageBackground)
-        bottomNav.setBackgroundColor(palette.navBackground)
-        val itemColors = ColorStateList(
-            arrayOf(
-                intArrayOf(android.R.attr.state_checked),
-                intArrayOf()
-            ),
-            intArrayOf(palette.buttonText, palette.textSecondary)
-        )
-        bottomNav.itemIconTintList = itemColors
-        bottomNav.itemTextColor = itemColors
+        bindComposeBar()
     }
 }

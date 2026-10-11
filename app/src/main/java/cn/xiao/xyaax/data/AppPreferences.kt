@@ -15,6 +15,8 @@ object AppPreferences {
     private const val KEY_DARK_MODE = "dark_mode"
     private const val KEY_REMINDER_ENABLED = "daily_reminder_enabled"
     private const val KEY_REMINDER_MINUTE = "daily_reminder_minute"
+    private const val KEY_GLASS_ENABLED = "glass_enabled"
+    private const val KEY_GLASS_BLUR = "glass_blur"
 
     const val PAGE_TIMETABLE = "timetable"
     const val PAGE_TODAY = "today"
@@ -34,6 +36,33 @@ object AppPreferences {
             DARK_LIGHT, DARK_DARK -> raw ?: DARK_SYSTEM
             else -> DARK_SYSTEM
         }
+    }
+
+    // ---- 液态主题：玻璃效果与模糊强度 ----
+    fun getGlassEnabled(context: Context): Boolean {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getBoolean(KEY_GLASS_ENABLED, true)
+    }
+
+    fun setGlassEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_GLASS_ENABLED, enabled)
+            .apply()
+    }
+
+    /** 模糊强度 0..1，默认 1.0 */
+    fun getGlassBlur(context: Context): Float {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getFloat(KEY_GLASS_BLUR, 1f)
+            .coerceIn(0f, 1f)
+    }
+
+    fun setGlassBlur(context: Context, value: Float) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putFloat(KEY_GLASS_BLUR, value.coerceIn(0f, 1f))
+            .apply()
     }
 
     fun setDarkMode(context: Context, mode: String) {
