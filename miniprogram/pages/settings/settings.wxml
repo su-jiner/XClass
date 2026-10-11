@@ -114,6 +114,5 @@
   <view class="card" style="background:{{palette.panel}}">
     <view style="font-size:30rpx;font-weight:600">关于</view>
     <view class="muted">XClass {{version}} · 纯本地课表，不联网、无广告</view>
-    <view class="muted" bindtap="checkUpdate" style="margin-top:12rpx;color:{{palette.accent}}">检查新版本 · 复制下载页链接</view>
   </view>
 </view>

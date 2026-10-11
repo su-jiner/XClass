@@ -174,12 +174,6 @@ Page({
       },
     });
   },
-  checkUpdate() {
-    wx.setClipboardData({
-      data: 'https://github.com/su-jiner/XClass/releases',
-      success: () => wx.showToast({ title: '已复制版本下载页链接', icon: 'none' }),
-    });
-  },
   writeCalendar() {
     const courses = store.loadCourses();
     const semesterStart = store.getActiveSemesterStart();
