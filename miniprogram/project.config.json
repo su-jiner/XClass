@@ -1,5 +1,5 @@
 {
-  "appid": "wxacf0e9804a8f3962",
+  "appid": "wx71fe9ee9aa858f78",
   "projectname": "XClass",
   "compileType": "miniprogram",
   "libVersion": "3.5.5",
@@ -32,9 +32,18 @@
   "simulatorPluginLibVersion": {},
   "packOptions": {
     "ignore": [
-      { "type": "folder", "value": "verify" },
-      { "type": "folder", "value": "tools" },
-      { "type": "file", "value": "run.mjs" }
+      {
+        "type": "folder",
+        "value": "verify"
+      },
+      {
+        "type": "folder",
+        "value": "tools"
+      },
+      {
+        "type": "file",
+        "value": "run.mjs"
+      }
     ],
     "include": []
   },
