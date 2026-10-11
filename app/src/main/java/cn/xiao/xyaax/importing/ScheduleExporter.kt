@@ -107,10 +107,13 @@ object ScheduleExporter {
                 weeks.forEach { week ->
                     if (start != null) {
                         val date = start.plusDays((week - 1) * 7L + weekdayOffset)
-                        val startTime = SectionTimes.DEFAULT_RANGES.getOrNull(meeting.startSection - 1)
-                            ?.substringBefore('-') ?: "08:00"
-                        val endTime = SectionTimes.DEFAULT_RANGES.getOrNull(meeting.endSection - 1)
-                            ?.substringAfter('-') ?: "09:40"
+                        // 自定义上课时间优先，否则按节次默认时间表
+                        val startTime = meeting.customStartTime?.takeIf { it.isNotBlank() }
+                            ?: (SectionTimes.DEFAULT_RANGES.getOrNull(meeting.startSection - 1)
+                                ?.substringBefore('-') ?: "08:00")
+                        val endTime = meeting.customEndTime?.takeIf { it.isNotBlank() }
+                            ?: (SectionTimes.DEFAULT_RANGES.getOrNull(meeting.endSection - 1)
+                                ?.substringAfter('-') ?: "09:40")
                         val dtStart = date.format(DateTimeFormatter.BASIC_ISO_DATE) + "T" + startTime.replace(":", "") + "00"
                         val dtEnd = date.format(DateTimeFormatter.BASIC_ISO_DATE) + "T" + endTime.replace(":", "") + "00"
                         sb.append("BEGIN:VEVENT\n")

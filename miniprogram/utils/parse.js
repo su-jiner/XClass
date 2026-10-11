@@ -125,6 +125,15 @@ function parseCellEntry(raw, defaultTotalWeeks) {
   // 噪声守卫：表头/页脚/说明文字不应成为课程
   if (isNoiseCourseName(courseName)) return null;
   const sectionAndWeeks = parts[1] || '';
+  // 自定义上课时间：`(1-2节)[09:00-10:40]12-14周` —— 提取后剥离，避免污染周次解析
+  let customStart = null;
+  let customEnd = null;
+  const customMatch = sectionAndWeeks.match(/\[(\d{2}:\d{2})\s*[-—–~～至]\s*(\d{2}:\d{2})\]/);
+  if (customMatch) {
+    customStart = customMatch[1];
+    customEnd = customMatch[2];
+  }
+  const sectionAndWeeksClean = customMatch ? sectionAndWeeks.replace(customMatch[0], '') : sectionAndWeeks;
   const locationRaw = parts[2] || '';
   const teacherRaw = parts.slice(3).join('/').trim();
   const campusMatch = locationRaw.match(CAMPUS_RE);
@@ -133,7 +142,9 @@ function parseCellEntry(raw, defaultTotalWeeks) {
     teacher: normalizePlaceholder(teacherRaw.replace(TEACHER_TAIL_RE, '').trim()),
     location: normalizePlaceholder(locationRaw.replace(CAMPUS_RE, '').trim() || locationRaw.trim()),
     campusAlias: campusMatch ? campusMatch[1].trim() : null,
-    weekRules: parseWeekRules(sectionAndWeeks, defaultTotalWeeks),
+    weekRules: parseWeekRules(sectionAndWeeksClean, defaultTotalWeeks),
+    customStartTime: customStart,
+    customEndTime: customEnd,
     rawText: raw
   };
 }
@@ -424,7 +435,9 @@ function parseTableRows(rows, defaultTotalWeeks, timeTables) {
             endSection: sections.endSection,
             weekRules: entry.weekRules,
             location: entry.location,
-            campusAlias: entry.campusAlias
+            campusAlias: entry.campusAlias,
+            customStartTime: entry.customStartTime,
+            customEndTime: entry.customEndTime
           }]
         });
       });
@@ -479,7 +492,9 @@ function parseListStyle(lines, defaultTotalWeeks, timeTables) {
           endSection: sections.endSection,
           weekRules: entry.weekRules,
           location: entry.location,
-          campusAlias: entry.campusAlias
+          campusAlias: entry.campusAlias,
+          customStartTime: entry.customStartTime,
+          customEndTime: entry.customEndTime
         }]
       });
     });
@@ -678,6 +693,12 @@ function encodeShareText(courses, profileName, semester, semesterStart, totalWee
         day = ['星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日'][index];
       }
       const sections = meeting.startSection + '-' + meeting.endSection + '节';
+      // 自定义上课时间：`(1-2节)[09:00-10:40]`，导入端自动还原
+      let custom = '';
+      if (meeting.customStartTime && String(meeting.customStartTime).trim()) {
+        const end = (meeting.customEndTime && String(meeting.customEndTime).trim()) ? meeting.customEndTime : meeting.customStartTime;
+        custom = '[' + meeting.customStartTime + '-' + end + ']';
+      }
       const weeks = (course.rawWeekText && String(course.rawWeekText).trim())
         ? course.rawWeekText
         : weekRulesText(meeting.weekRules || []);
@@ -686,7 +707,7 @@ function encodeShareText(courses, profileName, semester, semesterStart, totalWee
       location += (meeting.location || '').trim();
       if (!location) location = '-';
       const teacher = (course.teacher || '').trim();
-      rows.push(day + ' ' + course.courseName + '/(' + sections + ')' + weeks + '/' + location + '/' + (teacher ? teacher : '-'));
+      rows.push(day + ' ' + course.courseName + '/(' + sections + ')' + custom + weeks + '/' + location + '/' + (teacher ? teacher : '-'));
     });
   });
   rows.filter(function (value, index) { return rows.indexOf(value) === index; })

@@ -33,7 +33,7 @@ struct FullSchedulePage: View {
                     currentSection: nil,
                     showDates: false,
                     sectionRanges: sectionRanges,
-                    onTap: { courseIndex, course, meeting in
+                    onTap: { courseIndex, course, meeting, conflicts in
                         editingItem = (courseIndex, course, meeting)
                         showEditSheet = true
                     }

@@ -122,6 +122,8 @@ data class ParsedCellEntry(
     val location: String,
     val campusAlias: String?,
     val weekRules: List<WeekRule>,
+    val customStartTime: String? = null,
+    val customEndTime: String? = null,
     val rawText: String
 )
 
@@ -154,6 +156,12 @@ object CellEntryParser {
         if (ImportNoiseFilter.isNoiseCourseName(courseName)) return null
 
         val sectionAndWeeks = parts.getOrNull(1).orEmpty()
+        // 自定义上课时间：`(1-2节)[09:00-10:40]12-14周` —— 提取后剥离，避免污染周次解析
+        val customTimeRegex = Regex("""\[(\d{2}:\d{2})\s*[-—–~～至]\s*(\d{2}:\d{2})\]""")
+        val customMatch = customTimeRegex.find(sectionAndWeeks)
+        val customStart = customMatch?.groupValues?.get(1)
+        val customEnd = customMatch?.groupValues?.get(2)
+        val sectionAndWeeksClean = customMatch?.let { sectionAndWeeks.replace(it.value, "") } ?: sectionAndWeeks
         val locationRaw = parts.getOrNull(2).orEmpty()
         val teacherRaw = parts.drop(3).joinToString("/").trim()
         val teacher = ImportNoiseFilter.normalizePlaceholder(teacherTailRegex.replace(teacherRaw, "").trim())
@@ -168,7 +176,9 @@ object CellEntryParser {
             teacher = teacher,
             location = locationClean,
             campusAlias = campusAlias,
-            weekRules = WeekRuleTextParser.parse(sectionAndWeeks, defaultTotalWeeks),
+            weekRules = WeekRuleTextParser.parse(sectionAndWeeksClean, defaultTotalWeeks),
+            customStartTime = customStart,
+            customEndTime = customEnd,
             rawText = raw
         )
     }

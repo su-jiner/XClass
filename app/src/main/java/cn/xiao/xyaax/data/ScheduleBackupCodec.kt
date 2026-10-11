@@ -81,7 +81,9 @@ object ScheduleBackupCodec {
         val endSection: Int,
         val weekRules: List<BackupWeekRule> = emptyList(),
         val location: String = "",
-        val campusId: String? = null
+        val campusId: String? = null,
+        val customStartTime: String? = null,
+        val customEndTime: String? = null
     )
 
     @Serializable
@@ -151,7 +153,9 @@ object ScheduleBackupCodec {
             endSection = endSection,
             weekRules = weekRules.map { it.toWeekRule() },
             location = location,
-            campusId = campusId
+            campusId = campusId,
+            customStartTime = customStartTime,
+            customEndTime = customEndTime
         )
     }
 
@@ -170,7 +174,9 @@ object ScheduleBackupCodec {
             endSection = endSection,
             weekRules = weekRules.map { it.toBackupWeekRule() },
             location = location,
-            campusId = campusId
+            campusId = campusId,
+            customStartTime = customStartTime,
+            customEndTime = customEndTime
         )
     }
 

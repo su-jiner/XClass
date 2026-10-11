@@ -87,133 +87,156 @@
                     android:layout_height="wrap_content"
                     android:orientation="horizontal" />
             </HorizontalScrollView>
-        </LinearLayout>
 
-        <!-- 课程名 -->
-        <TextView
-            android:id="@+id/detailTitle"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textSize="19sp"
-            android:textStyle="bold" />
-
-        <!-- 时间横幅：与课表格子同色系，强化视觉关联 -->
-        <LinearLayout
-            android:id="@+id/detailBanner"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:layout_marginTop="10dp"
-            android:foreground="?attr/selectableItemBackground"
-            android:paddingStart="14dp"
-            android:paddingTop="12dp"
-            android:paddingEnd="14dp"
-            android:paddingBottom="12dp">
+            <!-- 重叠课程左右滑动分页：一门课一页，滑动/点 Tab 切换 -->
+            <androidx.viewpager2.widget.ViewPager2
+                android:id="@+id/detailPager"
+                android:layout_width="match_parent"
+                android:layout_height="276dp"
+                android:layout_marginTop="4dp" />
 
             <TextView
-                android:id="@+id/detailBannerSection"
+                android:id="@+id/detailPageIndicator"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:textSize="16sp"
+                android:layout_marginTop="6dp"
+                android:gravity="center"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <!-- 单门课程详情（无冲突时显示；冲突时由分页器逐页渲染） -->
+        <LinearLayout
+            android:id="@+id/detailSingle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <!-- 课程名 -->
+            <TextView
+                android:id="@+id/detailTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="19sp"
                 android:textStyle="bold" />
 
-            <TextView
-                android:id="@+id/detailBannerTime"
+            <!-- 时间横幅：与课表格子同色系，强化视觉关联 -->
+            <LinearLayout
+                android:id="@+id/detailBanner"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:textSize="13sp" />
+                android:orientation="vertical"
+                android:layout_marginTop="10dp"
+                android:foreground="?attr/selectableItemBackground"
+                android:paddingStart="14dp"
+                android:paddingTop="12dp"
+                android:paddingEnd="14dp"
+                android:paddingBottom="12dp">
+
+                <TextView
+                    android:id="@+id/detailBannerSection"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/detailBannerTime"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:textSize="13sp" />
+            </LinearLayout>
+
+            <!-- 信息行：图标圆片 + 标签 + 值，点击复制 -->
+            <LinearLayout
+                android:id="@+id/rowTeacher"
+                style="@style/CourseDetailRow">
+                <FrameLayout style="@style/CourseDetailIconChip">
+                    <ImageView
+                        android:id="@+id/detailIconTeacher"
+                        style="@style/CourseDetailIcon"
+                        android:src="@drawable/ic_detail_person"
+                        android:contentDescription="@null" />
+                </FrameLayout>
+                <TextView
+                    style="@style/CourseDetailLabel"
+                    android:text="@string/course_detail_teacher" />
+                <TextView
+                    android:id="@+id/detailTeacher"
+                    style="@style/CourseDetailValue" />
+            </LinearLayout>
+
+            <View
+                    android:id="@+id/dividerOne"
+                    style="@style/CourseDetailDivider" />
+
+            <LinearLayout
+                android:id="@+id/rowLocation"
+                style="@style/CourseDetailRow">
+                <FrameLayout style="@style/CourseDetailIconChip">
+                    <ImageView
+                        android:id="@+id/detailIconLocation"
+                        style="@style/CourseDetailIcon"
+                        android:src="@drawable/ic_detail_place"
+                        android:contentDescription="@null" />
+                </FrameLayout>
+                <TextView
+                    style="@style/CourseDetailLabel"
+                    android:text="@string/course_detail_location" />
+                <TextView
+                    android:id="@+id/detailLocation"
+                    style="@style/CourseDetailValue" />
+            </LinearLayout>
+
+            <View
+                    android:id="@+id/dividerTwo"
+                    style="@style/CourseDetailDivider" />
+
+            <LinearLayout
+                android:id="@+id/rowWeeks"
+                style="@style/CourseDetailRow">
+                <FrameLayout style="@style/CourseDetailIconChip">
+                    <ImageView
+                        android:id="@+id/detailIconWeeks"
+                        style="@style/CourseDetailIcon"
+                        android:src="@drawable/ic_detail_week"
+                        android:contentDescription="@null" />
+                </FrameLayout>
+                <TextView
+                    style="@style/CourseDetailLabel"
+                    android:text="@string/course_detail_weeks" />
+                <TextView
+                    android:id="@+id/detailWeeks"
+                    style="@style/CourseDetailValue" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/rowSemester"
+                style="@style/CourseDetailRow">
+                <FrameLayout style="@style/CourseDetailIconChip">
+                    <ImageView
+                        android:id="@+id/detailIconSemester"
+                        style="@style/CourseDetailIcon"
+                        android:src="@drawable/ic_detail_semester"
+                        android:contentDescription="@null" />
+                </FrameLayout>
+                <TextView
+                    style="@style/CourseDetailLabel"
+                    android:text="@string/course_detail_semester" />
+                <TextView
+                    android:id="@+id/detailMeta"
+                    style="@style/CourseDetailValue" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/detailCopyHint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:gravity="center"
+                android:text="@string/course_detail_copy_hint"
+                android:textSize="11sp" />
         </LinearLayout>
-
-        <!-- 信息行：图标圆片 + 标签 + 值，点击复制 -->
-        <LinearLayout
-            android:id="@+id/rowTeacher"
-            style="@style/CourseDetailRow">
-            <FrameLayout style="@style/CourseDetailIconChip">
-                <ImageView
-                    android:id="@+id/detailIconTeacher"
-                    style="@style/CourseDetailIcon"
-                    android:src="@drawable/ic_detail_person"
-                    android:contentDescription="@null" />
-            </FrameLayout>
-            <TextView
-                style="@style/CourseDetailLabel"
-                android:text="@string/course_detail_teacher" />
-            <TextView
-                android:id="@+id/detailTeacher"
-                style="@style/CourseDetailValue" />
-        </LinearLayout>
-
-        <View
-                android:id="@+id/dividerOne"
-                style="@style/CourseDetailDivider" />
-
-        <LinearLayout
-            android:id="@+id/rowLocation"
-            style="@style/CourseDetailRow">
-            <FrameLayout style="@style/CourseDetailIconChip">
-                <ImageView
-                    android:id="@+id/detailIconLocation"
-                    style="@style/CourseDetailIcon"
-                    android:src="@drawable/ic_detail_place"
-                    android:contentDescription="@null" />
-            </FrameLayout>
-            <TextView
-                style="@style/CourseDetailLabel"
-                android:text="@string/course_detail_location" />
-            <TextView
-                android:id="@+id/detailLocation"
-                style="@style/CourseDetailValue" />
-        </LinearLayout>
-
-        <View
-                android:id="@+id/dividerTwo"
-                style="@style/CourseDetailDivider" />
-
-        <LinearLayout
-            android:id="@+id/rowWeeks"
-            style="@style/CourseDetailRow">
-            <FrameLayout style="@style/CourseDetailIconChip">
-                <ImageView
-                    android:id="@+id/detailIconWeeks"
-                    style="@style/CourseDetailIcon"
-                    android:src="@drawable/ic_detail_week"
-                    android:contentDescription="@null" />
-            </FrameLayout>
-            <TextView
-                style="@style/CourseDetailLabel"
-                android:text="@string/course_detail_weeks" />
-            <TextView
-                android:id="@+id/detailWeeks"
-                style="@style/CourseDetailValue" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/rowSemester"
-            style="@style/CourseDetailRow">
-            <FrameLayout style="@style/CourseDetailIconChip">
-                <ImageView
-                    android:id="@+id/detailIconSemester"
-                    style="@style/CourseDetailIcon"
-                    android:src="@drawable/ic_detail_semester"
-                    android:contentDescription="@null" />
-            </FrameLayout>
-            <TextView
-                style="@style/CourseDetailLabel"
-                android:text="@string/course_detail_semester" />
-            <TextView
-                android:id="@+id/detailMeta"
-                style="@style/CourseDetailValue" />
-        </LinearLayout>
-
-        <TextView
-            android:id="@+id/detailCopyHint"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:gravity="center"
-            android:text="@string/course_detail_copy_hint"
-            android:textSize="11sp" />
 
         <TextView
             android:id="@+id/detailEditCourseBtn"

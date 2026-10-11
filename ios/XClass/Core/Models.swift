@@ -51,6 +51,9 @@ struct MeetingTime: Codable, Hashable {
     var location: String
     /// 校区/楼栋时间表 ID；为空表示使用默认 12 节表
     var campusId: String? = nil
+    /// 自定义上课起止时间（HH:mm）；为空时沿用节次默认时间
+    var customStartTime: String? = nil
+    var customEndTime: String? = nil
 }
 
 struct CourseSchedule: Codable, Hashable, Identifiable {

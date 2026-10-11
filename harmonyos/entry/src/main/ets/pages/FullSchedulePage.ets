@@ -29,6 +29,7 @@ export struct FullSchedulePage {
   @State sectionCount: number = 12;
   @State notes: string[] = [];
   @State editingCourseIndex: number = -1;
+  @State editingMeetingIndex: number = 0;
   @State editingCourse: ImportedCourse = {
     courseName: '', teacher: '', semester: '', credit: null, rawWeekText: '', meetings: [],
   };
@@ -37,6 +38,7 @@ export struct FullSchedulePage {
   editDialogController: CustomDialogController = new CustomDialogController({
     builder: EditCourseDialog({
       course: this.editingCourse,
+      meetingIndex: this.editingMeetingIndex,
       onSaved: (updated: ImportedCourse): void => {
         this.applyEdit(updated);
       },
@@ -233,6 +235,7 @@ export struct FullSchedulePage {
     .borderRadius(5)
     .onClick(() => {
       this.editingCourseIndex = item.courseIndex;
+      this.editingMeetingIndex = item.meetingIndex;
       this.editingCourse = this.toImportedCourse(item.course);
       this.editDialogController.open();
     })
@@ -252,6 +255,8 @@ export struct FullSchedulePage {
         weekRules: m.weekRules,
         location: m.location,
         campusAlias: m.campusId ?? null,
+        customStartTime: m.customStartTime ?? null,
+        customEndTime: m.customEndTime ?? null,
       })),
     };
   }
@@ -266,6 +271,8 @@ export struct FullSchedulePage {
       weekRules: m.weekRules,
       location: m.location,
       campusId: m.campusAlias,
+      customStartTime: m.customStartTime ?? null,
+      customEndTime: m.customEndTime ?? null,
     }));
     const newCourse: CourseSchedule = {
       courseName: updated.courseName,
@@ -275,7 +282,36 @@ export struct FullSchedulePage {
       rawWeekText: updated.rawWeekText,
       meetings: meetings,
     };
-    const ok = ProfileStore.instance?.updateCourse(this.editingCourseIndex, newCourse, this.profileId) ?? false;
+    // 拆分保存：同名同师课程含多个上课时段且改了名/师时，只改被编辑时段，
+    // 其余时段（其他天）保留原名原师，避免跨天绑定连带修改
+    const nameChanged = updated.courseName !== old.courseName;
+    const teacherChanged = updated.teacher !== old.teacher;
+    let ok = false;
+    if (old.meetings.length > 1 && (nameChanged || teacherChanged)) {
+      const targetIndex = Math.min(this.editingMeetingIndex, Math.max(0, old.meetings.length - 1));
+      const keptMeetings = old.meetings.slice();
+      keptMeetings.splice(targetIndex, 1);
+      const keptCourse: CourseSchedule = {
+        courseName: old.courseName,
+        teacher: old.teacher,
+        semester: old.semester,
+        credit: old.credit,
+        rawWeekText: old.rawWeekText,
+        meetings: keptMeetings,
+      };
+      const extractedCourse: CourseSchedule = {
+        courseName: updated.courseName,
+        teacher: updated.teacher,
+        semester: old.semester,
+        credit: old.credit,
+        rawWeekText: updated.rawWeekText,
+        meetings: meetings.filter((m: MeetingTime, index: number) => index === targetIndex),
+      };
+      ok = ProfileStore.instance?.splitUpdateCourse(
+        this.editingCourseIndex, keptCourse, extractedCourse, this.profileId) ?? false;
+    } else {
+      ok = ProfileStore.instance?.updateCourse(this.editingCourseIndex, newCourse, this.profileId) ?? false;
+    }
     if (ok) {
       AppStorage.setOrCreate('dataVersion', Date.now());
     }

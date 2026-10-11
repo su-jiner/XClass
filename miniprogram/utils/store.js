@@ -240,6 +240,14 @@ function updateCourse(courseIndex, newCourse, profileId) {
   return true;
 }
 
+/** 编辑拆分追加：把独立出的新课程追加到课表末尾（不做同名合并）。 */
+function appendCourse(course, profileId) {
+  const courses = loadCourses(profileId);
+  courses.push(course);
+  saveCourses(courses, profileId);
+  return true;
+}
+
 /** 删除指定课表中的课程（课表管理/完整课表视图使用）。 */
 function deleteCourseInProfile(index, profileId) {
   const courses = loadCourses(profileId);
@@ -426,6 +434,7 @@ module.exports = {
   addManualCourse,
   deleteCourse,
   updateCourse,
+  appendCourse,
   deleteCourseInProfile,
   importCourses,
   loadProfileNotes,

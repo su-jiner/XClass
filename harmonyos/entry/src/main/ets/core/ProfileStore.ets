@@ -242,6 +242,8 @@ export class ProfileStore {
         weekRules: m.weekRules.map((r) => ({ startWeek: r.startWeek, endWeek: r.endWeek, parity: r.parity })),
         location: m.location,
         campusId: m.campusId ?? null,
+        customStartTime: m.customStartTime ?? null,
+        customEndTime: m.customEndTime ?? null,
       })),
     };
   }
@@ -263,6 +265,8 @@ export class ProfileStore {
         })),
         location: m.location,
         campusId: m.campusId ?? null,
+        customStartTime: m.customStartTime ?? null,
+        customEndTime: m.customEndTime ?? null,
       })),
     };
   }
@@ -506,6 +510,30 @@ export class ProfileStore {
     return true;
   }
 
+  /**
+   * 编辑拆分保存：课程含多个上课时段且课程名/教师被修改时，被编辑时段独立成新课程（追加到末尾），
+   * 原课程保留其余时段（原名原师）；keptCourse 时段为空时原课程被移除。避免跨天绑定连带修改。
+   */
+  splitUpdateCourse(courseIndex: number, keptCourse: CourseSchedule, extractedCourse: CourseSchedule, profileId: string): boolean {
+    const meta = this.ensureInitialized();
+    const profile = profileId.length > 0
+      ? meta.profiles.find((p) => p.id === profileId)
+      : (meta.profiles.find((p) => p.id === meta.activeId) ?? meta.profiles[0]);
+    if (!profile) return false;
+    const courses = this.readCoursesFile(profile.coursesFile);
+    if (courseIndex < 0 || courseIndex >= courses.length) return false;
+    if (keptCourse.meetings.length === 0) {
+      courses.splice(courseIndex, 1);
+    } else {
+      courses[courseIndex] = keptCourse;
+    }
+    courses.push(extractedCourse);
+    this.writeCoursesFile(profile.coursesFile, courses);
+    profile.updatedAt = Date.now();
+    this.writeMeta(meta);
+    return true;
+  }
+
   /** 删除指定课表中的课程。 */
   deleteCourseInProfile(courseIndex: number, profileId: string): boolean {
     const meta = this.ensureInitialized();
@@ -575,6 +603,8 @@ export class ProfileStore {
         weekRules: meeting.weekRules,
         location: meeting.location,
         campusId: meeting.campusId ?? null,
+        customStartTime: meeting.customStartTime ?? null,
+        customEndTime: meeting.customEndTime ?? null,
       })),
     }));
 

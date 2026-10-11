@@ -36,6 +36,12 @@ enum ShareTextCodec {
             for meeting in course.meetings {
                 guard let day = weekdayLabels[meeting.weekday] else { continue }
                 let sections = "\(meeting.startSection)-\(meeting.endSection)节"
+                // 自定义上课时间：`(1-2节)[09:00-10:40]`，导入端自动还原
+                var custom = ""
+                if let customStart = meeting.customStartTime, !customStart.isEmpty {
+                    let end = (meeting.customEndTime?.isEmpty == false) ? meeting.customEndTime! : customStart
+                    custom = "[\(customStart)-\(end)]"
+                }
                 let weeks = course.rawWeekText.isEmpty
                     ? CourseTableImporter.weekRulesText(meeting.weekRules)
                     : course.rawWeekText
@@ -45,7 +51,7 @@ enum ShareTextCodec {
                 location += meeting.location.trimmingCharacters(in: .whitespaces)
                 if location.isEmpty { location = "-" }
                 let teacher = course.teacher.trimmingCharacters(in: .whitespaces)
-                rows.append("\(day) \(course.courseName)/(\(sections))\(weeks)/\(location)/\(teacher.isEmpty ? "-" : teacher)")
+                rows.append("\(day) \(course.courseName)/(\(sections))\(custom)\(weeks)/\(location)/\(teacher.isEmpty ? "-" : teacher)")
             }
         }
         rows = Array(Set(rows)).sorted()

@@ -112,6 +112,26 @@ object ScheduleRepository {
         }
     }
 
+    /**
+     * 编辑拆分保存：同名同师课程含多个上课时段时，仅把被编辑时段拆出为新课程，
+     * 其余时段（其他天）保留原名原师，避免跨天绑定连带修改。
+     */
+    suspend fun splitUpdateCourse(
+        context: Context,
+        profileId: String?,
+        courseIndex: Int,
+        expected: CourseSchedule,
+        keptCourse: CourseSchedule,
+        extractedCourse: CourseSchedule
+    ): Result<Boolean> = mutate(context) {
+        val pid = if (!profileId.isNullOrBlank()) profileId
+            else ImportedScheduleStorage.listProfiles(context.filesDir).firstOrNull { it.isActive }?.id
+                ?: return@mutate false
+        ImportedScheduleStorage.splitUpdateCourseInProfile(
+            context.filesDir, pid, courseIndex, expected, keptCourse, extractedCourse
+        )
+    }
+
     suspend fun createEmptyProfile(context: Context, name: String): Result<ImportedScheduleStorage.TimetableProfile> =
         mutate(context) {
             ImportedScheduleStorage.createEmptyProfile(context.filesDir, name)

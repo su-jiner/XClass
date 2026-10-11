@@ -296,6 +296,41 @@ object ImportedScheduleStorage {
         true
     }
 
+    /**
+     * 编辑拆分保存：课程含多个上课时段且课程名/教师被修改时，
+     * 被编辑时段独立成新课程（追加到列表末尾，避免其余 courseIndex 位移），
+     * 原课程保留其余时段（原名原师）；keptCourse 时段为空时原课程被移除。
+     * 作用域与 updateCourseInProfile 一致（当前课表或指定课表）。
+     */
+    fun splitUpdateCourseInProfile(
+        filesDir: File,
+        profileId: String,
+        courseIndex: Int,
+        expected: CourseSchedule,
+        keptCourse: CourseSchedule,
+        extractedCourse: CourseSchedule
+    ): Boolean = synchronized(lock) {
+        val meta = ensureInitialized(filesDir)
+        val profile = meta.profiles.firstOrNull { it.id == profileId } ?: return false
+        val courses = readCoursesFile(filesDir, profile.coursesFile)
+        if (courses.getOrNull(courseIndex) != expected) return false
+
+        val updated = courses.toMutableList()
+        if (keptCourse.meetings.isEmpty()) {
+            updated.removeAt(courseIndex)
+        } else {
+            updated[courseIndex] = keptCourse
+        }
+        updated += extractedCourse
+        writeCoursesFile(filesDir, profile.coursesFile, updated)
+        val now = System.currentTimeMillis()
+        saveMeta(filesDir, meta.copy(
+            activeId = meta.activeId,
+            profiles = meta.profiles.map { if (it.id == profile.id) it.copy(updatedAt = now) else it }
+        ))
+        true
+    }
+
     fun exportBackup(filesDir: File): String = synchronized(lock) {
         val meta = ensureInitialized(filesDir)
         val profiles = meta.profiles.map { profile ->
@@ -759,7 +794,9 @@ object ImportedScheduleStorage {
         val endSection: Int,
         val weekRules: List<PersistedWeekRule>,
         val location: String,
-        val campusId: String? = null
+        val campusId: String? = null,
+        val customStartTime: String? = null,
+        val customEndTime: String? = null
     ) {
         fun toMeetingTime(): MeetingTime {
             return MeetingTime(
@@ -768,7 +805,9 @@ object ImportedScheduleStorage {
                 endSection = endSection,
                 weekRules = weekRules.map { it.toWeekRule() },
                 location = location,
-                campusId = campusId
+                campusId = campusId,
+                customStartTime = customStartTime,
+                customEndTime = customEndTime
             )
         }
 
@@ -780,7 +819,9 @@ object ImportedScheduleStorage {
                     endSection = meeting.endSection,
                     weekRules = meeting.weekRules.map { PersistedWeekRule.fromWeekRule(it) },
                     location = meeting.location,
-                    campusId = meeting.campusId
+                    campusId = meeting.campusId,
+                    customStartTime = meeting.customStartTime,
+                    customEndTime = meeting.customEndTime
                 )
             }
         }

@@ -18,10 +18,13 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.core.graphics.ColorUtils
+import androidx.recyclerview.widget.RecyclerView
+import androidx.viewpager2.widget.ViewPager2
 import cn.xiao.xyaax.R
 import cn.xiao.xyaax.domain.CourseMeetingRef
 import cn.xiao.xyaax.model.WeekParity
 import cn.xiao.xyaax.model.Weekday
+import cn.xiao.xyaax.model.effectiveTimeText
 import cn.xiao.xyaax.ui.theme.ThemePalette
 import cn.xiao.xyaax.ui.theme.ThemePaletteProvider
 import com.google.android.material.bottomsheet.BottomSheetDialog
@@ -82,10 +85,10 @@ object CourseDetailBottomSheet {
         // 拖拽把手与信息行图标按主题着色
         view.findViewById<View>(R.id.detailHandle).backgroundTintList =
             ColorStateList.valueOf(ColorUtils.blendARGB(palette.detailCard, palette.textSecondary, 0.35f))
-        bindRowIcon(view, R.id.detailIconTeacher, palette)
-        bindRowIcon(view, R.id.detailIconLocation, palette)
-        bindRowIcon(view, R.id.detailIconWeeks, palette)
-        bindRowIcon(view, R.id.detailIconSemester, palette)
+
+        val detailSingle = view.findViewById<LinearLayout>(R.id.detailSingle)
+        val detailPager = view.findViewById<ViewPager2>(R.id.detailPager)
+        val pageIndicator = view.findViewById<TextView>(R.id.detailPageIndicator)
 
         val uniqueCourses = allCourses.distinctBy { it.courseIndex }
         var currentItem = primary
@@ -159,34 +162,34 @@ object CourseDetailBottomSheet {
             }
         }
 
-        fun bindCourseDetails(item: CourseMeetingRef) {
+        fun bindCourseDetails(container: View, item: CourseMeetingRef) {
             currentItem = item
             val meeting = item.meeting
 
             // 标题
-            val title = view.findViewById<TextView>(R.id.detailTitle)
+            val title = container.findViewById<TextView>(R.id.detailTitle)
             title.text = item.course.courseName
             title.setTextColor(palette.detailTitle)
 
             // 时间横幅：与课表格子同色，建立视觉关联；点击复制时间概要
-            val banner = view.findViewById<LinearLayout>(R.id.detailBanner)
+            val banner = container.findViewById<LinearLayout>(R.id.detailBanner)
             banner.background = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
                 cornerRadius = 14f
                 setColor(CourseCardColors.forCourse(item.courseIndex, palette.isDark))
             }
-            val bannerSection = view.findViewById<TextView>(R.id.detailBannerSection)
+            val bannerSection = container.findViewById<TextView>(R.id.detailBannerSection)
             bannerSection.text = "${weekdayLabels[meeting.weekday]} · 第${meeting.startSection}-${meeting.endSection}节"
             bannerSection.setTextColor(CourseCardColors.textColorFor(item.courseIndex, palette.isDark))
-            val bannerTime = view.findViewById<TextView>(R.id.detailBannerTime)
-            val timeText = "${sectionStart(periodRanges, meeting.startSection)} - ${sectionEnd(periodRanges, meeting.endSection)}"
+            val bannerTime = container.findViewById<TextView>(R.id.detailBannerTime)
+            val timeText = meeting.effectiveTimeText(periodRanges)
             bannerTime.text = timeText
             bannerTime.setTextColor(CourseCardColors.textColorFor(item.courseIndex, palette.isDark))
 
             // 信息行
-            val teacher = view.findViewById<TextView>(R.id.detailTeacher)
+            val teacher = container.findViewById<TextView>(R.id.detailTeacher)
             teacher.text = item.course.teacher.ifBlank { "未知" }
-            val location = view.findViewById<TextView>(R.id.detailLocation)
+            val location = container.findViewById<TextView>(R.id.detailLocation)
             // 多校区：地点行同时显示课程所属校区/楼栋时间表名称
             val campusName = meeting.campusId?.let { id ->
                 cn.xiao.xyaax.data.TimeProfileStore.load(context.filesDir).firstOrNull { it.id == id }?.name
@@ -195,22 +198,33 @@ object CourseDetailBottomSheet {
                 campusName?.takeIf { it.isNotBlank() },
                 meeting.location.takeIf { it.isNotBlank() }
             ).joinToString(" · ").ifBlank { "未标注" }
-            val weeks = view.findViewById<TextView>(R.id.detailWeeks)
+            val weeks = container.findViewById<TextView>(R.id.detailWeeks)
             weeks.text = meetingWeekText(item)
-            val meta = view.findViewById<TextView>(R.id.detailMeta)
+            val meta = container.findViewById<TextView>(R.id.detailMeta)
             val creditText = item.course.credit?.let { "${it}学分" } ?: "学分未标注"
             meta.text = "${item.course.semester} · $creditText"
 
             val valueColor = palette.textPrimary
             listOf(teacher, location, weeks, meta).forEach { it.setTextColor(valueColor) }
 
+            // 页内图标与分隔线按主题着色（单视图与分页页通用）
+            bindRowIcon(container, R.id.detailIconTeacher, palette)
+            bindRowIcon(container, R.id.detailIconLocation, palette)
+            bindRowIcon(container, R.id.detailIconWeeks, palette)
+            bindRowIcon(container, R.id.detailIconSemester, palette)
+            val dividerColor = ColorUtils.blendARGB(palette.detailCard, palette.textSecondary, 0.22f)
+            container.findViewById<View>(R.id.dividerOne).backgroundTintList =
+                ColorStateList.valueOf(dividerColor)
+            container.findViewById<View>(R.id.dividerTwo).backgroundTintList =
+                ColorStateList.valueOf(dividerColor)
+
             // 点击行复制到剪贴板
-            bindCopy(context, view, R.id.rowTeacher, "教师", teacher.text.toString(), palette)
-            bindCopy(context, view, R.id.rowLocation, "地点", location.text.toString(), palette)
-            bindCopy(context, view, R.id.rowWeeks, "周次", weeks.text.toString(), palette)
-            bindCopy(context, view, R.id.rowSemester, "学期", meta.text.toString(), palette)
+            bindCopy(context, container, R.id.rowTeacher, "教师", teacher.text.toString(), palette)
+            bindCopy(context, container, R.id.rowLocation, "地点", location.text.toString(), palette)
+            bindCopy(context, container, R.id.rowWeeks, "周次", weeks.text.toString(), palette)
+            bindCopy(context, container, R.id.rowSemester, "学期", meta.text.toString(), palette)
             bindCopy(
-                context, view, R.id.detailBanner, "时间",
+                context, container, R.id.detailBanner, "时间",
                 "${bannerSection.text} $timeText", palette
             )
 
@@ -219,6 +233,8 @@ object CourseDetailBottomSheet {
 
         if (uniqueCourses.size > 1) {
             conflictContainer.visibility = View.VISIBLE
+            detailSingle.visibility = View.GONE
+            detailPager.visibility = View.VISIBLE
             conflictBadge.text = "时间冲突 (${uniqueCourses.size}门)"
             conflictBadge.setTextColor(palette.textPrimary)
             conflictBadge.background = GradientDrawable().apply {
@@ -246,43 +262,15 @@ object CourseDetailBottomSheet {
             val dp12 = (12 * context.resources.displayMetrics.density + 0.5f).toInt()
             val dp6 = (6 * context.resources.displayMetrics.density + 0.5f).toInt()
 
-            uniqueCourses.forEach { courseItem ->
-                val isSelected = courseItem.courseIndex == currentItem.courseIndex
-                val tab = TextView(context).apply {
-                    text = "${courseItem.course.courseName} (第${courseItem.meeting.startSection}-${courseItem.meeting.endSection}节)"
-                    textSize = 12f
-                    setPadding(dp12, dp6, dp12, dp6)
-                    val lp = LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.WRAP_CONTENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT
-                    ).apply { marginEnd = dp8 }
-                    layoutParams = lp
-                    setOnClickListener {
-                        bindCourseDetails(courseItem)
-                        // 重新刷新 Tab 选中样式
-                        for (i in 0 until conflictTabs.childCount) {
-                            val child = conflictTabs.getChildAt(i) as? TextView ?: continue
-                            val active = uniqueCourses.getOrNull(i)?.courseIndex == courseItem.courseIndex
-                            child.setTypeface(null, if (active) Typeface.BOLD else Typeface.NORMAL)
-                            child.background = GradientDrawable().apply {
-                                shape = GradientDrawable.RECTANGLE
-                                cornerRadius = 16f
-                                if (active) {
-                                    setColor(ColorUtils.setAlphaComponent(palette.iconTint, 50))
-                                    setStroke(2, palette.iconTint)
-                                } else {
-                                    setColor(palette.panelBackground)
-                                    setStroke(1, ColorUtils.blendARGB(palette.panelBackground, palette.textSecondary, 0.2f))
-                                }
-                            }
-                            child.setTextColor(if (active) palette.textPrimary else palette.textSecondary)
-                        }
-                    }
-                    setTypeface(null, if (isSelected) Typeface.BOLD else Typeface.NORMAL)
-                    background = GradientDrawable().apply {
+            fun refreshTabStyles() {
+                for (i in 0 until conflictTabs.childCount) {
+                    val child = conflictTabs.getChildAt(i) as? TextView ?: continue
+                    val active = uniqueCourses.getOrNull(i)?.courseIndex == currentItem.courseIndex
+                    child.setTypeface(null, if (active) Typeface.BOLD else Typeface.NORMAL)
+                    child.background = GradientDrawable().apply {
                         shape = GradientDrawable.RECTANGLE
                         cornerRadius = 16f
-                        if (isSelected) {
+                        if (active) {
                             setColor(ColorUtils.setAlphaComponent(palette.iconTint, 50))
                             setStroke(2, palette.iconTint)
                         } else {
@@ -290,15 +278,64 @@ object CourseDetailBottomSheet {
                             setStroke(1, ColorUtils.blendARGB(palette.panelBackground, palette.textSecondary, 0.2f))
                         }
                     }
-                    setTextColor(if (isSelected) palette.textPrimary else palette.textSecondary)
+                    child.setTextColor(if (active) palette.textPrimary else palette.textSecondary)
+                }
+            }
+
+            uniqueCourses.forEachIndexed { index, courseItem ->
+                val tab = TextView(context).apply {
+                    text = "${courseItem.course.courseName} (第${courseItem.meeting.startSection}-${courseItem.meeting.endSection}节)"
+                    textSize = 12f
+                    setPadding(dp12, dp6, dp12, dp6)
+                    layoutParams = LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                    ).apply { marginEnd = dp8 }
+                    setOnClickListener {
+                        detailPager.setCurrentItem(index, true)
+                    }
                 }
                 conflictTabs.addView(tab)
             }
+            refreshTabStyles()
+
+            // 左右滑动分页：一门课一页，滑动/点 Tab 双向同步
+            detailPager.adapter = object : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+                override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder =
+                    object : RecyclerView.ViewHolder(
+                        LayoutInflater.from(context).inflate(R.layout.item_course_detail_page, parent, false)
+                    ) {}
+
+                override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
+                    bindCourseDetails(holder.itemView, uniqueCourses[position])
+                }
+
+                override fun getItemCount(): Int = uniqueCourses.size
+            }
+            detailPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
+                override fun onPageSelected(position: Int) {
+                    currentItem = uniqueCourses[position]
+                    pageIndicator.text = "第 ${position + 1} / ${uniqueCourses.size} 门"
+                    pageIndicator.setTextColor(palette.textSecondary)
+                    refreshTabStyles()
+                    updatePinCoverState(currentItem)
+                }
+            })
+
+            // 初始定位到用户点开的那门课程所在页
+            val initialIndex = uniqueCourses.indexOfFirst { it.courseIndex == primary.courseIndex }.coerceAtLeast(0)
+            detailPager.setCurrentItem(initialIndex, false)
+            currentItem = uniqueCourses[initialIndex]
+            pageIndicator.text = "第 ${initialIndex + 1} / ${uniqueCourses.size} 门"
+            pageIndicator.setTextColor(palette.textSecondary)
+            refreshTabStyles()
+            updatePinCoverState(currentItem)
         } else {
             conflictContainer.visibility = View.GONE
+            detailPager.visibility = View.GONE
+            detailSingle.visibility = View.VISIBLE
+            bindCourseDetails(detailSingle, primary)
         }
-
-        bindCourseDetails(primary)
 
         dialog.setContentView(view)
         dialog.show()

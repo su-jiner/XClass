@@ -26,6 +26,9 @@ export interface MeetingTime {
   location: string;
   /** 校区/楼栋时间表 ID；为空表示使用默认 12 节表 */
   campusId?: string | null;
+  /** 自定义上课起止时间（HH:mm）；为空时沿用节次默认时间 */
+  customStartTime?: string | null;
+  customEndTime?: string | null;
 }
 
 export interface CourseSchedule {
@@ -155,6 +158,7 @@ export interface CourseMeetingRef {
   courseIndex: number;
   course: CourseSchedule;
   meeting: MeetingTime;
+  meetingIndex: number;
   isCurrentWeek: boolean;
   nextActiveWeek: number;
 }
@@ -162,9 +166,10 @@ export interface CourseMeetingRef {
 export function meetingsInWeek(courses: CourseSchedule[], week: number): CourseMeetingRef[] {
   const result: CourseMeetingRef[] = [];
   courses.forEach((course, index) => {
-    for (const meeting of course.meetings) {
+    for (let meetingIndex = 0; meetingIndex < course.meetings.length; meetingIndex += 1) {
+      const meeting = course.meetings[meetingIndex];
       if (isMeetingActiveInWeek(meeting, week)) {
-        result.push({ courseIndex: index, course, meeting, isCurrentWeek: true, nextActiveWeek: week });
+        result.push({ courseIndex: index, course, meeting, meetingIndex, isCurrentWeek: true, nextActiveWeek: week });
       }
     }
   });
@@ -175,15 +180,16 @@ export function meetingsInWeek(courses: CourseSchedule[], week: number): CourseM
 export function displayMeetings(courses: CourseSchedule[], week: number, showNonCurrent: boolean): CourseMeetingRef[] {
   const result: CourseMeetingRef[] = [];
   courses.forEach((course, index) => {
-    for (const meeting of course.meetings) {
+    for (let meetingIndex = 0; meetingIndex < course.meetings.length; meetingIndex += 1) {
+      const meeting = course.meetings[meetingIndex];
       if (isMeetingActiveInWeek(meeting, week)) {
-        result.push({ courseIndex: index, course, meeting, isCurrentWeek: true, nextActiveWeek: week });
+        result.push({ courseIndex: index, course, meeting, meetingIndex, isCurrentWeek: true, nextActiveWeek: week });
         continue;
       }
       if (!showNonCurrent) continue;
       const next = nextActiveWeekOf(meeting, week);
       if (next === null) continue;
-      result.push({ courseIndex: index, course, meeting, isCurrentWeek: false, nextActiveWeek: next });
+      result.push({ courseIndex: index, course, meeting, meetingIndex, isCurrentWeek: false, nextActiveWeek: next });
     }
   });
   return result;
@@ -193,9 +199,10 @@ export function displayMeetings(courses: CourseSchedule[], week: number, showNon
 export function allMeetings(courses: CourseSchedule[]): CourseMeetingRef[] {
   const result: CourseMeetingRef[] = [];
   courses.forEach((course, index) => {
-    for (const meeting of course.meetings) {
+    for (let meetingIndex = 0; meetingIndex < course.meetings.length; meetingIndex += 1) {
+      const meeting = course.meetings[meetingIndex];
       result.push({
-        courseIndex: index, course, meeting, isCurrentWeek: true,
+        courseIndex: index, course, meeting, meetingIndex, isCurrentWeek: true,
         nextActiveWeek: firstActiveWeekOf(meeting),
       });
     }
@@ -508,6 +515,8 @@ export interface ImportedMeeting {
   weekRules: WeekRule[];
   location: string;
   campusAlias: string | null;
+  customStartTime?: string | null;
+  customEndTime?: string | null;
 }
 
 export interface ImportedCourse {
@@ -586,6 +595,8 @@ export interface ParsedCellEntry {
   location: string;
   campusAlias: string | null;
   weekRules: WeekRule[];
+  customStartTime?: string | null;
+  customEndTime?: string | null;
   rawText: string;
 }
 
@@ -630,6 +641,16 @@ export function parseCellEntries(cellText: string, defaultTotalWeeks: number = D
     // 噪声守卫：表头/页脚/说明文字不应成为课程
     if (isNoiseCourseName(parts[0])) return;
     const sectionAndWeeks = parts.length > 1 ? parts[1] : '';
+    // 自定义上课时间：`(1-2节)[09:00-10:40]12-14周` —— 提取后剥离，避免污染周次解析
+    let customStart: string | null = null;
+    let customEnd: string | null = null;
+    let sectionAndWeeksClean = sectionAndWeeks;
+    const customMatch = sectionAndWeeks.match(/\[(\d{2}:\d{2})\s*[-—–~～至]\s*(\d{2}:\d{2})\]/);
+    if (customMatch) {
+      customStart = customMatch[1];
+      customEnd = customMatch[2];
+      sectionAndWeeksClean = sectionAndWeeks.replace(customMatch[0], '');
+    }
     const locationRaw = parts.length > 2 ? parts[2] : '';
     const teacherRaw = parts.length > 3 ? parts.slice(3).join('/') : '';
     const campusMatch = locationRaw.match(CAMPUS_RE);
@@ -638,7 +659,9 @@ export function parseCellEntries(cellText: string, defaultTotalWeeks: number = D
       teacher: normalizePlaceholder(teacherRaw.replace(TEACHER_TAIL_RE, '').trim()),
       location: normalizePlaceholder(locationRaw.replace(CAMPUS_RE, '').trim() || locationRaw.trim()),
       campusAlias: campusMatch ? campusMatch[1].trim() : null,
-      weekRules: parseWeekRulesText(sectionAndWeeks, defaultTotalWeeks),
+      weekRules: parseWeekRulesText(sectionAndWeeksClean, defaultTotalWeeks),
+      customStartTime: customStart,
+      customEndTime: customEnd,
       rawText: line,
     });
   });
@@ -897,6 +920,8 @@ export function parseCourseTableText(rawText: string, rows: string[][] | null = 
                 weekRules: entry.weekRules,
                 location: entry.location,
                 campusAlias: entry.campusAlias,
+                customStartTime: entry.customStartTime ?? null,
+                customEndTime: entry.customEndTime ?? null,
               }],
             });
           });
@@ -923,6 +948,8 @@ export function parseCourseTableText(rawText: string, rows: string[][] | null = 
             weekRules: entry.weekRules,
             location: entry.location,
             campusAlias: entry.campusAlias,
+            customStartTime: entry.customStartTime ?? null,
+            customEndTime: entry.customEndTime ?? null,
           }],
         });
       });
@@ -1105,6 +1132,12 @@ export function encodeShareText(
       if (meeting.weekday < 1 || meeting.weekday > 7) return;
       const day = SHARE_WEEKDAY_LABELS[meeting.weekday - 1];
       const sections = `${meeting.startSection}-${meeting.endSection}节`;
+      // 自定义上课时间：`(1-2节)[09:00-10:40]`，导入端自动还原
+      let custom = '';
+      if (meeting.customStartTime && meeting.customStartTime.trim().length > 0) {
+        const end = (meeting.customEndTime && meeting.customEndTime.trim().length > 0) ? meeting.customEndTime : meeting.customStartTime;
+        custom = `[${meeting.customStartTime}-${end}]`;
+      }
       const weeks = (course.rawWeekText && course.rawWeekText.trim().length > 0)
         ? course.rawWeekText
         : weekRulesToText(meeting.weekRules);
@@ -1114,7 +1147,7 @@ export function encodeShareText(
       location += meeting.location.trim();
       if (location.length === 0) location = '-';
       const teacher = course.teacher.trim();
-      rows.push(`${day} ${course.courseName}/(${sections})${weeks}/${location}/${teacher.length === 0 ? '-' : teacher}`);
+      rows.push(`${day} ${course.courseName}/(${sections})${custom}${weeks}/${location}/${teacher.length === 0 ? '-' : teacher}`);
     });
   });
 

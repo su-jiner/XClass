@@ -166,6 +166,76 @@
                     android:textColorHint="?android:attr/textColorHint" />
             </LinearLayout>
 
+            <!-- 节次对应时间预览 + 自定义上课时间 -->
+            <TextView
+                android:id="@+id/timePreview"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:textColor="?android:attr/textColorSecondary"
+                android:textSize="12sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <CheckBox
+                    android:id="@+id/customTimeToggle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/manual_custom_time"
+                    android:textColor="?android:attr/textColorPrimary"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/customTimeRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:orientation="horizontal"
+                android:visibility="gone">
+
+                <EditText
+                    android:id="@+id/inputCustomStart"
+                    android:layout_width="0dp"
+                    android:layout_height="40dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_add_course_input"
+                    android:digits="0123456789:"
+                    android:hint="@string/manual_custom_start_hint"
+                    android:inputType="time"
+                    android:maxLength="5"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp"
+                    android:textColor="?android:attr/textColorPrimary"
+                    android:textColorHint="?android:attr/textColorHint" />
+
+                <EditText
+                    android:id="@+id/inputCustomEnd"
+                    android:layout_width="0dp"
+                    android:layout_height="40dp"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_add_course_input"
+                    android:digits="0123456789:"
+                    android:hint="@string/manual_custom_end_hint"
+                    android:inputType="time"
+                    android:maxLength="5"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp"
+                    android:textColor="?android:attr/textColorPrimary"
+                    android:textColorHint="?android:attr/textColorHint" />
+            </LinearLayout>
+
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

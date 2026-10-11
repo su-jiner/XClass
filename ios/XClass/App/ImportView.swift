@@ -546,7 +546,9 @@ struct ImportView: View {
                             endSection: meeting.endSection,
                             weekRules: meeting.weekRules,
                             location: meeting.location,
-                            campusId: meeting.campusAlias.flatMap { campusMap[$0] }
+                            campusId: meeting.campusAlias.flatMap { campusMap[$0] },
+                            customStartTime: meeting.customStartTime,
+                            customEndTime: meeting.customEndTime
                         )
                     },
                     notes: notes

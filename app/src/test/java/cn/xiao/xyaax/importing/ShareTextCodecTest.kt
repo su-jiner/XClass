@@ -1,6 +1,10 @@
 package cn.xiao.xyaax.importing
 
+import cn.xiao.xyaax.domain.SectionTimes
 import cn.xiao.xyaax.model.CourseSchedule
+import cn.xiao.xyaax.model.effectiveEndTime
+import cn.xiao.xyaax.model.effectiveStartTime
+import cn.xiao.xyaax.model.effectiveTimeText
 import cn.xiao.xyaax.model.MeetingTime
 import cn.xiao.xyaax.model.WeekParity
 import cn.xiao.xyaax.model.WeekRule
@@ -165,5 +169,60 @@ class ShareTextCodecTest {
         val study = result.courses.first { it.courseName == "自习" }
         assertEquals("", study.teacher)
         assertEquals("", study.meetings.first().location)
+    }
+
+    // ---------------------------------------------------------------- 自定义上课时间（P2）
+
+    @Test
+    fun `share text carries custom time and round-trips`() {
+        val custom = CourseSchedule(
+            courseName = "英语（一）",
+            teacher = "章斌",
+            semester = "2026-2027年第1学期",
+            credit = null,
+            rawWeekText = "6-7周,9-17周,19周",
+            meetings = listOf(
+                MeetingTime(
+                    weekday = Weekday.FRIDAY,
+                    startSection = 5,
+                    endSection = 6,
+                    weekRules = listOf(WeekRule(6, 7, WeekParity.ALL), WeekRule(9, 17, WeekParity.ALL), WeekRule(19, 19, WeekParity.ALL)),
+                    location = "多媒体202",
+                    campusId = "campus-wu",
+                    customStartTime = "13:30",
+                    customEndTime = "15:10"
+                )
+            )
+        )
+        val text = ShareTextCodec.encode(
+            courses = listOf(custom),
+            totalWeeks = 21,
+            campusIdToAlias = mapOf("campus-wu" to "乌")
+        )
+        assertTrue(text.contains("星期五 英语（一）/(5-6节)[13:30-15:10]6-7周,9-17周,19周/（乌）多媒体202/章斌"))
+
+        val result = CourseTableImporter.parse(PlainTextLayout.toBlocks(text), text)
+        val back = result.courses.first { it.courseName == "英语（一）" }
+        assertEquals("13:30", back.meetings.first().customStartTime)
+        assertEquals("15:10", back.meetings.first().customEndTime)
+        // 周次解析不受自定义时间段污染：仍是三段
+        assertEquals(3, back.meetings.first().weekRules.size)
+        assertEquals(19, back.meetings.first().weekRules.last().endWeek)
+    }
+
+    @Test
+    fun `effective time prefers custom over default section ranges`() {
+        val meeting = MeetingTime(
+            weekday = Weekday.FRIDAY,
+            startSection = 5,
+            endSection = 6,
+            weekRules = listOf(WeekRule(1, 16, WeekParity.ALL)),
+            location = "多媒体202",
+            customStartTime = "13:30",
+            customEndTime = "15:10"
+        )
+        assertEquals("13:30", meeting.effectiveStartTime(SectionTimes.DEFAULT_RANGES))
+        assertEquals("15:10", meeting.effectiveEndTime(SectionTimes.DEFAULT_RANGES))
+        assertEquals("13:30 - 15:10", meeting.effectiveTimeText(SectionTimes.DEFAULT_RANGES))
     }
 }

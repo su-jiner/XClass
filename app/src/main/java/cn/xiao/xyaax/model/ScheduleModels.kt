@@ -35,7 +35,10 @@ data class MeetingTime(
     val weekRules: List<WeekRule>,
     val location: String,
     /** 校区/楼栋时间表 ID；为空表示使用默认节次时间表 */
-    val campusId: String? = null
+    val campusId: String? = null,
+    /** 自定义上课起止时间（HH:mm）；为空时沿用节次默认时间 */
+    val customStartTime: String? = null,
+    val customEndTime: String? = null
 )
 
 @Serializable
@@ -47,3 +50,15 @@ data class CourseSchedule(
     val rawWeekText: String,
     val meetings: List<MeetingTime>
 )
+
+/** 上课时间的实际起止：优先自定义时间，否则按节次默认时间表映射。 */
+fun MeetingTime.effectiveStartTime(periodRanges: List<String>): String =
+    customStartTime ?: periodRanges.getOrNull(startSection - 1)?.substringBefore('-') ?: "--:--"
+
+/** 上课时间的实际结束：优先自定义时间，否则按节次默认时间表映射。 */
+fun MeetingTime.effectiveEndTime(periodRanges: List<String>): String =
+    customEndTime ?: periodRanges.getOrNull(endSection - 1)?.substringAfter('-') ?: "--:--"
+
+/** 上课时间文本（"HH:mm - HH:mm"），用于详情横幅与导出。 */
+fun MeetingTime.effectiveTimeText(periodRanges: List<String>): String =
+    "${effectiveStartTime(periodRanges)} - ${effectiveEndTime(periodRanges)}"

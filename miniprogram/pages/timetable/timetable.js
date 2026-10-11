@@ -30,6 +30,9 @@ Page({
     monthLabel: '',
     dayHeaders: [],
     sections: [],
+    showDetail: false,
+    detailCourses: [],
+    detailIndex: 0,
     columns: [],
     touchStartX: 0,
     rowHeight: 96,
@@ -145,7 +148,7 @@ Page({
       });
     }
     this.courses.forEach((course, courseIndex) => {
-      (course.meetings || []).forEach((meeting) => {
+      (course.meetings || []).forEach((meeting, meetingIndex) => {
         const weekday = core.WEEKDAYS.indexOf(meeting.weekday);
         if (weekday < 0) return;
         // 只显示本周课程：非本周课程一律不渲染
@@ -156,7 +159,11 @@ Page({
           top: (start - 1) * rowHeight + 2,
           height: (end - start + 1) * rowHeight - 4 + (end >= 12 ? lastRowExtra : 0),
           startSection: start,
+          endSection: end,
           courseIndex: courseIndex,
+          meetingIndex: meetingIndex,
+          customStartTime: meeting.customStartTime || '',
+          customEndTime: meeting.customEndTime || '',
           name: course.courseName,
           location: [this.campusName(meeting.campusId), meeting.location || ''].filter(Boolean).join(' '),
           badge: '',
@@ -229,38 +236,61 @@ Page({
     const column = this.data.columns[day];
     const card = column && column.courses[courseIndex];
     if (!card) return;
-    const course = this.courses[card.courseIndex];
-    const range = this.data.sections[card.startSection - 1];
-    const content = [
-      '教师：' + (course.teacher || '未知'),
-      '地点：' + (card.location || '未标注'),
-      '节次：第' + card.startSection + '节 ' + (range ? range.startTime + '-' + range.endTime : ''),
-      '周次：' + (course.rawWeekText || ''),
-    ].join('\n');
-    const that = this;
-    wx.showModal({
-      title: course.courseName,
-      content: content,
-      showCancel: true,
-      cancelText: '编辑课程',
-      confirmText: '删除课程',
-      confirmColor: '#e64340',
-      success: (result) => {
-        if (result.cancel) {
-          that.editCourse(card.courseIndex);
-        } else if (result.confirm) {
-          that.deleteCourseConfirm(card.courseIndex);
-        }
-      },
+    // 收集同格子重叠课程组：节次区间相交且课程不同的卡，按纵向位置排序
+    const members = column.courses.filter((c) => {
+      const sectionOverlap = c.startSection <= (card.endSection || card.startSection)
+        && (card.startSection) <= (c.endSection || c.startSection);
+      return sectionOverlap && c.courseIndex !== card.courseIndex;
+    });
+    const allMembers = [card].concat(members).sort((a, b) => a.top - b.top);
+    const tappedIndex = allMembers.findIndex((m) => m.courseIndex === card.courseIndex && m.startSection === card.startSection);
+    const detailCourses = allMembers.map((m) => {
+      const c = this.courses[m.courseIndex];
+      const range = this.data.sections[m.startSection - 1];
+      const time = m.customStartTime ? (m.customStartTime + '-' + (m.customEndTime || ''))
+        : (range ? (range.startTime + '-' + range.endTime) : '');
+      return {
+        courseIndex: m.courseIndex,
+        meetingIndex: m.meetingIndex || 0,
+        name: c ? (c.courseName || '') : '',
+        teacher: c ? (c.teacher || '未知') : '未知',
+        location: m.location || '未标注',
+        sectionText: '第' + m.startSection + '-' + (m.endSection || m.startSection) + '节',
+        timeText: time,
+        weekText: c ? (c.rawWeekText || '未标注') : '未标注',
+      };
+    });
+    this.setData({
+      showDetail: true,
+      detailCourses: detailCourses,
+      detailIndex: Math.max(0, tappedIndex),
     });
   },
-  /** 打开编辑表单：预填课程信息，保存时更新课程定义（所有周同步）。 */
-  editCourse(courseIndex) {
+  onDetailChange(event) {
+    this.setData({ detailIndex: event.detail.current });
+  },
+  closeDetail() {
+    this.setData({ showDetail: false });
+  },
+  editDetail() {
+    const item = this.data.detailCourses[this.data.detailIndex];
+    this.setData({ showDetail: false });
+    if (item) this.editCourse(item.courseIndex, item.meetingIndex);
+  },
+  deleteDetail() {
+    const item = this.data.detailCourses[this.data.detailIndex];
+    this.setData({ showDetail: false });
+    if (item) this.deleteCourseConfirm(item.courseIndex);
+  },
+  /** 打开编辑表单：预填课程信息，保存时更新课程定义（所有周同步）。meetingIndex 指定被编辑的上课时段。 */
+  editCourse(courseIndex, meetingIndex) {
     const course = this.courses[courseIndex];
     if (!course) return;
-    const meeting = (course.meetings || [])[0] || {};
+    const meetings = course.meetings || [];
+    const meeting = meetings[meetingIndex || 0] || meetings[0] || {};
     const weekdayIndex = Math.max(0, core.WEEKDAYS.indexOf(meeting.weekday));
     this.editingCourseIndex = courseIndex;
+    this.editingMeetingIndex = Math.min(meetingIndex || 0, Math.max(0, meetings.length - 1));
     this.setData({
       showManual: true,
       manualTitle: '编辑课程',
@@ -272,6 +302,8 @@ Page({
         weekText: course.rawWeekText || '1-16周',
         location: meeting.location || '',
         teacher: course.teacher || '',
+        customStart: meeting.customStartTime || '',
+        customEnd: meeting.customEndTime || '',
       },
     });
   },
@@ -373,6 +405,8 @@ Page({
         weekText: '1-16周',
         location: '',
         teacher: '',
+        customStart: '',
+        customEnd: '',
       },
     });
   },
@@ -406,23 +440,66 @@ Page({
         return;
       }
       const meetings = (old.meetings || []).slice();
+      const meetingIndex = Math.min(this.editingMeetingIndex || 0, Math.max(0, meetings.length - 1));
+      // 自定义上课时间：两个都填才生效，校验 HH:mm 且开始早于结束
+      const customStart = (form.customStart || '').trim();
+      const customEnd = (form.customEnd || '').trim();
+      let customStartTime = null;
+      let customEndTime = null;
+      if (customStart || customEnd) {
+        if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(customStart) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(customEnd)) {
+          wx.showToast({ title: '时间格式应为 HH:mm', icon: 'none' });
+          return;
+        }
+        if (customStart >= customEnd) {
+          wx.showToast({ title: '结束时间须晚于开始时间', icon: 'none' });
+          return;
+        }
+        customStartTime = customStart;
+        customEndTime = customEnd;
+      }
+      const editedMeeting = {
+        weekday: core.WEEKDAYS[form.weekdayIndex],
+        startSection: sections.startSection,
+        endSection: sections.endSection,
+        location: (form.location || '').trim(),
+        weekRules: core.parseWeekRules(weekText),
+        customStartTime: customStartTime,
+        customEndTime: customEndTime,
+      };
+      const nameChanged = name !== (old.courseName || '');
+      const teacherChanged = (form.teacher || '').trim() !== (old.teacher || '');
+      // 拆分保存：同名同师课程含多个上课时段且改了名/师时，只改被编辑时段，
+      // 其余时段（其他天）保留原名原师，避免跨天绑定连带修改
+      if (meetings.length > 1 && (nameChanged || teacherChanged)) {
+        const keptMeetings = meetings.slice();
+        keptMeetings.splice(meetingIndex, 1);
+        const keptCourse = Object.assign({}, old, {
+          courseName: old.courseName,
+          teacher: old.teacher,
+          rawWeekText: old.rawWeekText || '',
+          meetings: keptMeetings,
+        });
+        const extractedCourse = Object.assign({}, old, {
+          courseName: name,
+          teacher: (form.teacher || '').trim(),
+          rawWeekText: weekText,
+          meetings: [Object.assign({}, meetings[meetingIndex] || {}, editedMeeting)],
+        });
+        const ok = store.updateCourse(this.editingCourseIndex, keptCourse, this.viewProfileId)
+          && store.appendCourse(extractedCourse, this.viewProfileId);
+        this.setData({ showManual: false });
+        this.reload();
+        wx.showToast({
+          title: ok ? '已保存，仅修改该上课时间' : '保存失败，请重试',
+          icon: 'none',
+        });
+        return;
+      }
       if (meetings.length > 0) {
-        meetings[0] = Object.assign({}, meetings[0], {
-          weekday: core.WEEKDAYS[form.weekdayIndex],
-          startSection: sections.startSection,
-          endSection: sections.endSection,
-          location: (form.location || '').trim(),
-          weekRules: core.parseWeekRules(weekText),
-        });
+        meetings[meetingIndex] = Object.assign({}, meetings[meetingIndex] || {}, editedMeeting);
       } else {
-        meetings.push({
-          weekday: core.WEEKDAYS[form.weekdayIndex],
-          startSection: sections.startSection,
-          endSection: sections.endSection,
-          weekRules: core.parseWeekRules(weekText),
-          location: (form.location || '').trim(),
-          campusId: null,
-        });
+        meetings.push(Object.assign({}, editedMeeting, { campusId: null }));
       }
       const updated = Object.assign({}, old, {
         courseName: name,

@@ -1,5 +1,9 @@
 package cn.xiao.xyaax.data
 
+import cn.xiao.xyaax.model.CourseSchedule
+import cn.xiao.xyaax.model.MeetingTime
+import cn.xiao.xyaax.model.WeekParity
+import cn.xiao.xyaax.model.WeekRule
 import cn.xiao.xyaax.model.Weekday
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -290,5 +294,134 @@ class ImportedScheduleStorageTest {
         assertFalse(ImportedScheduleStorage.renameProfile(filesDir, profile.id, "   "))
         assertTrue(ImportedScheduleStorage.renameProfile(filesDir, profile.id, "主课表"))
         assertEquals("主课表", ImportedScheduleStorage.listProfiles(filesDir).single().name)
+    }
+
+    // ---------------------------------------------------------------- 编辑拆分保存（P3）
+
+    private fun twoMeetingCourse(): CourseSchedule = CourseSchedule(
+        courseName = "思想道德与法治",
+        teacher = "李老师",
+        semester = "2026-2027年第1学期",
+        credit = null,
+        rawWeekText = "1-19周",
+        meetings = listOf(
+            MeetingTime(
+                weekday = Weekday.WEDNESDAY,
+                startSection = 1,
+                endSection = 2,
+                weekRules = listOf(WeekRule(1, 19, WeekParity.ALL)),
+                location = "E406"
+            ),
+            MeetingTime(
+                weekday = Weekday.THURSDAY,
+                startSection = 5,
+                endSection = 6,
+                weekRules = listOf(WeekRule(1, 19, WeekParity.ALL)),
+                location = "报告厅506"
+            )
+        )
+    )
+
+    @Test
+    fun splitUpdate_splitsEditedMeetingIntoNewCourseAndKeepsOthers() {
+        ImportedScheduleStorage.listProfiles(filesDir)
+        // 同名同师课程含两个上课时段：周三1-2节 + 周四5-6节（跨天绑定场景）
+        ImportedScheduleStorage.importCourses(
+            filesDir,
+            listOf(twoMeetingCourse()),
+            ImportedScheduleStorage.ImportMode.OVERWRITE_ACTIVE
+        )
+        val expected = ImportedScheduleStorage.loadActiveCourses(filesDir).single()
+        assertEquals(2, expected.meetings.size)
+        val profile = ImportedScheduleStorage.listProfiles(filesDir).single()
+
+        // 只改周三时段课程名：原课程保留周四时段，改名时段拆为新课程追加
+        val kept = expected.copy(
+            courseName = "思想道德与法治",
+            teacher = "李老师",
+            meetings = listOf(expected.meetings[1])
+        )
+        val extracted = expected.copy(
+            courseName = "思想道德与法治（周三）",
+            teacher = "李老师",
+            meetings = listOf(expected.meetings[0])
+        )
+        val ok = ImportedScheduleStorage.splitUpdateCourseInProfile(
+            filesDir, profile.id, 0, expected, kept, extracted
+        )
+        assertTrue(ok)
+
+        val after = ImportedScheduleStorage.loadActiveCourses(filesDir)
+        assertEquals(2, after.size)
+        // 原课程只剩周四时段，名称不变
+        val keptBack = after.first { it.courseName == "思想道德与法治" }
+        assertEquals(1, keptBack.meetings.size)
+        assertEquals(Weekday.THURSDAY, keptBack.meetings.single().weekday)
+        // 新课程独立，只含周三时段
+        val extractedBack = after.first { it.courseName == "思想道德与法治（周三）" }
+        assertEquals(1, extractedBack.meetings.size)
+        assertEquals(Weekday.WEDNESDAY, extractedBack.meetings.single().weekday)
+    }
+
+    @Test
+    fun splitUpdate_removesCourseWhenKeptMeetingsEmpty() {
+        ImportedScheduleStorage.listProfiles(filesDir)
+        ImportedScheduleStorage.importCourses(
+            filesDir,
+            listOf(twoMeetingCourse()),
+            ImportedScheduleStorage.ImportMode.OVERWRITE_ACTIVE
+        )
+        val expected = ImportedScheduleStorage.loadActiveCourses(filesDir).single()
+        val profile = ImportedScheduleStorage.listProfiles(filesDir).single()
+
+        val extracted = expected.copy(
+            courseName = "思想道德与法治（改名）",
+            teacher = "李老师",
+            meetings = expected.meetings
+        )
+        val ok = ImportedScheduleStorage.splitUpdateCourseInProfile(
+            filesDir, profile.id, 0, expected, expected.copy(meetings = emptyList()), extracted
+        )
+        assertTrue(ok)
+        val after = ImportedScheduleStorage.loadActiveCourses(filesDir)
+        assertEquals(1, after.size)
+        assertEquals("思想道德与法治（改名）", after.single().courseName)
+    }
+
+    @Test
+    fun customTime_persistsThroughStorageRoundTrip() {
+        ImportedScheduleStorage.listProfiles(filesDir)
+        val custom = twoMeetingCourse().copy(
+            courseName = "英语（一）",
+            teacher = "章斌",
+            rawWeekText = "6-7周,9-17周,19周",
+            meetings = listOf(
+                MeetingTime(
+                    weekday = Weekday.FRIDAY,
+                    startSection = 5,
+                    endSection = 6,
+                    weekRules = listOf(WeekRule(6, 7, WeekParity.ALL), WeekRule(9, 17, WeekParity.ALL), WeekRule(19, 19, WeekParity.ALL)),
+                    location = "多媒体202",
+                    campusId = "campus-wu",
+                    customStartTime = "13:30",
+                    customEndTime = "15:10"
+                )
+            )
+        )
+        ImportedScheduleStorage.importCourses(
+            filesDir,
+            listOf(custom),
+            ImportedScheduleStorage.ImportMode.OVERWRITE_ACTIVE
+        )
+        val back = ImportedScheduleStorage.loadActiveCourses(filesDir).single()
+        assertEquals("13:30", back.meetings.single().customStartTime)
+        assertEquals("15:10", back.meetings.single().customEndTime)
+
+        // 备份导出/导入后自定义时间仍保留
+        val backup = ImportedScheduleStorage.exportBackup(filesDir)
+        ImportedScheduleStorage.importBackup(filesDir, backup)
+        val restored = ImportedScheduleStorage.loadActiveCourses(filesDir).single()
+        assertEquals("13:30", restored.meetings.single().customStartTime)
+        assertEquals("15:10", restored.meetings.single().customEndTime)
     }
 }

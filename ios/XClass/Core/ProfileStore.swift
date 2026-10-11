@@ -275,6 +275,36 @@ final class ProfileStore {
         save(meta)
     }
 
+    /// 编辑拆分保存：课程含多个上课时段且课程名/教师被修改时，被编辑时段独立成新课程（追加到末尾），
+    /// 原课程保留其余时段（原名原师）；keptCourse 时段为空时原课程被移除。避免跨天绑定连带修改。
+    func splitUpdateCourse(index: Int, keptCourse: CourseSchedule, extractedCourse: CourseSchedule, profileId: String?) throws {
+        lock.lock(); defer { lock.unlock() }
+        var meta = ensureInitialized()
+        let profile: ProfileMeta
+        if let profileId = profileId, !profileId.isEmpty,
+           let found = meta.profiles.first(where: { $0.id == profileId }) {
+            profile = found
+        } else {
+            profile = meta.profiles.first { $0.id == meta.activeId } ?? meta.profiles[0]
+        }
+        var courses = readCourses(profile.coursesFile)
+        guard courses.indices.contains(index) else {
+            throw NSError(domain: "ProfileStore", code: 3,
+                          userInfo: [NSLocalizedDescriptionKey: "课程不存在，可能已被删除"])
+        }
+        if keptCourse.meetings.isEmpty {
+            courses.remove(at: index)
+        } else {
+            courses[index] = keptCourse
+        }
+        courses.append(extractedCourse)
+        writeCourses(courses, to: profile.coursesFile)
+        if let idx = meta.profiles.firstIndex(where: { $0.id == profile.id }) {
+            meta.profiles[idx].updatedAt = Date()
+        }
+        save(meta)
+    }
+
     /// 删除指定课表中的课程；返回是否成功。
     func deleteCourseInProfile(index: Int, profileId: String?) -> Bool {
         lock.lock(); defer { lock.unlock() }
@@ -681,6 +711,9 @@ private struct PersistedMeeting: Codable {
     var location: String
     /// 校区/楼栋时间表 ID（v2 起）
     var campusId: String? = nil
+    /// 自定义上课起止时间（HH:mm），旧数据无此字段时回退为 nil
+    var customStartTime: String? = nil
+    var customEndTime: String? = nil
 
     init(from meeting: MeetingTime) {
         weekday = meeting.weekday.rawValue.description
@@ -689,6 +722,8 @@ private struct PersistedMeeting: Codable {
         weekRules = meeting.weekRules.map { PersistedWeekRule(startWeek: $0.startWeek, endWeek: $0.endWeek, parity: $0.parity.rawValue) }
         location = meeting.location
         campusId = meeting.campusId
+        customStartTime = meeting.customStartTime
+        customEndTime = meeting.customEndTime
     }
 
     func toMeetingTime() -> MeetingTime {
@@ -699,7 +734,9 @@ private struct PersistedMeeting: Codable {
                                  parity: WeekParity(rawValue: $0.parity) ?? .all)
                     },
                     location: location,
-                    campusId: campusId)
+                    campusId: campusId,
+                    customStartTime: customStartTime,
+                    customEndTime: customEndTime)
     }
 }
 

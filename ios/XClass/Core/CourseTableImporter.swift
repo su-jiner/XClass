@@ -9,13 +9,15 @@ enum CourseTableImporter {
         var location: String
         var campusAlias: String?
         var weekRules: [WeekRule]
+        var customStartTime: String?
+        var customEndTime: String?
         var rawText: String
     }
 
     struct ParsedCourse {
         var courseName: String
         var teacher: String
-        var meetings: [(weekday: Weekday, startSection: Int, endSection: Int, weekRules: [WeekRule], location: String, campusAlias: String?)]
+        var meetings: [(weekday: Weekday, startSection: Int, endSection: Int, weekRules: [WeekRule], location: String, campusAlias: String?, customStartTime: String?, customEndTime: String?)]
     }
 
     struct Result {
@@ -107,6 +109,17 @@ enum CourseTableImporter {
             // 噪声守卫：表头/页脚/说明文字不应成为课程
             if isNoiseCourseName(courseName) { return nil }
             let sectionAndWeeks = parts.count > 1 ? parts[1] : ""
+            // 自定义上课时间：`(1-2节)[09:00-10:40]12-14周` —— 提取后剥离，避免污染周次解析
+            var customStart: String?
+            var customEnd: String?
+            var sectionAndWeeksClean = sectionAndWeeks
+            if let customMatch = firstMatch(#"\[(\d{2}:\d{2})\s*[-—–~～至]\s*(\d{2}:\d{2})\]"#, in: sectionAndWeeks) {
+                customStart = customMatch[0]
+                customEnd = customMatch[1]
+                sectionAndWeeksClean = sectionAndWeeks.replacingOccurrences(
+                    of: #"\[(\d{2}:\d{2})\s*[-—–~～至]\s*(\d{2}:\d{2})\]"#, with: "", options: .regularExpression
+                )
+            }
             let locationRaw = parts.count > 2 ? parts[2] : ""
             let teacherRaw = parts.count > 3 ? parts.dropFirst(3).joined(separator: "/") : ""
             var campusAlias: String?
@@ -127,7 +140,9 @@ enum CourseTableImporter {
                 teacher: teacher,
                 location: normalizePlaceholder(location.isEmpty ? locationRaw : location),
                 campusAlias: campusAlias,
-                weekRules: parseWeekRules(sectionAndWeeks, defaultTotalWeeks: defaultTotalWeeks),
+                weekRules: parseWeekRules(sectionAndWeeksClean, defaultTotalWeeks: defaultTotalWeeks),
+                customStartTime: customStart,
+                customEndTime: customEnd,
                 rawText: line
             )
         }
@@ -371,7 +386,7 @@ enum CourseTableImporter {
                             collected.append(ParsedCourse(
                                 courseName: entry.courseName,
                                 teacher: entry.teacher,
-                                meetings: [(Weekday.allCases[weekday - 1], sections.0, sections.1, entry.weekRules, entry.location, entry.campusAlias)]
+                                meetings: [(Weekday.allCases[weekday - 1], sections.0, sections.1, entry.weekRules, entry.location, entry.campusAlias, entry.customStartTime, entry.customEndTime)]
                             ))
                         }
                     }
@@ -387,7 +402,7 @@ enum CourseTableImporter {
                     collected.append(ParsedCourse(
                         courseName: entry.courseName,
                         teacher: entry.teacher,
-                        meetings: [(Weekday.allCases[weekday - 1], sections.0, sections.1, entry.weekRules, entry.location, entry.campusAlias)]
+                        meetings: [(Weekday.allCases[weekday - 1], sections.0, sections.1, entry.weekRules, entry.location, entry.campusAlias, entry.customStartTime, entry.customEndTime)]
                     ))
                 }
             }

@@ -17,20 +17,28 @@ export struct EditCourseDialog {
     rawWeekText: '',
     meetings: [],
   };
+  /** 被编辑的上课时段在 course.meetings 中的索引（默认 0）。 */
+  meetingIndex: number = 0;
   onSaved: (updated: ImportedCourse) => void = (updated: ImportedCourse): void => {};
   @State courseName: string = '';
   @State teacher: string = '';
   @State location: string = '';
   @State weekText: string = '';
+  @State customStart: string = '';
+  @State customEnd: string = '';
   @State errorMessage: string = '';
   @StorageProp('systemDark') systemDark: boolean = false;
 
   aboutToAppear(): void {
+    const targetIndex = Math.min(this.meetingIndex, Math.max(0, this.course.meetings.length - 1));
+    const target = this.course.meetings[targetIndex];
     this.courseName = this.course.courseName;
     this.teacher = this.course.teacher;
-    this.location = this.course.meetings.length > 0 ? this.course.meetings[0].location : '';
+    this.location = target ? target.location : '';
+    this.customStart = target ? (target.customStartTime ?? '') : '';
+    this.customEnd = target ? (target.customEndTime ?? '') : '';
     this.weekText = this.course.rawWeekText.length > 0 ? this.course.rawWeekText
-      : (this.course.meetings.length > 0 ? this.weekRulesText(this.course.meetings[0].weekRules) : '');
+      : (target ? this.weekRulesText(target.weekRules) : '');
   }
 
   palette(): ThemePalette {
@@ -47,8 +55,26 @@ export struct EditCourseDialog {
   save(): void {
     const name = this.courseName.trim();
     if (name.length === 0) { this.errorMessage = '课程名不能为空'; return; }
+    // 自定义上课时间：两个都填才生效，校验 HH:mm 且开始早于结束
+    const cs = this.customStart.trim();
+    const ce = this.customEnd.trim();
+    let customStartTime: string | null = null;
+    let customEndTime: string | null = null;
+    if (cs.length > 0 || ce.length > 0) {
+      if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(cs) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(ce)) {
+        this.errorMessage = '时间格式应为 HH:mm';
+        return;
+      }
+      if (cs >= ce) {
+        this.errorMessage = '结束时间须晚于开始时间';
+        return;
+      }
+      customStartTime = cs;
+      customEndTime = ce;
+    }
     const weekRules = parseWeekRulesText(this.weekText.trim().length > 0 ? this.weekText.trim() : '1-16周');
     const first = this.course.meetings.length > 0 ? this.course.meetings[0] : null;
+    const targetIndex = Math.min(this.meetingIndex, Math.max(0, this.course.meetings.length - 1));
     const updated: ImportedCourse = {
       courseName: name,
       teacher: this.teacher.trim(),
@@ -56,7 +82,7 @@ export struct EditCourseDialog {
       credit: this.course.credit,
       rawWeekText: this.weekText.trim(),
       meetings: this.course.meetings.map((meeting, index) => {
-        if (index !== 0) return meeting;
+        if (index !== targetIndex) return meeting;
         return {
           weekday: meeting.weekday,
           startSection: meeting.startSection,
@@ -64,6 +90,8 @@ export struct EditCourseDialog {
           weekRules: weekRules,
           location: this.location.trim(),
           campusAlias: meeting.campusAlias,
+          customStartTime: customStartTime,
+          customEndTime: customEndTime,
         };
       }),
     };
@@ -75,6 +103,8 @@ export struct EditCourseDialog {
         weekRules: weekRules,
         location: this.location.trim(),
         campusAlias: null,
+        customStartTime: customStartTime,
+        customEndTime: customEndTime,
       }];
     }
     this.controller?.close();
@@ -101,6 +131,14 @@ export struct EditCourseDialog {
           this.fieldLabel('上课地点（可留空）')
           TextInput({ text: this.location, placeholder: '上课地点（可留空）' })
             .onChange((value: string) => { this.location = value; })
+            .height(40)
+          this.fieldLabel('自定义开始（可留空，如 09:00）')
+          TextInput({ text: this.customStart, placeholder: '自定义开始 如 09:00' })
+            .onChange((value: string) => { this.customStart = value; })
+            .height(40)
+          this.fieldLabel('自定义结束（可留空，如 10:40；留空则按节次默认时间）')
+          TextInput({ text: this.customEnd, placeholder: '自定义结束 如 10:40' })
+            .onChange((value: string) => { this.customEnd = value; })
             .height(40)
           this.fieldLabel('周次（如 1-16周 / 3-9周(单)）')
           TextInput({ text: this.weekText, placeholder: '1-16周 / 3-9周(单)' })

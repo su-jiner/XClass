@@ -14,7 +14,9 @@ data class ParsedMeeting(
     val endSection: Int,
     val weekRules: List<WeekRule>,
     val location: String,
-    val campusAlias: String?
+    val campusAlias: String?,
+    val customStartTime: String? = null,
+    val customEndTime: String? = null
 )
 
 /** 导入中间结果中的一门课（可含多次上课时间）。 */
@@ -49,7 +51,9 @@ data class ParsedCourse(
                 endSection = meeting.endSection,
                 weekRules = meeting.weekRules,
                 location = meeting.location,
-                campusId = campusIdResolver(meeting.campusAlias)
+                campusId = campusIdResolver(meeting.campusAlias),
+                customStartTime = meeting.customStartTime,
+                customEndTime = meeting.customEndTime
             )
         }
     )
@@ -124,7 +128,9 @@ object CourseTableImporter {
                                     endSection = sections.last,
                                     weekRules = entry.weekRules,
                                     location = entry.location,
-                                    campusAlias = entry.campusAlias
+                                    campusAlias = entry.campusAlias,
+                                    customStartTime = entry.customStartTime,
+                                    customEndTime = entry.customEndTime
                                 )
                             )
                         )
@@ -226,7 +232,9 @@ object CourseTableImporter {
                             endSection = sections.last,
                             weekRules = entry.weekRules,
                             location = entry.location,
-                            campusAlias = entry.campusAlias
+                            campusAlias = entry.campusAlias,
+                            customStartTime = entry.customStartTime,
+                            customEndTime = entry.customEndTime
                         )
                     )
                 )

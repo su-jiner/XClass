@@ -80,6 +80,11 @@ object ShareTextCodec {
             course.meetings.forEach { meeting ->
                 val day = weekdayLabel[meeting.weekday] ?: return@forEach
                 val sections = "${meeting.startSection}-${meeting.endSection}节"
+                // 自定义上课时间：`(1-2节)[09:00-10:40]`，导入端自动还原
+                val custom = meeting.customStartTime?.takeIf { it.isNotBlank() }?.let { start ->
+                    val end = meeting.customEndTime?.takeIf { it.isNotBlank() } ?: start
+                    "[$start-$end]"
+                }.orEmpty()
                 val weeks = weekText(course)
                 val alias = meeting.campusId?.let { campusIdToAlias[it] }
                 val location = buildString {
@@ -87,7 +92,7 @@ object ShareTextCodec {
                     append(meeting.location.trim())
                 }.ifBlank { "-" }
                 val teacher = course.teacher.trim().ifBlank { "-" }
-                rows += "$day ${course.courseName}/($sections)$weeks/$location/$teacher"
+                rows += "$day ${course.courseName}/($sections)$custom$weeks/$location/$teacher"
             }
         }
         rows.distinct().sorted().forEach { append(it).append('\n') }

@@ -71,6 +71,8 @@ enum ScheduleBackupCodec {
         var weekRules: [BackupWeekRule] = []
         var location: String = ""
         var campusId: String? = nil
+        var customStartTime: String? = nil
+        var customEndTime: String? = nil
     }
 
     struct BackupWeekRule: Codable {
@@ -127,7 +129,9 @@ enum ScheduleBackupCodec {
                         BackupWeekRule(startWeek: $0.startWeek, endWeek: $0.endWeek, parity: $0.parity.rawValue)
                     },
                     location: meeting.location,
-                    campusId: meeting.campusId
+                    campusId: meeting.campusId,
+                    customStartTime: meeting.customStartTime,
+                    customEndTime: meeting.customEndTime
                 )
             },
             notes: course.notes
@@ -151,7 +155,9 @@ enum ScheduleBackupCodec {
                                  parity: WeekParity(rawValue: $0.parity) ?? .all)
                     },
                     location: meeting.location,
-                    campusId: meeting.campusId
+                    campusId: meeting.campusId,
+                    customStartTime: meeting.customStartTime,
+                    customEndTime: meeting.customEndTime
                 )
             },
             notes: backup.notes

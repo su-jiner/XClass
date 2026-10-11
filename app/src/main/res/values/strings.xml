@@ -140,6 +140,11 @@
     <string name="manual_parity_all">单双周都上</string>
     <string name="manual_parity_odd">仅单周</string>
     <string name="manual_parity_even">仅双周</string>
+    <string name="manual_custom_time">自定义上课时间</string>
+    <string name="manual_custom_start_hint">开始 如 09:00</string>
+    <string name="manual_custom_end_hint">结束 如 10:40</string>
+    <string name="manual_custom_time_invalid">时间格式应为 HH:mm，且结束须晚于开始</string>
+    <string name="manual_time_preview">对应时间：%1$s</string>
     <string name="manual_name_required">课程名不能为空</string>
     <string name="manual_end_before_start">结束节不能小于开始节</string>
     <string name="manual_end_before_start_week">结束周不能小于开始周</string>

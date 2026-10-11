@@ -126,6 +126,20 @@
         </view>
       </view>
 
+      <view class="manual-row">
+        <view class="manual-half">
+          <view class="manual-label" style="color:{{palette.textSecondary}}">自定义开始（可留空）</view>
+          <input class="manual-input" style="background:{{palette.panelAlt}};color:{{palette.textPrimary}}"
+            value="{{manualForm.customStart}}" data-field="customStart" bindinput="onManualField" placeholder="如 09:00" placeholder-class="manual-ph" />
+        </view>
+        <view class="manual-half">
+          <view class="manual-label" style="color:{{palette.textSecondary}}">自定义结束（可留空）</view>
+          <input class="manual-input" style="background:{{palette.panelAlt}};color:{{palette.textPrimary}}"
+            value="{{manualForm.customEnd}}" data-field="customEnd" bindinput="onManualField" placeholder="如 10:40" placeholder-class="manual-ph" />
+        </view>
+      </view>
+      <view class="manual-hint" style="color:{{palette.textSecondary}}">留空则按节次默认时间（如第3-4节 10:00-11:40）</view>
+
       <view class="manual-field">
         <view class="manual-label" style="color:{{palette.textSecondary}}">上课地点（可留空）</view>
         <input class="manual-input" style="background:{{palette.panelAlt}};color:{{palette.textPrimary}}"
@@ -141,6 +155,42 @@
       <view class="manual-actions">
         <view class="manual-btn" style="background:{{palette.panelAlt}};color:{{palette.textPrimary}}" bindtap="closeManual">取消</view>
         <view class="manual-btn manual-btn-primary" style="background:{{palette.buttonBackground}};color:{{palette.buttonText}}" bindtap="saveManual">保存</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 课程详情弹层：重叠课程左右滑动切换查看 -->
+  <view class="detail-mask" wx:if="{{showDetail}}" bindtap="closeDetail">
+    <view class="detail-panel" catchtap="noop" style="background:{{palette.panel}}">
+      <view class="detail-head">
+        <text class="detail-title" style="color:{{palette.textPrimary}}">{{detailCourses[detailIndex].name}}</text>
+        <text class="detail-count" wx:if="{{detailCourses.length > 1}}" style="color:{{palette.textSecondary}}">{{detailIndex + 1}} / {{detailCourses.length}}</text>
+      </view>
+      <swiper class="detail-swiper" current="{{detailIndex}}" bindchange="onDetailChange">
+        <swiper-item wx:for="{{detailCourses}}" wx:key="courseIndex">
+          <view class="detail-content">
+            <view class="detail-row">
+              <text class="detail-label" style="color:{{palette.textSecondary}}">教师</text>
+              <text class="detail-value" style="color:{{palette.textPrimary}}">{{item.teacher}}</text>
+            </view>
+            <view class="detail-row">
+              <text class="detail-label" style="color:{{palette.textSecondary}}">地点</text>
+              <text class="detail-value" style="color:{{palette.textPrimary}}">{{item.location}}</text>
+            </view>
+            <view class="detail-row">
+              <text class="detail-label" style="color:{{palette.textSecondary}}">节次</text>
+              <text class="detail-value" style="color:{{palette.textPrimary}}">{{item.sectionText}} {{item.timeText}}</text>
+            </view>
+            <view class="detail-row">
+              <text class="detail-label" style="color:{{palette.textSecondary}}">周次</text>
+              <text class="detail-value" style="color:{{palette.textPrimary}}">{{item.weekText}}</text>
+            </view>
+          </view>
+        </swiper-item>
+      </swiper>
+      <view class="detail-actions">
+        <view class="manual-btn" style="background:{{palette.panelAlt}};color:{{palette.textPrimary}}" bindtap="editDetail">编辑课程</view>
+        <view class="manual-btn manual-btn-danger" style="background:{{palette.panelAlt}};color:#e64340" bindtap="deleteDetail">删除课程</view>
       </view>
     </view>
   </view>

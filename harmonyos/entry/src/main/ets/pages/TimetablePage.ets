@@ -32,6 +32,10 @@ export struct TimetablePage {
   @State sectionCount: number = 12;
   @State notes: string[] = [];
   @State editingCourseIndex: number = -1;
+  @State editingMeetingIndex: number = 0;
+  @State showDetail: boolean = false;
+  @State detailItems: CourseMeetingRef[] = [];
+  @State detailIndex: number = 0;
   @State editingCourse: ImportedCourse = {
     courseName: '', teacher: '', semester: '', credit: null, rawWeekText: '', meetings: [],
   };
@@ -47,6 +51,7 @@ export struct TimetablePage {
   editDialogController: CustomDialogController = new CustomDialogController({
     builder: EditCourseDialog({
       course: this.editingCourse,
+      meetingIndex: this.editingMeetingIndex,
       onSaved: (updated: ImportedCourse): void => {
         this.applyEdit(updated);
       },
@@ -271,9 +276,114 @@ export struct TimetablePage {
       .scrollable(ScrollDirection.Vertical)
       .width('100%')
     }
+
+    // 课程详情弹窗：重叠课程左右滑动切换查看
+    if (this.showDetail) {
+      this.CourseDetailOverlay()
+    }
+    }
     .width('100%')
     .height('100%')
     .backgroundColor(this.palette().page)
+  }
+
+  @Builder
+  CourseDetailOverlay() {
+    Stack() {
+      Column() {
+        Row() {
+          Text(this.detailItems[this.detailIndex]?.course.courseName ?? '')
+            .fontSize(17)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(this.palette().textPrimary)
+            .maxLines(1)
+            .layoutWeight(1)
+          if (this.detailItems.length > 1) {
+            Text(`${this.detailIndex + 1} / ${this.detailItems.length}`)
+              .fontSize(12)
+              .fontColor(this.palette().textSecondary)
+              .margin({ left: 8 })
+          }
+        }
+        .width('100%')
+        .margin({ bottom: 10 })
+
+        Swiper() {
+          ForEach(this.detailItems, (item: CourseMeetingRef) => {
+            Column() {
+              Text(`教师：${item.course.teacher.length > 0 ? item.course.teacher : '未知'}`)
+              Text(`节次：第${item.meeting.startSection}-${item.meeting.endSection}节 ${this.detailTimeText(item)}`)
+              Text(`周次：${item.course.rawWeekText.length > 0 ? item.course.rawWeekText : '未标注'}`)
+              Text(`地点：${item.meeting.location.length > 0 ? item.meeting.location : '未标注'}`)
+              Text(`学期：${item.course.semester}   学分：${item.course.credit === null ? 'N/A' : String(item.course.credit)}`)
+            }
+            .alignItems(HorizontalAlign.Start)
+            .width('100%')
+            .padding({ top: 4 })
+            .fontSize(14)
+            .fontColor(this.palette().textPrimary)
+            .rowGap(10)
+          }, (item: CourseMeetingRef) =>
+            `${item.courseIndex}-${item.meeting.weekday}-${item.meeting.startSection}`)
+        }
+        .indicator(false)
+        .height(190)
+        .width('100%')
+        .onChange((index: number) => {
+          this.detailIndex = index;
+        })
+
+        Row({ space: 12 }) {
+          Button('编辑课程')
+            .layoutWeight(1)
+            .height(40)
+            .fontSize(14)
+            .fontColor(this.palette().textPrimary)
+            .backgroundColor(this.palette().panelAlt)
+            .onClick(() => {
+              this.editDetailCourse();
+            })
+          Button(Prefs.coverImageKey() === this.detailCoverKey() ? '取消课表封面' : '设为课表封面')
+            .layoutWeight(1)
+            .height(40)
+            .fontSize(14)
+            .fontColor(this.palette().iconTint)
+            .backgroundColor(this.palette().panelAlt)
+            .onClick(() => {
+              this.toggleDetailCover();
+            })
+        }
+        .width('100%')
+        .margin({ top: 16 })
+      }
+      .width('92%')
+      .padding(18)
+      .borderRadius(20)
+      .backgroundColor(this.palette().panel)
+      .onClick(() => {})
+    }
+    .width('100%')
+    .height('100%')
+    .backgroundColor('#66000000')
+    .onClick(() => {
+      this.showDetail = false;
+    })
+  }
+
+  detailCoverKey(): string {
+    const item = this.detailItems[this.detailIndex];
+    if (!item) return '';
+    return `${item.meeting.weekday}:${item.meeting.startSection}`;
+  }
+
+  /** 详情时间文本：优先自定义起止时间，否则节次默认时间 */
+  detailTimeText(item: CourseMeetingRef): string {
+    if (item.meeting.customStartTime && item.meeting.customStartTime.length > 0) {
+      return `${item.meeting.customStartTime}-${item.meeting.customEndTime ?? ''}`;
+    }
+    const start = this.sectionRanges[item.meeting.startSection - 1]?.split('-')[0] ?? '--:--';
+    const end = this.sectionRanges[item.meeting.endSection - 1]?.split('-')[1] ?? '--:--';
+    return `${start}-${end}`;
   }
 
   weekStart(): SimpleDate {
@@ -392,36 +502,40 @@ export struct TimetablePage {
   }
 
   showCourseDetail(item: CourseMeetingRef): void {
-    const rangeStart = this.sectionRanges[item.meeting.startSection - 1]?.split('-')[0] ?? '--:--';
-    const rangeEnd = this.sectionRanges[item.meeting.endSection - 1]?.split('-')[1] ?? '--:--';
-    const creditText = item.course.credit === null ? 'N/A' : String(item.course.credit);
+    // 收集同格子重叠课程组：节次区间相交且不同课程，按节次排序
+    const dayItems = displayMeetings(this.courses, this.selectedWeek, false)
+      .filter((it: CourseMeetingRef) => it.meeting.weekday === item.meeting.weekday);
+    const group = dayItems.filter((other: CourseMeetingRef) => {
+      const aS = Math.min(Math.max(item.meeting.startSection, 1), 12);
+      const aE = Math.min(Math.max(item.meeting.endSection, 1), 12);
+      const bS = Math.min(Math.max(other.meeting.startSection, 1), 12);
+      const bE = Math.min(Math.max(other.meeting.endSection, 1), 12);
+      return !(aE < bS || bE < aS);
+    }).sort((a: CourseMeetingRef, b: CourseMeetingRef) => a.meeting.startSection - b.meeting.startSection);
+    this.detailItems = group.length > 0 ? group : [item];
+    this.detailIndex = Math.max(0, this.detailItems.findIndex(
+      (g: CourseMeetingRef) => g.courseIndex === item.courseIndex && g.meeting.startSection === item.meeting.startSection));
+    this.showDetail = true;
+  }
+
+  /** 详情弹窗：编辑当前页课程 */
+  editDetailCourse(): void {
+    const item = this.detailItems[this.detailIndex];
+    if (!item) return;
+    this.editingCourseIndex = item.courseIndex;
+    this.editingMeetingIndex = item.meetingIndex;
+    this.editingCourse = this.toImportedCourse(item.course);
+    this.showDetail = false;
+    this.editDialogController.open();
+  }
+
+  /** 详情弹窗：切换当前页课程为课表封面 */
+  toggleDetailCover(): void {
+    const item = this.detailItems[this.detailIndex];
+    if (!item) return;
     const slotKey = `${item.meeting.weekday}:${item.meeting.startSection}`;
-    this.getUIContext().showAlertDialog({
-      title: item.course.courseName,
-      message: `教师：${item.course.teacher.length > 0 ? item.course.teacher : '未知'}\n` +
-        `节次：第${item.meeting.startSection}-${item.meeting.endSection}节 (${rangeStart}-${rangeEnd})\n` +
-        `地点：${item.meeting.location.length > 0 ? item.meeting.location : '未标注'}\n` +
-        `周次：${item.course.rawWeekText}\n` +
-        `学期：${item.course.semester}   学分：${creditText}`,
-      buttons: [
-        {
-          value: '编辑课程（修改同步所有周）',
-          action: (): void => {
-            this.editingCourseIndex = item.courseIndex;
-            this.editingCourse = this.toImportedCourse(item.course);
-            this.editDialogController.open();
-          },
-        },
-        {
-          value: Prefs.coverImageKey() === slotKey ? '取消课表封面' : '设为课表封面',
-          action: (): void => {
-            Prefs.setCoverImageKey(Prefs.coverImageKey() === slotKey ? '' : slotKey);
-            AppStorage.setOrCreate('dataVersion', Date.now());
-          },
-        },
-        { value: '知道了', action: (): void => {} },
-      ],
-    });
+    Prefs.setCoverImageKey(Prefs.coverImageKey() === slotKey ? '' : slotKey);
+    AppStorage.setOrCreate('dataVersion', Date.now());
   }
 
   toImportedCourse(course: CourseSchedule): ImportedCourse {
@@ -438,6 +552,8 @@ export struct TimetablePage {
         weekRules: m.weekRules,
         location: m.location,
         campusAlias: m.campusId ?? null,
+        customStartTime: m.customStartTime ?? null,
+        customEndTime: m.customEndTime ?? null,
       })),
     };
   }
@@ -452,6 +568,8 @@ export struct TimetablePage {
       weekRules: m.weekRules,
       location: m.location,
       campusId: m.campusAlias,
+      customStartTime: m.customStartTime ?? null,
+      customEndTime: m.customEndTime ?? null,
     }));
     const newCourse: CourseSchedule = {
       courseName: updated.courseName,
@@ -461,7 +579,36 @@ export struct TimetablePage {
       rawWeekText: updated.rawWeekText,
       meetings: meetings,
     };
-    const ok = ProfileStore.instance?.updateCourse(this.editingCourseIndex, newCourse, '') ?? false;
+    // 拆分保存：同名同师课程含多个上课时段且改了名/师时，只改被编辑时段，
+    // 其余时段（其他天）保留原名原师，避免跨天绑定连带修改
+    const nameChanged = updated.courseName !== old.courseName;
+    const teacherChanged = updated.teacher !== old.teacher;
+    let ok = false;
+    if (old.meetings.length > 1 && (nameChanged || teacherChanged)) {
+      const targetIndex = Math.min(this.editingMeetingIndex, Math.max(0, old.meetings.length - 1));
+      const keptMeetings = old.meetings.slice();
+      keptMeetings.splice(targetIndex, 1);
+      const keptCourse: CourseSchedule = {
+        courseName: old.courseName,
+        teacher: old.teacher,
+        semester: old.semester,
+        credit: old.credit,
+        rawWeekText: old.rawWeekText,
+        meetings: keptMeetings,
+      };
+      const extractedCourse: CourseSchedule = {
+        courseName: updated.courseName,
+        teacher: updated.teacher,
+        semester: old.semester,
+        credit: old.credit,
+        rawWeekText: updated.rawWeekText,
+        meetings: meetings.filter((m: MeetingTime, index: number) => index === targetIndex),
+      };
+      ok = ProfileStore.instance?.splitUpdateCourse(
+        this.editingCourseIndex, keptCourse, extractedCourse, '') ?? false;
+    } else {
+      ok = ProfileStore.instance?.updateCourse(this.editingCourseIndex, newCourse, '') ?? false;
+    }
     if (ok) {
       AppStorage.setOrCreate('dataVersion', Date.now());
     }

@@ -11,6 +11,7 @@ struct TimetablePage: View {
     @State private var totalWeeks = WeekScheduleCalculator.defaultTotalWeeks
     @State private var selectedWeek = 1
     @State private var detailItem: CourseDetailItem?
+    @State private var detailGroup: [CourseDetailItem] = []
     @State private var showAddSheet = false
     @State private var showImportSheet = false
     @State private var showAddChooser = false
@@ -50,9 +51,10 @@ struct TimetablePage: View {
                 Button("取消", role: .cancel) {}
             }
             .sheet(item: $detailItem) { item in
-                CourseDetailSheet(palette: palette, course: item.course, meeting: item.meeting,
-                                  onEdit: {
-                                      editingItem = (item.courseIndex, item.course, item.meeting)
+                let items = detailGroup.isEmpty ? [item] : detailGroup
+                CourseDetailSheet(palette: palette, items: items,
+                                  onEdit: { edited in
+                                      editingItem = (edited.courseIndex, edited.course, edited.meeting)
                                       detailItem = nil
                                       showEditSheet = true
                                   })
@@ -121,8 +123,9 @@ struct TimetablePage: View {
                     showDates: true,
                     sectionRanges: sectionRanges,
                     notes: notes,
-                    onTap: { courseIndex, course, meeting in
-                        detailItem = CourseDetailItem(courseIndex: courseIndex, course: course, meeting: meeting)
+                    onTap: { courseIndex, course, meeting, conflicts in
+                        detailGroup = conflicts.map { CourseDetailItem(courseIndex: $0.courseIndex, course: $0.course, meeting: $0.meeting) }
+                        detailItem = detailGroup.first ?? CourseDetailItem(courseIndex: courseIndex, course: course, meeting: meeting)
                     }
                 )
                 .tag(week)
@@ -201,7 +204,7 @@ struct WeekGridView: View {
     var showDates: Bool = true
     var sectionRanges: [String] = SectionTimes.ranges
     var notes: [String] = []
-    let onTap: (Int, CourseSchedule, MeetingTime) -> Void
+    let onTap: (Int, CourseSchedule, MeetingTime, [(courseIndex: Int, course: CourseSchedule, meeting: MeetingTime)]) -> Void
 
     private let leftColumnWidth: CGFloat = 44
     private let rowHeight: CGFloat = 46
@@ -308,7 +311,17 @@ struct WeekGridView: View {
                     }
                 }
                 ForEach(Array(visible.enumerated()), id: \.offset) { _, item in
-                    card(for: item, width: width - 2)
+                    let group: [(courseIndex: Int, course: CourseSchedule, meeting: MeetingTime)] = dayItems
+                        .filter { other in
+                            let aStart = min(max(item.meeting.startSection, 1), 12)
+                            let aEnd = min(max(item.meeting.endSection, 1), 12)
+                            let bStart = min(max(other.meeting.startSection, 1), 12)
+                            let bEnd = min(max(other.meeting.endSection, 1), 12)
+                            return !(aEnd < bStart || bEnd < aStart)
+                        }
+                        .map { ($0.courseIndex, $0.course, $0.meeting) }
+                        .sorted { $0.2.startSection < $1.2.startSection }
+                    card(for: item, width: width - 2, conflicts: group)
                         .offset(y: CGFloat(item.meeting.startSection - 1) * rowHeight + 1)
                 }
             }
@@ -320,13 +333,14 @@ struct WeekGridView: View {
     }
 
     private func card(for item: (courseIndex: Int, course: CourseSchedule, meeting: MeetingTime, isCurrentWeek: Bool, nextActiveWeek: Int),
-                      width: CGFloat) -> some View {
+                      width: CGFloat,
+                      conflicts: [(courseIndex: Int, course: CourseSchedule, meeting: MeetingTime)]) -> some View {
         let height = CGFloat(item.meeting.endSection - item.meeting.startSection + 1) * rowHeight - 2 +
             (item.meeting.endSection >= sectionCount ? lastRowExtra : 0)
         let color = cardColors[item.courseIndex % cardColors.count]
         let isCover = AppPreferences.coverImageKey == "\(item.meeting.weekday.rawValue):\(item.meeting.startSection)"
         return Button {
-            onTap(item.courseIndex, item.course, item.meeting)
+            onTap(item.courseIndex, item.course, item.meeting, conflicts)
         } label: {
             VStack(alignment: .leading, spacing: 1) {
                 if isCover {
@@ -383,9 +397,9 @@ struct WeekGridView: View {
 
 struct CourseDetailSheet: View {
     let palette: ThemePalette
-    let course: CourseSchedule
-    let meeting: MeetingTime
-    var onEdit: (() -> Void)?
+    let items: [CourseDetailItem]
+    var onEdit: ((CourseDetailItem) -> Void)?
+    @State private var currentIndex = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -393,23 +407,45 @@ struct CourseDetailSheet: View {
                 .fill(palette.textSecondary.opacity(0.4))
                 .frame(width: 36, height: 4)
                 .frame(maxWidth: .infinity)
+            if items.count > 1 {
+                Text("第 \(currentIndex + 1) / \(items.count) 门")
+                    .font(.system(size: 12))
+                    .foregroundColor(palette.textSecondary)
+                    .frame(maxWidth: .infinity)
+            }
+            TabView(selection: $currentIndex) {
+                ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+                    detailPage(item).tag(index)
+                }
+            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            .frame(height: 330)
+        }
+        .padding(20)
+        .background(palette.panelBackground)
+    }
+
+    private func detailPage(_ item: CourseDetailItem) -> some View {
+        let course = item.course
+        let meeting = item.meeting
+        return VStack(alignment: .leading, spacing: 10) {
             Text(course.courseName)
                 .font(.system(size: 18, weight: .bold))
                 .foregroundColor(palette.detailTitle)
             row("教师：", course.teacher.isEmpty ? "未知" : course.teacher)
-            row("节次：", "\(Weekday(rawValue: meeting.weekday.rawValue)?.shortLabel ?? "") 第\(meeting.startSection)-\(meeting.endSection)节 \(sectionTime)")
-            row("周次：", weekText)
+            row("节次：", "\(Weekday(rawValue: meeting.weekday.rawValue)?.shortLabel ?? "") 第\(meeting.startSection)-\(meeting.endSection)节 \(sectionTime(meeting))")
+            row("周次：", weekText(meeting, course))
             row("地点：", meeting.location.isEmpty ? "未标注" : meeting.location)
             row("学期：", "\(course.semester)   学分：\(course.credit.map { "\($0)" } ?? "N/A")")
-            Button(isCover ? "取消课表封面" : "设为课表封面") {
-                AppPreferences.coverImageKey = isCover ? "" : coverKey
+            Button(isCover(meeting) ? "取消课表封面" : "设为课表封面") {
+                AppPreferences.coverImageKey = isCover(meeting) ? "" : coverKey(meeting)
                 StoreChangeNotifier.shared.notifyChanged()
             }
             .font(.system(size: 14, weight: .medium))
-            .foregroundColor(isCover ? palette.textSecondary : palette.iconTint)
+            .foregroundColor(isCover(meeting) ? palette.textSecondary : palette.iconTint)
             .frame(maxWidth: .infinity)
             if let onEdit = onEdit {
-                Button("编辑课程（修改同步所有周）") { onEdit() }
+                Button("编辑课程（修改同步所有周）") { onEdit(item) }
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(palette.buttonText)
                     .frame(maxWidth: .infinity)
@@ -418,18 +454,18 @@ struct CourseDetailSheet: View {
             }
             Spacer()
         }
-        .padding(20)
-        .background(palette.detailBackground)
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 2)
     }
 
-    private var coverKey: String { "\(meeting.weekday.rawValue):\(meeting.startSection)" }
-    private var isCover: Bool { AppPreferences.coverImageKey == coverKey }
+    private func coverKey(_ meeting: MeetingTime) -> String { "\(meeting.weekday.rawValue):\(meeting.startSection)" }
+    private func isCover(_ meeting: MeetingTime) -> Bool { AppPreferences.coverImageKey == coverKey(meeting) }
 
-    private var detailBackground: Color {
-        palette.panelBackground
-    }
-
-    private var sectionTime: String {
+    private func sectionTime(_ meeting: MeetingTime) -> String {
+        if let custom = meeting.customStartTime, !custom.isEmpty {
+            let end = (meeting.customEndTime?.isEmpty == false) ? meeting.customEndTime! : custom
+            return "\(custom)-\(end)"
+        }
         let start = SectionTimes.ranges.indices.contains(meeting.startSection - 1)
             ? String(SectionTimes.ranges[meeting.startSection - 1].prefix(5)) : "--:--"
         let end = SectionTimes.ranges.indices.contains(meeting.endSection - 1)
@@ -437,7 +473,7 @@ struct CourseDetailSheet: View {
         return "\(start)-\(end)"
     }
 
-    private var weekText: String {
+    private func weekText(_ meeting: MeetingTime, _ course: CourseSchedule) -> String {
         if meeting.weekRules.isEmpty {
             return course.rawWeekText.isEmpty ? "未标注" : course.rawWeekText
         }
