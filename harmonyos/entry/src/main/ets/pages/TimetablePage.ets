@@ -199,43 +199,74 @@ export struct TimetablePage {
       .width('100%')
       .padding({ left: 12, right: 12, bottom: 4 })
 
-      // 周网格
-      Scroll() {
-        Row() {
-          // 左列：节次
-          Column() {
-            Text(`${this.weekStart().month}月`)
-              .fontSize(10).fontWeight(FontWeight.Bold)
-              .fontColor(this.palette().textPrimary)
-              .height(HEADER_HEIGHT)
-              .width('100%')
-              .textAlign(TextAlign.Center)
-            ForEach(this.sectionRanges, (range: string, index: number) => {
-              Column() {
-                Text(`${index + 1}`).fontSize(11).fontWeight(FontWeight.Bold)
-                Text(range.split('-')[0]).fontSize(8)
-                Text(range.split('-')[1]).fontSize(8)
-              }
-              .fontColor(this.palette().textSecondary)
-              .width(LEFT_COLUMN_WIDTH - 6)
-              .height(ROW_HEIGHT)
-              .textAlign(TextAlign.Center)
-            }, (range: string) => range)
-          }
-          .backgroundColor(this.palette().gridLeft)
+      // 周网格 / 空态
+      if (this.courses.length > 0) {
+        Scroll() {
+          Row() {
+            // 左列：节次
+            Column() {
+              Text(`${this.weekStart().month}月`)
+                .fontSize(10).fontWeight(FontWeight.Bold)
+                .fontColor(this.palette().textPrimary)
+                .height(HEADER_HEIGHT)
+                .width('100%')
+                .textAlign(TextAlign.Center)
+              ForEach(this.sectionRanges, (range: string, index: number) => {
+                Column() {
+                  Text(`${index + 1}`).fontSize(11).fontWeight(FontWeight.Bold)
+                  Text(range.split('-')[0]).fontSize(8)
+                  Text(range.split('-')[1]).fontSize(8)
+                }
+                .fontColor(this.palette().textSecondary)
+                .width(LEFT_COLUMN_WIDTH - 6)
+                .height(ROW_HEIGHT)
+                .textAlign(TextAlign.Center)
+              }, (range: string) => range)
+            }
+            .backgroundColor(this.palette().gridLeft)
 
-          Row({ space: 2 }) {
-            ForEach([0, 1, 2, 3, 4, 5, 6], (dayIndex: number) => {
-              this.DayColumn(dayIndex)
-            }, (dayIndex: number) => dayIndex.toString())
+            Row({ space: 2 }) {
+              ForEach([0, 1, 2, 3, 4, 5, 6], (dayIndex: number) => {
+                this.DayColumn(dayIndex)
+              }, (dayIndex: number) => dayIndex.toString())
+            }
+            .padding({ left: 4, right: 4 })
           }
-          .padding({ left: 4, right: 4 })
+          .alignItems(VerticalAlign.Top)
         }
-        .alignItems(VerticalAlign.Top)
+        .layoutWeight(1)
+        .align(Alignment.Top)
+        .scrollable(ScrollDirection.Vertical)
+      } else {
+        // 空课表：隐藏左侧时间列与网格，显示空态引导
+        Column() {
+          Text('📅').fontSize(44)
+          Text('暂无课程')
+            .fontSize(17).fontWeight(FontWeight.Bold)
+            .fontColor(this.palette().textPrimary)
+            .margin({ top: 12 })
+          Text('还没有课表内容，点击右上角 ＋ 手动添加课程，或到「设置 → 导入课表」导入课表')
+            .fontSize(13)
+            .fontColor(this.palette().textSecondary)
+            .textAlign(TextAlign.Center)
+            .margin({ top: 6, left: 40, right: 40 })
+          Button('去添加课程')
+            .fontSize(14).fontWeight(FontWeight.Bold)
+            .fontColor(this.palette().buttonText)
+            .backgroundColor(this.palette().buttonBackground)
+            .height(40)
+            .padding({ left: 28, right: 28 })
+            .borderRadius(999)
+            .margin({ top: 20 })
+            .onClick(() => {
+              this.showAddChooser();
+            })
+        }
+        .layoutWeight(1)
+        .width('100%')
+        .justifyContent(FlexAlign.Center)
+        .alignItems(HorizontalAlign.Center)
       }
-      .layoutWeight(1)
-      .align(Alignment.Top)
-      .scrollable(ScrollDirection.Vertical)
 
       // 底部课表级备注栏（非空才显示：小字、次级色、圆角卡片）
       if (this.notes.length > 0) {

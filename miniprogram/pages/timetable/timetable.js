@@ -51,6 +51,7 @@ Page({
     manualTitle: '手动添加课程',
     allModeHeader: '',
     notes: [],
+    empty: false,
   },
   onShow() {
     if (this.getTabBar && this.getTabBar()) this.getTabBar().setData({ selected: 0 });
@@ -80,6 +81,7 @@ Page({
       profileName: store.activeProfile().name,
       isAllMode: false,
       notes: this.notes,
+      empty: this.courses.length === 0,
     });
     this.computeRowHeight();
     const scaleMap = { small: 0.9, normal: 1, large: 1.15 };

@@ -9,7 +9,7 @@
     </view>
   </view>
 
-  <view class="grid" bindtouchstart="onTouchStart" bindtouchend="onTouchEnd">
+  <view class="grid" wx:if="{{!empty}}" bindtouchstart="onTouchStart" bindtouchend="onTouchEnd">
     <view class="grid-head">
       <view class="head-time" style="background:{{palette.gridHeader}};color:{{palette.textPrimary}}">{{monthLabel}}</view>
       <view
@@ -63,6 +63,13 @@
         </view>
       </view>
     </scroll-view>
+  </view>
+
+  <view class="empty-state" wx:else style="background:{{palette.page}};color:{{palette.textSecondary}}">
+    <view class="empty-icon" style="color:{{palette.textSecondary}}">📅</view>
+    <view class="empty-title" style="color:{{palette.textPrimary}}">暂无课程</view>
+    <view class="empty-desc">还没有课表内容，点击右上角 ＋ 手动添加课程，或到「设置 → 导入课表」导入课表</view>
+    <view class="empty-btn" style="background:{{palette.buttonBackground}};color:{{palette.buttonText}}" bindtap="onAddTap">去添加课程</view>
   </view>
 
   <view class="week-hint" wx:if="{{!isAllMode}}" style="color:{{palette.textSecondary}}">
