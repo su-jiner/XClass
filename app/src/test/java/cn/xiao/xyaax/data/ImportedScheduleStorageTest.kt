@@ -237,6 +237,53 @@ class ImportedScheduleStorageTest {
     }
 
     @Test
+    fun importCourses_persistsNotesAndReloads() {
+        ImportedScheduleStorage.listProfiles(filesDir)
+        val notes = listOf("军事技能（张爽）1-19周", "学期时间：2026-08-31至2027-01-22，共21周")
+
+        ImportedScheduleStorage.importCourses(
+            filesDir,
+            listOf(),
+            ImportedScheduleStorage.ImportMode.OVERWRITE_ACTIVE,
+            notes = notes
+        )
+
+        val profile = ImportedScheduleStorage.listProfiles(filesDir).single()
+        assertEquals(notes, profile.notes)
+    }
+
+    @Test
+    fun oldProfilesWithoutNotes_defaultToEmptyList() {
+        // 旧数据：meta.json 不含 notes 字段，读取必须兜底为空列表、不报错
+        ImportedScheduleStorage.listProfiles(filesDir)
+        val metaFile = File(storageDir(), "meta.json")
+        val legacyMeta = metaFile.readText(Charsets.UTF_8)
+            .replace(Regex(""","notes":\[[^\]]*\]"""), "")
+        metaFile.writeText(legacyMeta, Charsets.UTF_8)
+
+        val profile = ImportedScheduleStorage.listProfiles(filesDir).single()
+        assertTrue(profile.notes.isEmpty())
+    }
+
+    @Test
+    fun backup_roundTrip_restoresNotes() {
+        ImportedScheduleStorage.listProfiles(filesDir)
+        ImportedScheduleStorage.importCourses(
+            filesDir,
+            listOf(),
+            ImportedScheduleStorage.ImportMode.OVERWRITE_ACTIVE,
+            notes = listOf("入学教育（张爽）1-19周")
+        )
+
+        val backup = ImportedScheduleStorage.exportBackup(filesDir)
+        assertTrue(backup.contains("入学教育（张爽）1-19周"))
+
+        ImportedScheduleStorage.importBackup(filesDir, backup)
+        val restored = ImportedScheduleStorage.listProfiles(filesDir).single()
+        assertEquals(listOf("入学教育（张爽）1-19周"), restored.notes)
+    }
+
+    @Test
     fun renameProfile_updatesNameAndRejectsBlank() {
         val profile = ImportedScheduleStorage.listProfiles(filesDir).single()
 

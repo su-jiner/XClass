@@ -59,7 +59,9 @@ object ScheduleBackupCodec {
     data class BackupProfile(
         val name: String,
         val semesterStartDate: String? = null,
-        val courses: List<BackupCourse> = emptyList()
+        val courses: List<BackupCourse> = emptyList(),
+        /** 课表级公共备注；旧版备份缺省为空列表（向后兼容，version 保持 2） */
+        val notes: List<String> = emptyList()
     )
 
     @Serializable

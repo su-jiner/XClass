@@ -48,19 +48,32 @@ class ImportWizardActivity : AppCompatActivity() {
         val parsed: CourseTableParseResult,
         val courses: MutableList<ParsedCourse>
     )
+
+    /** 待识别文件项：选择阶段只收集文件名/类型，不立即解析。 */
+    private data class PendingFile(
+        val uri: Uri,
+        val name: String,
+        val mime: String?
+    )
+
     private lateinit var palette: ThemePalette
     private lateinit var summary: TextView
     private lateinit var listContainer: LinearLayout
     private lateinit var saveButton: Button
+    private lateinit var recognizeButton: Button
 
     private var result: CourseTableParseResult? = null
     /** 多文件/粘贴导入分组：一个来源 = 一个课表（课程时间） */
     private val groups = mutableListOf<ParsedGroup>()
+    /** 待识别文件列表：选择阶段累加、可移除，点「识别全部」后统一解析 */
+    private val pending = mutableListOf<PendingFile>()
+    /** true=待识别列表阶段；false=预览阶段 */
+    private var pendingPhase = true
     private var lastUri: Uri? = null
 
     private val pickFilesLauncher = registerForActivityResult(
         ActivityResultContracts.OpenMultipleDocuments()
-    ) { uris -> uris.takeIf { it.isNotEmpty() }?.let { parseFiles(it) } }
+    ) { uris -> uris.takeIf { it.isNotEmpty() }?.let { addPending(it) } }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         ThemePaletteProvider.applyNightMode(this)
@@ -75,9 +88,11 @@ class ImportWizardActivity : AppCompatActivity() {
         summary = findViewById(R.id.importSummary)
         listContainer = findViewById(R.id.importListContainer)
         saveButton = findViewById(R.id.importSaveBtn)
+        recognizeButton = findViewById(R.id.importRecognizeBtn)
 
         findViewById<ImageView>(R.id.importBackBtn).setOnClickListener { finish() }
         findViewById<Button>(R.id.importPickBtn).setOnClickListener { openPicker() }
+        recognizeButton.setOnClickListener { parsePending() }
         saveButton.setOnClickListener { confirmSave() }
         saveButton.isEnabled = false
 
@@ -86,12 +101,14 @@ class ImportWizardActivity : AppCompatActivity() {
         when {
             !pastedText.isNullOrBlank() -> parsePastedText(pastedText)
             shared != null -> parseFile(shared)
-            else -> openPicker()
+            else -> showPendingEmpty()
         }
     }
 
     /** 粘贴文本导入：与文件导入共用解析管线，只跳过提取步骤。 */
     private fun parsePastedText(text: String) {
+        pendingPhase = false
+        recognizeButton.visibility = View.GONE
         summary.text = getString(R.string.import_parsing)
         listContainer.removeAllViews()
         saveButton.isEnabled = false
@@ -107,13 +124,7 @@ class ImportWizardActivity : AppCompatActivity() {
         result = parsed
         groups.clear()
         groups.add(ParsedGroup(sourceNote, parsed, parsed.courses.toMutableList()))
-        summary.text = buildString {
-            append(sourceNote)
-            parsed.semester?.let { append(" · ").append(it) }
-            parsed.totalWeeks?.let { append(" · 共").append(it).append("周") }
-            append(" · 识别 ").append(parsed.courses.size).append(" 门课")
-            if (parsed.warnings.isNotEmpty()) append("\n").append(parsed.warnings.take(3).joinToString("；"))
-        }
+        summary.text = buildSummaryLine(sourceNote, parsed, 1)
         renderGroups()
         saveButton.isEnabled = groups.any { it.courses.isNotEmpty() }
     }
@@ -143,19 +154,99 @@ class ImportWizardActivity : AppCompatActivity() {
         )
     }
 
-    private fun parseFiles(uris: List<Uri>) {
+    /** 选择阶段：只把文件收集进待识别列表（按 Uri 去重、可重复累加、可移除），不解析。 */
+    private fun addPending(uris: List<Uri>) {
+        pendingPhase = true
+        groups.clear()
+        uris.forEach { uri ->
+            if (pending.none { it.uri == uri }) {
+                val (name, mime) = queryMeta(uri)
+                pending += PendingFile(uri, name, mime)
+            }
+        }
+        recognizeButton.visibility = View.VISIBLE
+        renderPending()
+    }
+
+    private fun showPendingEmpty() {
+        pendingPhase = true
+        recognizeButton.visibility = View.VISIBLE
+        renderPending()
+    }
+
+    /** 待识别列表渲染：每项显示文件名+大小，可移除。 */
+    private fun renderPending() {
+        saveButton.isEnabled = false
+        recognizeButton.isEnabled = pending.isNotEmpty()
+        summary.text = buildString {
+            append(getString(R.string.import_pending_hint))
+            if (pending.isNotEmpty()) append("\n已添加 ").append(pending.size).append(" 个待识别文件")
+        }
+        listContainer.removeAllViews()
+        if (pending.isEmpty()) {
+            listContainer.addView(TextView(this).apply {
+                text = getString(R.string.import_pending_empty)
+                setTextColor(palette.textSecondary)
+                textSize = 13f
+            })
+            return
+        }
+        pending.forEachIndexed { index, file ->
+            listContainer.addView(buildPendingRow(index, file))
+        }
+    }
+
+    private fun buildPendingRow(index: Int, file: PendingFile): View {
+        val density = resources.displayMetrics.density
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            background = GradientDrawable().apply {
+                cornerRadius = 14f * density
+                setColor(palette.panelAltBackground)
+            }
+            setPadding((14 * density).toInt(), (10 * density).toInt(), (10 * density).toInt(), (10 * density).toInt())
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = (10 * density).toInt() }
+        }
+        row.addView(TextView(this).apply {
+            text = file.name
+            setTextColor(palette.textPrimary)
+            textSize = 14f
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        })
+        row.addView(TextView(this).apply {
+            text = getString(R.string.import_remove_file)
+            setTextColor(palette.iconTint)
+            textSize = 13f
+            setPadding((12 * density).toInt(), 0, (12 * density).toInt(), 0)
+            setOnClickListener {
+                pending.removeAt(index)
+                renderPending()
+            }
+        })
+        return row
+    }
+
+    /** 「识别全部」：统一遍历待识别列表逐文件解析，进入预览。 */
+    private fun parsePending() {
+        if (pending.isEmpty()) return
         summary.text = getString(R.string.import_parsing)
         saveButton.isEnabled = false
         listContainer.removeAllViews()
+        val snapshot = pending.toList()
         lifecycleScope.launch {
+            pending.clear()
+            groups.clear()
             var total = 0
-            uris.forEach { uri ->
+            snapshot.forEach { file ->
                 val group = runCatching {
-                    val (name, mime) = queryMeta(uri)
                     withContext(Dispatchers.IO) {
-                        val document = DocumentTextExtractor.extract(this@ImportWizardActivity, uri, name, mime)
+                        val document = DocumentTextExtractor.extract(this@ImportWizardActivity, file.uri, file.name, file.mime)
                         val parsed = CourseTableImporter.parse(document.blocks, document.rawText)
-                        ParsedGroup(name, parsed, parsed.courses.toMutableList())
+                        ParsedGroup(file.name, parsed, parsed.courses.toMutableList())
                     }
                 }
                 group.onSuccess {
@@ -165,17 +256,32 @@ class ImportWizardActivity : AppCompatActivity() {
                     UiFeedback.showMessage(listContainer, getString(R.string.import_failed, error.message ?: "未知错误"), palette)
                 }
             }
+            pendingPhase = false
+            recognizeButton.visibility = View.GONE
             summary.text = buildString {
-                append("已解析 ").append(groups.size).append(" 份课表文件 · 识别 ").append(total).append(" 门课")
+                append("已识别 ").append(groups.size).append(" 份课表文件 · 识别 ").append(total).append(" 门课")
+                groups.firstOrNull()?.parsed?.warnings?.take(3)?.let { warns ->
+                    if (warns.isNotEmpty()) append("\n").append(warns.joinToString("；"))
+                }
             }
             renderGroups()
             saveButton.isEnabled = groups.any { it.courses.isNotEmpty() }
         }
     }
 
+    private fun buildSummaryLine(sourceNote: String, parsed: CourseTableParseResult, count: Int): String = buildString {
+        append(sourceNote)
+        parsed.semester?.let { append(" · ").append(it) }
+        parsed.totalWeeks?.let { append(" · 共").append(it).append("周") }
+        append(" · 识别 ").append(parsed.courses.size).append(" 门课")
+        if (parsed.warnings.isNotEmpty()) append("\n").append(parsed.warnings.take(3).joinToString("；"))
+    }
+
     /** 单文件/共享 Intent 场景：包装为单组。 */
     private fun parseFile(uri: Uri) {
         lastUri = uri
+        pendingPhase = false
+        recognizeButton.visibility = View.GONE
         summary.text = getString(R.string.import_parsing)
         saveButton.isEnabled = false
         listContainer.removeAllViews()
@@ -405,7 +511,8 @@ class ImportWizardActivity : AppCompatActivity() {
                     newProfileName = if (overwrite && index == 0) null else (name ?: group.name.removeSuffix(".txt").removeSuffix(".md").removeSuffix(".csv")),
                     semesterStartDate = parsed.semesterStartDate?.let { raw ->
                         runCatching { java.time.LocalDate.parse(raw) }.getOrNull()
-                    }
+                    },
+                    notes = parsed.notes
                 ).onSuccess { profileName ->
                     onSuccess(profileName, schedules.size)
                 }.onFailure { error ->
@@ -437,6 +544,10 @@ class ImportWizardActivity : AppCompatActivity() {
             campusMap[alias] = matched.id
         }
         TimeProfileStore.saveCampusMap(filesDir, campusMap)
+        // 导入解析出校区时间表时，自动把首个校区时间表设为当前显示时间表
+        if (parsed.timeTables.isNotEmpty()) {
+            TimeProfileStore.saveDefaultProfileId(filesDir, parsed.timeTables.first().id)
+        }
         return campusMap
     }
 

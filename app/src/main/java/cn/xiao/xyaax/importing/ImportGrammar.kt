@@ -235,13 +235,28 @@ object PageMetadataParser {
     private val totalWeeksRegex = Regex("""共\s*(\d{1,2})\s*周""")
     private val otherCoursesRegex = Regex("""其他课程[：:]\s*(.+)""")
 
+    // 课表级底部备注提取：只收「不像课程行」的独立备注行
+    // (a) 名称（教师）1-19周 这类备注
+    private val noteParenWeekRegex =
+        Regex("""\S+[（(][^）)]{1,6}[）)]\s*\d{1,2}\s*[-—–~～至]\s*\d{1,2}\s*周""")
+    // (b) 学期时间：YYYY-MM-DD 至 YYYY-MM-DD
+    private val noteSemesterDateRegex =
+        Regex("""(学期时间|学期[：:]).*?\d{4}-\d{2}-\d{2}\s*[-—–~～至]\s*\d{4}-\d{2}-\d{2}""")
+    // (c) 共N周
+    private val noteTotalWeeksRegex = Regex("""共\s*\d{1,2}\s*周""")
+    // 显式节次标记：仅 N-M节 / 第N节 才算节次行，不误伤"1-19周"或"节假日调休"
+    private val sectionMarkRegex = Regex("""\d{1,2}\s*[-—–~～至]\s*\d{1,2}\s*节|第\s*\d{1,2}\s*节""")
+    private const val MAX_NOTES = 10
+
     data class Metadata(
         val semester: String? = null,
         val startYear: Int? = null,
         val startMonth: Int? = null,
         val startDay: Int? = null,
         val totalWeeks: Int? = null,
-        val otherCourseLines: List<String> = emptyList()
+        val otherCourseLines: List<String> = emptyList(),
+        /** 课表级公共备注（底部独立备注行，每行原样保留） */
+        val notes: List<String> = emptyList()
     )
 
     fun parse(text: String): Metadata {
@@ -268,8 +283,32 @@ object PageMetadataParser {
                 .mapNotNull { it.groupValues.getOrNull(1)?.toIntOrNull() }
                 .filter { it in 1..30 }
                 .maxOrNull(),
-            otherCourseLines = other
+            otherCourseLines = other,
+            notes = extractNotes(text)
         )
+    }
+
+    /**
+     * 提取课表级底部备注行：不含星期与节次标记（现有解析器不会判为课程行）、
+     * 且不是「其他课程：」汇总行（该行仍进 warnings）的独立行，命中 a/b/c 任一模式即收。
+     * 按原样字符串去重、最多 [MAX_NOTES] 条、原样保留。
+     */
+    internal fun extractNotes(text: String): List<String> {
+        val collected = LinkedHashSet<String>()
+        text.lines().forEach { raw ->
+            val line = raw.trim()
+            if (line.isEmpty()) return@forEach
+            // 「其他课程：」汇总行仍走 warnings，不进备注
+            if (line.startsWith("其他课程")) return@forEach
+            // 课程行必带星期或节次标记，跳过，避免把单元格里的「(1-2节)7-19周」误收为备注
+            if (ImportLabels.weekdayIndex(line) != null) return@forEach
+            if (sectionMarkRegex.containsMatchIn(line)) return@forEach
+            val matches = noteParenWeekRegex.containsMatchIn(line) ||
+                noteSemesterDateRegex.containsMatchIn(line) ||
+                noteTotalWeeksRegex.containsMatchIn(line)
+            if (matches) collected += line
+        }
+        return collected.take(MAX_NOTES)
     }
 
     private fun termLabel(raw: String): String = when (raw) {

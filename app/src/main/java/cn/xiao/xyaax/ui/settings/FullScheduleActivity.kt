@@ -142,6 +142,35 @@ class FullScheduleActivity : AppCompatActivity() {
             today = java.time.LocalDate.now(),
             currentSection = null
         )
+        renderNotesBar(ImportedScheduleStorage.loadNotesForProfile(filesDir, profileId), palette)
+    }
+
+    /** 完整课表页底部公共备注栏：notes 非空才显示，小字、次级色、圆角卡片。 */
+    private fun renderNotesBar(notes: List<String>, palette: ThemePalette) {
+        val bar = findViewById<LinearLayout>(R.id.notesBar)
+        bar.removeAllViews()
+        if (notes.isEmpty()) {
+            bar.visibility = View.GONE
+            return
+        }
+        val density = resources.displayMetrics.density
+        notes.forEach { note ->
+            bar.addView(TextView(this).apply {
+                text = note
+                setTextColor(palette.textSecondary)
+                textSize = 11.5f
+                background = android.graphics.drawable.GradientDrawable().apply {
+                    cornerRadius = 10f * density
+                    setColor(palette.panelAltBackground)
+                }
+                setPadding((12 * density).toInt(), (7 * density).toInt(), (12 * density).toInt(), (7 * density).toInt())
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { topMargin = (6 * density).toInt() }
+            })
+        }
+        bar.visibility = View.VISIBLE
     }
 
     private fun applySystemBarInsets() {

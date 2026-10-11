@@ -76,6 +76,14 @@
             android:text="@string/import_pick_file" />
 
         <Button
+            android:id="@+id/importRecognizeBtn"
+            style="@style/SettingsPrimaryButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/import_recognize_all" />
+
+        <Button
             android:id="@+id/importSaveBtn"
             style="@style/SettingsPrimaryButton"
             android:layout_width="match_parent"

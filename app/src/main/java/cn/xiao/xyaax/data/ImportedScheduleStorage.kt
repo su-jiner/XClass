@@ -30,6 +30,7 @@ object ImportedScheduleStorage {
     private const val TEMP_FILE_SUFFIX = ".tmp"
     private const val COURSES_FILE_PREFIX = "courses_"
     private const val COURSES_FILE_SUFFIX = ".json"
+    private const val MAX_PROFILE_NOTES = 10
 
     private val lock = Any()
 
@@ -43,7 +44,9 @@ object ImportedScheduleStorage {
         val name: String,
         val isActive: Boolean,
         val updatedAt: Long,
-        val semesterStartDate: LocalDate
+        val semesterStartDate: LocalDate,
+        /** 课表级公共备注（每行原样保留） */
+        val notes: List<String> = emptyList()
     )
 
     data class ManualCourseInput(
@@ -67,12 +70,14 @@ object ImportedScheduleStorage {
         courses: List<CourseSchedule>,
         mode: ImportMode,
         newProfileName: String? = null,
-        semesterStartDate: LocalDate? = null
+        semesterStartDate: LocalDate? = null,
+        notes: List<String> = emptyList()
     ): String = synchronized(lock) {
         val merged = mergeDuplicateCourses(courses)
         val meta = ensureInitialized(filesDir)
         val now = System.currentTimeMillis()
         val start = semesterStartDate ?: SemesterStartDatePolicy.inferFromCourses(merged)
+        val normalizedNotes = notes.distinct().take(MAX_PROFILE_NOTES)
 
         when (mode) {
             ImportMode.OVERWRITE_ACTIVE -> {
@@ -83,7 +88,11 @@ object ImportedScheduleStorage {
                     meta.copy(
                         activeId = active.id,
                         profiles = meta.profiles.map {
-                            if (it.id == active.id) it.copy(updatedAt = now, semesterStartDate = start.toString()) else it
+                            if (it.id == active.id) it.copy(
+                                updatedAt = now,
+                                semesterStartDate = start.toString(),
+                                notes = normalizedNotes
+                            ) else it
                         }
                     )
                 )
@@ -105,7 +114,8 @@ object ImportedScheduleStorage {
                             coursesFile = fileName,
                             createdAt = now,
                             updatedAt = now,
-                            semesterStartDate = start.toString()
+                            semesterStartDate = start.toString(),
+                            notes = normalizedNotes
                         )
                     )
                 )
@@ -122,7 +132,8 @@ object ImportedScheduleStorage {
                 name = it.name,
                 isActive = it.id == meta.activeId,
                 updatedAt = it.updatedAt,
-                semesterStartDate = semesterStartDateForProfile(it)
+                semesterStartDate = semesterStartDateForProfile(it),
+                notes = it.notes.orEmpty()
             )
         }
     }
@@ -255,6 +266,12 @@ object ImportedScheduleStorage {
         readCoursesFile(filesDir, profile.coursesFile)
     }
 
+    /** 按课表 ID 加载课表级公共备注（完整课表页底部备注栏）。 */
+    fun loadNotesForProfile(filesDir: File, profileId: String): List<String> = synchronized(lock) {
+        val meta = ensureInitialized(filesDir)
+        meta.profiles.firstOrNull { it.id == profileId }?.notes.orEmpty()
+    }
+
     /** 编辑课程：整体替换指定课表中的课程定义（含周规则），全局生效（所有周同步）。 */
     fun updateCourseInProfile(
         filesDir: File,
@@ -285,6 +302,7 @@ object ImportedScheduleStorage {
             ScheduleBackupCodec.BackupProfile(
                 name = profile.name,
                 semesterStartDate = profile.semesterStartDate,
+                notes = profile.notes.orEmpty(),
                 courses = with(ScheduleBackupCodec) {
                     readCoursesFile(filesDir, profile.coursesFile).map { it.toBackupCourse() }
                 }
@@ -359,7 +377,8 @@ object ImportedScheduleStorage {
                     coursesFile = fileName,
                     createdAt = now,
                     updatedAt = now,
-                    semesterStartDate = backup.semesterStartDate
+                    semesterStartDate = backup.semesterStartDate,
+                    notes = backup.notes.distinct().take(MAX_PROFILE_NOTES)
                 )
             }.also { profiles ->
                 // 所有新课程文件写完后才切换元数据；失败时旧课表仍可读取。
@@ -694,7 +713,9 @@ object ImportedScheduleStorage {
         val coursesFile: String,
         val createdAt: Long,
         val updatedAt: Long,
-        val semesterStartDate: String? = null
+        val semesterStartDate: String? = null,
+        /** 课表级公共备注；旧数据缺省为 null，按空列表处理 */
+        val notes: List<String>? = null
     )
 
     @Serializable

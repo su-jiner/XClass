@@ -85,4 +85,28 @@ class ScheduleBackupCodecTest {
         assertEquals(cn.xiao.xyaax.model.Weekday.SUNDAY, schedule.meetings[2].weekday)
         assertEquals(cn.xiao.xyaax.model.Weekday.FRIDAY, schedule.meetings[3].weekday)
     }
+
+    @Test
+    fun backup_withNotes_roundTripsNotes() {
+        val profiles = listOf(
+            ScheduleBackupCodec.BackupProfile(
+                name = "主课表",
+                semesterStartDate = "2026-08-31",
+                notes = listOf("军事技能（张爽）1-19周", "学期时间：2026-08-31至2027-01-22，共21周")
+            )
+        )
+        val decoded = ScheduleBackupCodec.decode(ScheduleBackupCodec.encode("2026-09-05T12:00:00", profiles))
+        assertNotNull(decoded)
+        assertEquals(2, decoded!!.single().notes.size)
+        assertTrue(decoded.single().notes.contains("军事技能（张爽）1-19周"))
+    }
+
+    @Test
+    fun backup_withoutNotes_defaultsToEmptyList() {
+        // 旧版备份 JSON 不含 notes 字段：反序列化必须兜底为空列表、不报错
+        val legacy = """{"version":2,"exportedAt":"2026-09-05T12:00:00","profiles":[{"name":"主课表","semesterStartDate":"2026-08-31","courses":[]}]}"""
+        val decoded = ScheduleBackupCodec.decode(legacy)
+        assertNotNull(decoded)
+        assertTrue(decoded!!.single().notes.isEmpty())
+    }
 }

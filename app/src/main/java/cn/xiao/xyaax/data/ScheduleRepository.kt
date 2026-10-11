@@ -25,7 +25,9 @@ object ScheduleRepository {
         val courses: List<CourseSchedule>,
         val semesterStart: LocalDate,
         val totalWeeks: Int,
-        val currentWeek: Int
+        val currentWeek: Int,
+        /** 当前显示课表的课表级公共备注 */
+        val activeNotes: List<String> = emptyList()
     )
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -50,7 +52,8 @@ object ScheduleRepository {
             courses = courses,
             semesterStart = semesterStart,
             totalWeeks = totalWeeks,
-            currentWeek = currentWeek
+            currentWeek = currentWeek,
+            activeNotes = profiles.firstOrNull { it.isActive }?.notes.orEmpty()
         )
     }
 
@@ -66,9 +69,10 @@ object ScheduleRepository {
         courses: List<CourseSchedule>,
         mode: ImportedScheduleStorage.ImportMode,
         newProfileName: String? = null,
-        semesterStartDate: LocalDate? = null
+        semesterStartDate: LocalDate? = null,
+        notes: List<String> = emptyList()
     ): Result<String> = mutate(context) {
-        ImportedScheduleStorage.importCourses(context.filesDir, courses, mode, newProfileName, semesterStartDate)
+        ImportedScheduleStorage.importCourses(context.filesDir, courses, mode, newProfileName, semesterStartDate, notes)
     }
 
     suspend fun deleteCourse(

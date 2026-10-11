@@ -63,7 +63,9 @@ data class CourseTableParseResult(
     val totalWeeks: Int?,
     val timeTables: List<SectionTimeProfile>,
     val campusAliases: List<String>,
-    val warnings: List<String>
+    val warnings: List<String>,
+    /** 课表级公共备注（每行原样保留，最多 10 条） */
+    val notes: List<String> = emptyList()
 )
 
 /**
@@ -147,7 +149,8 @@ object CourseTableImporter {
             totalWeeks = metadata.totalWeeks,
             timeTables = timeTables,
             campusAliases = aliases,
-            warnings = warnings
+            warnings = warnings,
+            notes = metadata.notes
         )
     }
 
