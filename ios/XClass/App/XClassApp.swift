@@ -39,21 +39,25 @@ struct RootView: View {
     @State private var tab = AppPreferences.defaultPage == "today" ? 1 : 0
 
     var body: some View {
-        TabView(selection: $tab) {
-            TimetablePage(palette: palette)
-                .tabItem { Label("课表", systemImage: "calendar") }
-                .tag(0)
-            TodayPage(palette: palette)
-                .tabItem { Label("日程", systemImage: "clock") }
-                .tag(1)
-            ToolsView(palette: palette)
-                .tabItem { Label("工具", systemImage: "chart.bar.xaxis") }
-                .tag(2)
-            SettingsPage(palette: palette)
-                .tabItem { Label("设置", systemImage: "gearshape") }
-                .tag(3)
+        ZStack(alignment: .bottom) {
+            TabView(selection: $tab) {
+                TimetablePage(palette: palette)
+                    .tag(0)
+                TodayPage(palette: palette)
+                    .tag(1)
+                ToolsView(palette: palette)
+                    .tag(2)
+                SettingsPage(palette: palette)
+                    .tag(3)
+            }
+            .tint(palette.iconTint)
+
+            CapsuleTabBar(
+                selected: tab,
+                palette: palette,
+                onSelect: { tab = $0 }
+            )
         }
-        .tint(palette.iconTint)
     }
 
     private var palette: ThemePalette {
@@ -64,6 +68,61 @@ struct RootView: View {
         default: dark = systemScheme == .dark
         }
         return ThemePalette.palette(theme: AppPreferences.theme, dark: dark)
+    }
+}
+
+/// 液态胶囊底栏（等效 SleepDown LiquidBottomTabs 视觉）：浮动玻璃胶囊容器 + 圆角胶囊 Tab
+struct CapsuleTabBar: View {
+    let selected: Int
+    let palette: ThemePalette
+    let onSelect: (Int) -> Void
+    @Environment(\.colorScheme) private var systemScheme
+
+    private let items: [(Int, String, String)] = [
+        (0, "课表", "calendar"),
+        (1, "日程", "clock"),
+        (2, "工具", "chart.bar.xaxis"),
+        (3, "设置", "gearshape"),
+    ]
+
+    var body: some View {
+        let dark = systemScheme == .dark
+        HStack(spacing: 6) {
+            ForEach(items, id: \.0) { item in
+                let isSelected = item.0 == selected
+                Button {
+                    onSelect(item.0)
+                } label: {
+                    VStack(spacing: 2) {
+                        Image(systemName: item.2)
+                            .font(.system(size: 16))
+                        Text(item.1)
+                            .font(.system(size: 10))
+                    }
+                    .foregroundColor(isSelected ? palette.buttonText : palette.textSecondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(
+                        Capsule().fill(isSelected ? palette.buttonBackground : Color.clear)
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(6)
+        .background(
+            Capsule().fill(
+                dark
+                    ? Color(white: 0.12).opacity(0.82)
+                    : Color.white.opacity(0.78)
+            )
+        )
+        .overlay(
+            Capsule().stroke(palette.textSecondary.opacity(0.14), lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(dark ? 0.35 : 0.10), radius: 14, y: 4)
+        .padding(.horizontal, 14)
+        .padding(.bottom, 8)
     }
 }
 

@@ -1,10 +1,22 @@
 .tabbar {
   position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  left: 12rpx;
+  right: 12rpx;
+  bottom: 12rpx;
   display: flex;
-  padding: 6rpx 0 calc(6rpx + env(safe-area-inset-bottom));
+  padding: 8rpx;
+  border-radius: 48rpx;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1rpx solid rgba(128, 128, 128, 0.18);
+  box-shadow: 0 8rpx 32rpx rgba(0, 0, 0, 0.10);
+  box-sizing: border-box;
+}
+
+/* 深色模式玻璃容器（跟随页面深色状态） */
+.tabbar-dark {
+  background: rgba(18, 18, 22, 0.72);
+  border-color: rgba(255, 255, 255, 0.10);
+  box-shadow: 0 8rpx 32rpx rgba(0, 0, 0, 0.35);
 }
 
 .tabbar-item {
@@ -20,7 +32,7 @@
   align-items: center;
   justify-content: center;
   padding: 8rpx 26rpx;
-  border-radius: 32rpx;
+  border-radius: 36rpx;
   min-width: 108rpx;
 }
 

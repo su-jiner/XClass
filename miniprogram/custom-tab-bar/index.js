@@ -50,7 +50,7 @@ Component({
       iconNormal: iconUri(item.icon, palette.textSecondary, palette.panelAlt),
       iconActive: iconUri(item.icon, palette.iconTint, palette.panelAlt),
     }));
-    this.setData({ palette: palette, list: list });
+    this.setData({ palette: palette, dark: dark, list: list });
   },
   methods: {
     switchTab(event) {

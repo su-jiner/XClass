@@ -1,4 +1,4 @@
-<view class="tabbar" style="background:{{palette.nav}}">
+<view class="tabbar {{dark ? 'tabbar-dark' : ''}}">
   <view
     wx:for="{{list}}"
     wx:key="pagePath"
