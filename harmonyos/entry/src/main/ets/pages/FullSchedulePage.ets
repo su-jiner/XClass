@@ -1,6 +1,7 @@
 import {
   CourseSchedule, SimpleDate, CourseMeetingRef, ImportedCourse, ImportedMeeting,
   allMeetings, resolveOverlaps, SECTION_RANGES,
+  SectionTimeProfile, resolveProfile, defaultTimeProfile,
 } from '../core/Core.ets';
 import { ProfileStore } from '../core/ProfileStore.ets';
 import { currentPalette, CARD_COLORS, ThemePalette } from '../model/Theme.ets';
@@ -23,6 +24,10 @@ export struct FullSchedulePage {
   @StorageProp('themeVersion') @Watch('reload') themeVersion: number = 0;
   @StorageProp('systemDark') systemDark: boolean = false;
   @State courses: CourseSchedule[] = [];
+  @State displayProfile: SectionTimeProfile = defaultTimeProfile();
+  @State sectionRanges: string[] = SECTION_RANGES.slice();
+  @State sectionCount: number = 12;
+  @State notes: string[] = [];
   @State editingCourseIndex: number = -1;
   @State editingCourse: ImportedCourse = {
     courseName: '', teacher: '', semester: '', credit: null, rawWeekText: '', meetings: [],
@@ -49,6 +54,33 @@ export struct FullSchedulePage {
 
   reload(): void {
     this.courses = ProfileStore.instance?.loadCourses(this.profileId) ?? [];
+    // 左侧时间列动态跟随「当前显示时间表」
+    const profiles = ProfileStore.instance?.loadTimeProfiles() ?? [];
+    this.displayProfile = resolveProfile(profiles, ProfileStore.instance?.loadDefaultProfileId() ?? null);
+    let maxSection = 0;
+    this.displayProfile.blocks.forEach((block) => {
+      if (block.endSection > maxSection) maxSection = block.endSection;
+    });
+    this.sectionCount = Math.max(maxSection, 12);
+    this.sectionRanges = [];
+    for (let i = 1; i <= this.sectionCount; i += 1) {
+      const start = this.sectionRangeText(i, true);
+      const end = this.sectionRangeText(i, false);
+      this.sectionRanges.push(`${start}-${end}`);
+    }
+    this.notes = ProfileStore.instance?.listProfiles()
+      .find((p) => p.id === this.profileId || (this.profileId.length === 0 && p.isActive))?.notes ?? [];
+  }
+
+  /** 当前时间表下第 section 节的开始/结束时刻 */
+  sectionRangeText(section: number, isStart: boolean): string {
+    for (let i = 0; i < this.displayProfile.blocks.length; i += 1) {
+      const block = this.displayProfile.blocks[i];
+      if (section >= block.startSection && section <= block.endSection) {
+        return isStart ? block.startTime : block.endTime;
+      }
+    }
+    return '--:--';
   }
 
   palette(): ThemePalette {
@@ -95,7 +127,7 @@ export struct FullSchedulePage {
                 .height(HEADER_HEIGHT)
                 .width('100%')
                 .textAlign(TextAlign.Center)
-              ForEach(SECTION_RANGES, (range: string, index: number) => {
+              ForEach(this.sectionRanges, (range: string, index: number) => {
                 Column() {
                   Text(`${index + 1}`).fontSize(11).fontWeight(FontWeight.Bold)
                   Text(range.split('-')[0]).fontSize(8)
@@ -121,6 +153,27 @@ export struct FullSchedulePage {
         .layoutWeight(1)
         .align(Alignment.Top)
         .scrollable(ScrollDirection.Vertical)
+      }
+
+      // 底部课表级备注栏（非空才显示：小字、次级色、圆角卡片）
+      if (this.notes.length > 0) {
+        Column() {
+          ForEach(this.notes, (note: string) => {
+            Text(note)
+              .fontSize(11)
+              .fontColor(this.palette().textSecondary)
+              .maxLines(2)
+              .textAlign(TextAlign.Start)
+              .width('100%')
+              .margin({ bottom: 2 })
+          }, (note: string) => note)
+        }
+        .alignItems(HorizontalAlign.Start)
+        .width('100%')
+        .padding({ left: 12, right: 12, top: 8, bottom: 8 })
+        .margin({ left: 12, right: 12, bottom: 8 })
+        .backgroundColor(this.palette().panelAlt)
+        .borderRadius(12)
       }
     }
     .width('100%')
@@ -156,7 +209,7 @@ export struct FullSchedulePage {
         )
       }
       .width(46)
-      .height(ROW_HEIGHT * 12)
+      .height(ROW_HEIGHT * this.sectionCount)
       .clip(true)
     }
   }

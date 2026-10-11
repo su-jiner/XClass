@@ -21,6 +21,8 @@ export class ProfileInfo {
   isActive: boolean = false;
   updatedAt: number = 0;
   semesterStart: SimpleDate = defaultForToday();
+  /** 课表级公共备注（旧数据无此字段时按空数组处理） */
+  notes: string[] = [];
 }
 
 export class ManualCourseInput {
@@ -43,6 +45,8 @@ interface StoredProfileMeta {
   createdAt: number;
   updatedAt: number;
   semesterStartDate?: string;
+  /** 课表级公共备注（v2 起持久化；旧数据无此字段时按空数组处理） */
+  notes?: string[];
 }
 
 interface StoredMeta {
@@ -368,13 +372,17 @@ export class ProfileStore {
 
   listProfiles(): ProfileInfo[] {
     const meta = this.ensureInitialized();
-    return meta.profiles.map((p) => ({
-      id: p.id,
-      name: p.name,
-      isActive: p.id === meta.activeId,
-      updatedAt: p.updatedAt,
-      semesterStart: this.semesterStartOf(p),
-    } as ProfileInfo));
+    return meta.profiles.map((p) => {
+      const info = {
+        id: p.id,
+        name: p.name,
+        isActive: p.id === meta.activeId,
+        updatedAt: p.updatedAt,
+        semesterStart: this.semesterStartOf(p),
+      } as ProfileInfo;
+      info.notes = (p.notes ?? []).slice();
+      return info;
+    });
   }
 
   setActiveProfile(profileId: string): boolean {
@@ -534,6 +542,7 @@ export class ProfileStore {
       name: p.name,
       semesterStartDate: p.semesterStartDate ?? null,
       courses: this.readCoursesFile(p.coursesFile).map((c) => courseToBackup(c)),
+      notes: (p.notes ?? []).slice(),
     }));
     const timeProfiles = this.loadTimeProfiles()
       .filter((profile) => profile.id !== DEFAULT_PROFILE_ID)
@@ -550,7 +559,8 @@ export class ProfileStore {
     mode: 'overwrite' | 'new',
     newProfileName: string | null,
     semesterStartDate: string | null,
-    campusMap: Record<string, string>
+    campusMap: Record<string, string>,
+    notes: string[] = []
   ): string {
     const resolved: CourseSchedule[] = courses.map((course) => ({
       courseName: course.courseName,
@@ -568,6 +578,8 @@ export class ProfileStore {
       })),
     }));
 
+    const safeNotes = (notes ?? []).filter((item) => typeof item === 'string' && item.trim().length > 0);
+
     if (mode === 'new') {
       const meta = this.ensureInitialized();
       const id = this.randomUUID();
@@ -579,6 +591,7 @@ export class ProfileStore {
         id, name, coursesFile: fileName,
         createdAt: now, updatedAt: now,
         semesterStartDate: semesterStartDate ?? undefined,
+        notes: safeNotes.length > 0 ? safeNotes : undefined,
       });
       meta.activeId = id;
       this.writeMeta(meta);
@@ -590,6 +603,7 @@ export class ProfileStore {
     this.writeCoursesFile(active.coursesFile, resolved);
     active.updatedAt = Date.now();
     if (semesterStartDate) active.semesterStartDate = semesterStartDate;
+    if (safeNotes.length > 0) active.notes = safeNotes;
     meta.activeId = active.id;
     this.writeMeta(meta);
     return active.name;
@@ -622,12 +636,14 @@ export class ProfileStore {
       const id = this.randomUUID();
       const fileName = `courses_${id}.json`;
       this.writeCoursesFile(fileName, backup.courses.map((c) => backupToCourse(c)));
+      const backupNotes = (backup.notes ?? []).filter((item) => typeof item === 'string' && item.trim().length > 0);
       newProfiles.push({
         id,
         name: backup.name.length > 0 ? backup.name : `课表${this.timestampLabel()}`,
         coursesFile: fileName,
         createdAt: now, updatedAt: now,
         semesterStartDate: backup.semesterStartDate ?? undefined,
+        notes: backupNotes.length > 0 ? backupNotes : undefined,
       });
     }
     if (newProfiles.length > 0) {
@@ -749,8 +765,12 @@ export class ProfileStore {
     this.writeTextAtomic(this.timeProfilesPath(), JSON.stringify(payload, null, 2));
   }
 
-  /** 导入解析结果入库：保存识别出的时间表并建立「校区简称 → 时间表」映射 */
-  saveParsedTimeTables(timeTables: SectionTimeProfile[], campusAliases: string[]): Record<string, string> {
+  /**
+   * 导入解析结果入库：保存识别出的时间表并建立「校区简称 → 时间表」映射。
+   * preferredDefaultId 非空时（导入场景）自动把首套校区时间表设为当前显示时间表；
+   * 手动在时间表管理页操作时不传该参数，保持用户已选的当前时间表不变。
+   */
+  saveParsedTimeTables(timeTables: SectionTimeProfile[], campusAliases: string[], preferredDefaultId: string | null = null): Record<string, string> {
     const existing = this.loadTimeProfiles().filter((p) => p.id !== DEFAULT_PROFILE_ID);
     timeTables.forEach((profile) => {
       const index = existing.findIndex((item) => item.id === profile.id || item.name === profile.name);
@@ -761,7 +781,8 @@ export class ProfileStore {
       const matched = timeTables.find((profile) => profile.name.indexOf(alias) >= 0);
       if (matched) campusMap[alias] = matched.id;
     });
-    this.saveTimeProfiles(existing, campusMap, this.loadDefaultProfileId());
+    const defaultId = preferredDefaultId !== null ? preferredDefaultId : this.loadDefaultProfileId();
+    this.saveTimeProfiles(existing, campusMap, defaultId);
     return campusMap;
   }
 

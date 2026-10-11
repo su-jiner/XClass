@@ -1,6 +1,7 @@
 import {
   CourseSchedule, SimpleDate, CourseMeetingRef, ImportedCourse, ImportedMeeting,
   displayMeetings, guessCurrentWeek, totalWeeks, resolveOverlaps, SECTION_RANGES,
+  SectionTimeProfile, resolveProfile, defaultTimeProfile,
 } from '../core/Core.ets';
 import { ProfileStore } from '../core/ProfileStore.ets';
 import { currentPalette, CARD_COLORS, ThemePalette } from '../model/Theme.ets';
@@ -24,6 +25,10 @@ export struct TimetablePage {
   @State currentWeek: number = 1;
   @State weeks: number = 20;
   @State selectedWeek: number = 1;
+  @State displayProfile: SectionTimeProfile = defaultTimeProfile();
+  @State sectionRanges: string[] = SECTION_RANGES.slice();
+  @State sectionCount: number = 12;
+  @State notes: string[] = [];
   @State editingCourseIndex: number = -1;
   @State editingCourse: ImportedCourse = {
     courseName: '', teacher: '', semester: '', credit: null, rawWeekText: '', meetings: [],
@@ -60,6 +65,32 @@ export struct TimetablePage {
     if (this.selectedWeek < 1 || this.selectedWeek > this.weeks) {
       this.selectedWeek = this.currentWeek;
     }
+    // 左侧时间列动态跟随「当前显示时间表」（导入校区时间表后自动切换，可在时间表管理页手动改回）
+    const profiles = ProfileStore.instance?.loadTimeProfiles() ?? [];
+    this.displayProfile = resolveProfile(profiles, ProfileStore.instance?.loadDefaultProfileId() ?? null);
+    let maxSection = 0;
+    this.displayProfile.blocks.forEach((block) => {
+      if (block.endSection > maxSection) maxSection = block.endSection;
+    });
+    this.sectionCount = Math.max(maxSection, 12);
+    this.sectionRanges = [];
+    for (let i = 1; i <= this.sectionCount; i += 1) {
+      const start = this.sectionRangeText(i, true);
+      const end = this.sectionRangeText(i, false);
+      this.sectionRanges.push(`${start}-${end}`);
+    }
+    this.notes = ProfileStore.instance?.listProfiles().find((p) => p.isActive)?.notes ?? [];
+  }
+
+  /** 当前时间表下第 section 节的开始/结束时刻 */
+  sectionRangeText(section: number, isStart: boolean): string {
+    for (let i = 0; i < this.displayProfile.blocks.length; i += 1) {
+      const block = this.displayProfile.blocks[i];
+      if (section >= block.startSection && section <= block.endSection) {
+        return isStart ? block.startTime : block.endTime;
+      }
+    }
+    return '--:--';
   }
 
   palette(): ThemePalette {
@@ -98,9 +129,9 @@ export struct TimetablePage {
     const now = new Date();
     const pad = (n: number): string => String(n).padStart(2, '0');
     const nowText = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
-    for (let i = 0; i < SECTION_RANGES.length; i++) {
-      const parts = SECTION_RANGES[i].split('-');
-      if (parts[0] <= nowText && nowText < parts[1]) return i + 1;
+    for (let i = 0; i < this.sectionRanges.length; i++) {
+      const parts = this.sectionRanges[i].split('-');
+      if (parts.length === 2 && parts[0] <= nowText && nowText < parts[1]) return i + 1;
     }
     return null;
   }
@@ -179,7 +210,7 @@ export struct TimetablePage {
               .height(HEADER_HEIGHT)
               .width('100%')
               .textAlign(TextAlign.Center)
-            ForEach(SECTION_RANGES, (range: string, index: number) => {
+            ForEach(this.sectionRanges, (range: string, index: number) => {
               Column() {
                 Text(`${index + 1}`).fontSize(11).fontWeight(FontWeight.Bold)
                 Text(range.split('-')[0]).fontSize(8)
@@ -205,6 +236,27 @@ export struct TimetablePage {
       .layoutWeight(1)
       .align(Alignment.Top)
       .scrollable(ScrollDirection.Vertical)
+
+      // 底部课表级备注栏（非空才显示：小字、次级色、圆角卡片）
+      if (this.notes.length > 0) {
+        Column() {
+          ForEach(this.notes, (note: string) => {
+            Text(note)
+              .fontSize(11)
+              .fontColor(this.palette().textSecondary)
+              .maxLines(2)
+              .textAlign(TextAlign.Start)
+              .width('100%')
+              .margin({ bottom: 2 })
+          }, (note: string) => note)
+        }
+        .alignItems(HorizontalAlign.Start)
+        .width('100%')
+        .padding({ left: 12, right: 12, top: 8, bottom: 8 })
+        .margin({ left: 12, right: 12, bottom: 8 })
+        .backgroundColor(this.palette().panelAlt)
+        .borderRadius(12)
+      }
       }
     }
     .width('100%')
@@ -259,7 +311,7 @@ export struct TimetablePage {
         )
       }
       .width(46)
-      .height(ROW_HEIGHT * 12)
+      .height(ROW_HEIGHT * this.sectionCount)
       .clip(true)
     }
   }
@@ -316,8 +368,8 @@ export struct TimetablePage {
   }
 
   showCourseDetail(item: CourseMeetingRef): void {
-    const rangeStart = SECTION_RANGES[item.meeting.startSection - 1]?.split('-')[0] ?? '--:--';
-    const rangeEnd = SECTION_RANGES[item.meeting.endSection - 1]?.split('-')[1] ?? '--:--';
+    const rangeStart = this.sectionRanges[item.meeting.startSection - 1]?.split('-')[0] ?? '--:--';
+    const rangeEnd = this.sectionRanges[item.meeting.endSection - 1]?.split('-')[1] ?? '--:--';
     const creditText = item.course.credit === null ? 'N/A' : String(item.course.credit);
     const slotKey = `${item.meeting.weekday}:${item.meeting.startSection}`;
     this.getUIContext().showAlertDialog({

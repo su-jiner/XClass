@@ -51,6 +51,7 @@ import {
   parseWeekRulesText, weekRulesToText, parseCellEntries, sectionsOfText,
   sectionRangeFromLabel, weekdayIndexOfText, parsePageMetadata, parseTimeTablesText,
   parseCourseTableText, sectionTimeText, decodeBackupEnvelope,
+  extractNotesFromText, NOTE_MAX_COUNT,
   isNoiseLine, isNoiseCourseName, normalizePlaceholder, encodeShareText,
   gpaOfScore, scoreOfGrade, gpaSummary, groupGradesBySemester, examCountdownText, earnedCreditsFromGrades,
 } from './Core.ts';
@@ -368,6 +369,105 @@ test('exam countdown picks nearest upcoming exam', () => {
   assert.ok(text.indexOf('10 天') >= 0);
   assert.equal(examCountdownText([], now), '暂无考试安排');
   assert.equal(examCountdownText([{ courseName: '结束', time: '2026-01-01 08:30', location: '', seat: '' }], now), '考试均已结束');
+});
+
+// ---- 课表级底部备注（notes）提取 ----
+test('extracts note lines by teacher-week pattern (a)', () => {
+  const notes = extractNotesFromText('军事技能（张爽）1-19周\n入学教育（张爽）1-19周');
+  assert.equal(notes.length, 2);
+  assert.equal(notes[0], '军事技能（张爽）1-19周');
+  assert.equal(notes[1], '入学教育（张爽）1-19周');
+});
+
+test('extracts note lines by semester-date pattern (b)', () => {
+  const notes = extractNotesFromText('学期时间：2026-08-31至2027-01-22，共21周');
+  assert.equal(notes.length, 1);
+  assert.ok(notes[0].indexOf('学期时间') >= 0);
+});
+
+test('extracts note lines by total-weeks pattern (c)', () => {
+  const meta = parsePageMetadata('本学期2026-08-31正式上课至2027-01-22结束，共21周.');
+  assert.equal(meta.notes.length, 1);
+  assert.ok((meta.notes[0]).indexOf('共21周') >= 0);
+});
+
+test('deduplicates note lines and caps at NOTE_MAX_COUNT', () => {
+  const lines = [
+    '军事技能（张爽）1-19周',
+    '军事技能（张爽）1-19周',
+    '入学教育（张爽）1-19周',
+  ];
+  for (let i = 1; i <= 12; i += 1) lines.push('备注课程' + i + '（王老师）1-19周');
+  const notes = extractNotesFromText(lines.join('\n'));
+  assert.equal(notes.length, NOTE_MAX_COUNT);
+  assert.equal(notes.filter((n) => n === '军事技能（张爽）1-19周').length, 1);
+});
+
+test('other-course summary line stays in warnings not notes', () => {
+  const text = [
+    '星期一 第1-2节 高等数学/A101/张三',
+    '其他课程：军事技能（张爽）1-19周；入学教育（张爽）1-19周；',
+  ].join('\n');
+  const parsed = parseCourseTableText(text);
+  assert.equal(parsed.courses.length, 1);
+  assert.equal(parsed.notes.length, 0);
+  assert.ok(parsed.warnings.some((w) => w.indexOf('表外课程') >= 0));
+});
+
+test('course table result carries bottom notes', () => {
+  const text = [
+    '星期一 第1-2节 高等数学/A101/张三',
+    '军事技能（张爽）1-19周',
+    '学期时间：2026-08-31至2027-01-22，共21周',
+  ].join('\n');
+  const parsed = parseCourseTableText(text);
+  assert.equal(parsed.courses.length, 1);
+  assert.ok(parsed.notes.some((n) => n.indexOf('军事技能') >= 0));
+  assert.ok(parsed.notes.some((n) => n.indexOf('学期时间') >= 0));
+});
+
+test('course lines with weekday or explicit section marker excluded from notes', () => {
+  const text = [
+    '军事技能（张爽）1-19周',
+    '星期一 第1-2节 高等数学/A101/张三',
+    '体育（一）/(1-2节)7-19周/体育场1/殷乐',
+    '第5-6节 大学物理/B202/李四',
+  ].join('\n');
+  const notes = extractNotesFromText(text);
+  assert.equal(notes.length, 1);
+  assert.equal(notes[0], '军事技能（张爽）1-19周');
+});
+
+test('holiday lines and week ranges are not misjudged as section markers', () => {
+  const text = [
+    '共21周（含节假日调休）',
+    '入学教育（张爽）1-19周',
+  ].join('\n');
+  const notes = extractNotesFromText(text);
+  assert.equal(notes.length, 2);
+  assert.ok(notes.some((n) => n.indexOf('节假日') >= 0));
+  assert.ok(notes.some((n) => n === '入学教育（张爽）1-19周'));
+});
+
+test('weekday-only list line without section marker excluded from notes', () => {
+  const parsed = parseCourseTableText('星期一 高等数学/A101/张三\n军事技能（张爽）1-19周');
+  assert.equal(parsed.notes.length, 1);
+  assert.equal(parsed.notes[0], '军事技能（张爽）1-19周');
+});
+
+test('backup v2 carries notes and legacy backup without notes imports clean', () => {
+  const json = encodeBackup('2026-10-10T00:00:00', [{
+    name: '主课表', semesterStartDate: '2026-08-31', courses: [],
+    notes: ['军事技能（张爽）1-19周', '学期时间：2026-08-31至2027-01-22，共21周'],
+  }]);
+  const envelope = decodeBackupEnvelope(json);
+  assert.equal(envelope.version, 2);
+  assert.equal(envelope.profiles[0].notes.length, 2);
+  assert.equal(envelope.profiles[0].notes[1], '学期时间：2026-08-31至2027-01-22，共21周');
+  // 旧备份无 notes 字段：导入不报错，按空数组处理
+  const legacy = decodeBackup(JSON.stringify({ version: 2, exportedAt: '', profiles: [{ name: '旧', semesterStartDate: null, courses: [] }] }));
+  assert.equal(legacy.length, 1);
+  assert.deepEqual(legacy[0].notes ?? [], []);
 });
 
 for (const [status, name] of results) {

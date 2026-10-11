@@ -18,9 +18,15 @@ interface ImportGroup {
   courses: ImportedCourse[];
 }
 
+interface PendingFile {
+  name: string;
+  uri: string;
+  size: number;
+}
+
 /**
- * 课表导入页：粘贴文本 / 选择 txt·md·csv·tsv 文件（可多选，一个文件 = 一个课表）→
- * 本地解析 → 预览校对（可逐条编辑/删除）→ 确认后覆盖或新建课表。
+ * 课表导入页：粘贴文本 / 多次选择 txt·md·csv·tsv 文件累加待识别列表（一个文件 = 一个课表）→
+ * 「识别全部」统一解析 → 预览校对（可逐条编辑/删除）→ 确认后覆盖或新建课表。
  * 与 Android 导入向导、小程序导入页共用同一套解析规则；全程离线。
  */
 @Entry
@@ -31,6 +37,7 @@ struct ImportPage {
   @State text: string = '';
   @State mode: string = 'paste';
   @State groups: ImportGroup[] = [];
+  @State pendingFiles: PendingFile[] = [];
   @State previewCount: number = 0;
   @State toast: string = '';
   @State editingCourse: ImportedCourse | null = null;
@@ -60,34 +67,70 @@ struct ImportPage {
     return currentPalette(Prefs.theme(), Prefs.darkMode(), this.systemDark);
   }
 
+  /** 选择文件阶段：只收集「待识别文件列表」（名称+路径+大小），不解析；支持多次选择累加，按路径去重 */
   pickFile(): void {
     const picker = new documentViewPicker.DocumentViewPicker();
     const options = new documentViewPicker.DocumentSelectOptions();
     options.fileSuffixFilters = ['.txt', '.md', '.csv', '.tsv'];
     picker.select(options).then((urls: Array<string>) => {
       if (urls.length === 0) return;
-      let total = 0;
+      const list = this.pendingFiles.slice();
+      let added = 0;
       urls.forEach((url) => {
+        if (list.some((item: PendingFile) => item.uri === url)) return;
         try {
           const file = fs.openSync(url, fs.OpenMode.READ_ONLY);
           const stat = fs.statSync(file.fd);
-          const buf = new ArrayBuffer(stat.size);
-          fs.readSync(file.fd, buf);
           fs.closeSync(file);
-          const content = util.TextDecoder.create('utf-8').decodeToString(new Uint8Array(buf));
           const name = url.split('/').pop() ?? url;
-          this.parse(content, name);
-          total += this.groups.length > 0 ? this.groups[this.groups.length - 1].courses.length : 0;
+          list.push({ name, uri: url, size: stat.size });
+          added += 1;
         } catch {
-          this.toast = '读取文件失败';
+          // 单个文件读取失败时跳过
         }
       });
-      if (urls.length > 1) {
-        this.toast = `已解析 ${urls.length} 份课表文件，可逐条编辑后再保存`;
-      }
+      this.pendingFiles = list;
+      this.toast = added > 0 ? `已添加 ${added} 个待识别文件，点「识别全部」开始解析` : '所选文件已在列表中';
     }).catch(() => {
       this.toast = '未选择文件';
     });
+  }
+
+  /** 识别全部：统一遍历待识别列表逐文件解析（复用 Core.ets 解析管线）进入预览 */
+  identifyAll(): void {
+    if (this.pendingFiles.length === 0) {
+      this.toast = '请先选择课表文件';
+      return;
+    }
+    let ok = 0;
+    this.pendingFiles.forEach((item: PendingFile) => {
+      try {
+        const file = fs.openSync(item.uri, fs.OpenMode.READ_ONLY);
+        const stat = fs.statSync(file.fd);
+        const buf = new ArrayBuffer(stat.size);
+        fs.readSync(file.fd, buf);
+        fs.closeSync(file);
+        const content = util.TextDecoder.create('utf-8').decodeToString(new Uint8Array(buf));
+        this.parse(content, item.name);
+        ok += 1;
+      } catch {
+        this.toast = `读取 ${item.name} 失败，已跳过`;
+      }
+    });
+    this.pendingFiles = [];
+    if (ok > 0) this.toast = `已识别 ${ok} 份课表，可预览编辑后再保存`;
+  }
+
+  removePending(index: number): void {
+    const list = this.pendingFiles.slice();
+    list.splice(index, 1);
+    this.pendingFiles = list;
+  }
+
+  formatSize(size: number): string {
+    if (size < 1024) return `${size} B`;
+    if (size < 1024 * 1024) return `${Math.round(size / 1024)} KB`;
+    return `${(size / 1024 / 1024).toFixed(1)} MB`;
   }
 
   parse(content: string, sourceName: string): void {
@@ -197,7 +240,9 @@ struct ImportPage {
     let imported = 0;
     let firstName = '';
     valid.forEach((group, index) => {
-      const campusMap = store.saveParsedTimeTables(group.parsed.timeTables, group.parsed.campusAliases) ?? {};
+      // 导入解析出校区时间表时，自动把首个校区时间表设为当前显示时间表（仅导入后自动设置）
+      const preferredId = group.parsed.timeTables.length > 0 ? group.parsed.timeTables[0].id : null;
+      const campusMap = store.saveParsedTimeTables(group.parsed.timeTables, group.parsed.campusAliases, preferredId) ?? {};
       const schedules: CourseSchedule[] = group.courses.map((course) => ({
         courseName: course.courseName,
         teacher: course.teacher,
@@ -221,7 +266,8 @@ struct ImportPage {
         modeForGroup,
         modeForGroup === 'new' ? groupName : null,
         group.parsed.semesterStartDate,
-        campusMap
+        campusMap,
+        group.parsed.notes
       ) ?? '';
       imported += schedules.length;
       if (index === 0) firstName = name;
@@ -266,7 +312,7 @@ struct ImportPage {
   card() {
     Column() {
       Text('导入课表').fontSize(24).fontWeight(FontWeight.Bold).fontColor(this.palette().text)
-      Text('纯本地解析：粘贴文本或选择 txt/md/csv/tsv 文件（可多选，一个文件 = 一个课表）')
+      Text('一个文件 = 一个课表，选完点识别全部，可预览编辑后再保存')
         .fontSize(12).fontColor(this.palette().textSecondary).margin({ top: 4 })
     }
     .alignItems(HorizontalAlign.Start)
@@ -289,11 +335,41 @@ struct ImportPage {
             .backgroundColor(this.palette().buttonBackground)
             .fontColor(this.palette().buttonText)
             .onClick(() => this.parse(this.text, 'paste.txt'))
-          Button('从文件选择（可多选：txt/md/csv/tsv）')
+          Button('从文件添加（可多次选择：txt/md/csv/tsv）')
             .width('100%').margin({ top: 8 })
             .backgroundColor(this.palette().panelAlt)
             .fontColor(this.palette().text)
             .onClick(() => this.pickFile())
+
+          if (this.pendingFiles.length > 0) {
+            Column() {
+              Text(`待识别文件（${this.pendingFiles.length}）`)
+                .fontSize(12).fontColor(this.palette().textSecondary).margin({ bottom: 4 })
+              ForEach(this.pendingFiles, (item: PendingFile, index: number) => {
+                Row() {
+                  Text(item.name)
+                    .fontSize(13).fontColor(this.palette().text).layoutWeight(1)
+                    .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+                  Text(this.formatSize(item.size)).fontSize(11).fontColor(this.palette().textSecondary).margin({ right: 8 })
+                  Text('移除').fontSize(12).fontColor(this.palette().iconTint)
+                    .onClick(() => this.removePending(index))
+                }
+                .width('100%').padding({ top: 4, bottom: 4 })
+              }, (item: PendingFile) => item.uri)
+              Button(`识别全部（${this.pendingFiles.length} 个文件）`)
+                .width('100%').margin({ top: 8 })
+                .backgroundColor(this.palette().buttonBackground)
+                .fontColor(this.palette().buttonText)
+                .onClick(() => this.identifyAll())
+            }
+            .alignItems(HorizontalAlign.Start)
+            .width('100%')
+            .padding(12)
+            .margin({ top: 8 })
+            .backgroundColor(this.palette().panelAlt)
+            .borderRadius(14)
+          }
+
           Button('导出课表分享文本（复制到剪贴板）')
             .width('100%').margin({ top: 8 })
             .backgroundColor(this.palette().panelAlt)
@@ -321,6 +397,11 @@ struct ImportPage {
               ForEach(group.parsed.warnings, (warning: string) => {
                 Text(`⚠ ${warning}`).fontSize(12).fontColor(this.palette().textSecondary)
               })
+              if (group.parsed.notes.length > 0) {
+                ForEach(group.parsed.notes, (note: string) => {
+                  Text(`备注：${note}`).fontSize(11).fontColor(this.palette().textSecondary).maxLines(2)
+                })
+              }
             }
             .alignItems(HorizontalAlign.Start)
             .width('100%')

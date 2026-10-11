@@ -398,6 +398,8 @@ export interface BackupProfile {
   name: string;
   semesterStartDate: string | null;
   courses: BackupCourse[];
+  /** 课表级公共备注（v2 起；旧备份无此字段时按空数组处理） */
+  notes?: string[];
 }
 export interface BackupFile {
   version: number;
@@ -525,6 +527,8 @@ export interface CourseTableParseResult {
   timeTables: SectionTimeProfile[];
   campusAliases: string[];
   warnings: string[];
+  /** 课表级公共备注（底部展示，原样保留每行） */
+  notes: string[];
 }
 
 /** 周次文本 → WeekRule[]（7-19周 / 12-14周(双),15-19周 / 第1,3,5周（单）） */
@@ -701,7 +705,49 @@ export function sectionRangeFromLabel(text: string): number[] | null {
   return null;
 }
 
-/** 页眉页脚：学期、开学日期、总周数、其他课程 */
+/**
+ * 课表级底部备注提取：从原始文本中挑出独立备注行。
+ * 规则：不含星期与节次标记的行（现有解析器不会判为课程行），且不是「其他课程：」汇总行，
+ * 命中以下任一模式即入 notes：
+ *  (a) `名称（教师）N-N周`：\S+[（(][^）)]{1,6}[）)]\s*\d{1,2}\s*[-—–~～至]\s*\d{1,2}\s*周
+ *  (b) 含「学期时间」或「学期：」且后跟 YYYY-MM-DD 至 YYYY-MM-DD
+ *  (c) 含「共N周」
+ * 按原样字符串去重、最多 10 条、原样保留；无匹配返回空数组。
+ */
+const NOTE_LINE_RE_A = /\S+[（(][^）)]{1,6}[）)]\s*\d{1,2}\s*[-—–~～至]\s*\d{1,2}\s*周/;
+const NOTE_LINE_RE_DATE_RANGE = /\d{4}\s*[-/]\s*\d{1,2}\s*[-/]\s*\d{1,2}\s*[-—–~～至]\s*\d{4}\s*[-/]\s*\d{1,2}\s*[-/]\s*\d{1,2}/;
+const NOTE_LINE_RE_TOTAL_WEEKS = /共\s*\d{1,2}\s*周/;
+/** 显式节次标记：含「节」字的 N-M节 / 第N节；不得把 1-19周、节假日 误判为节次 */
+const NOTE_LINE_SECTION_MARK = /\d{1,2}\s*[-—–~～至]\s*\d{1,2}\s*节|第\s*\d{1,2}\s*节/;
+export const NOTE_MAX_COUNT = 10;
+
+export function extractNotesFromText(rawText: string): string[] {
+  const seen: string[] = [];
+  const notes: string[] = [];
+  rawText.split(/\r?\n/).forEach((lineRaw) => {
+    const line = lineRaw.trim();
+    if (line.length === 0) return;
+    // 「其他课程：」汇总行仍进 warnings，不入 notes
+    if (/^其他课程[：:]/.test(line)) return;
+    // 课程行（含星期标记 或 显式节次标记）不入 notes
+    if (weekdayIndexOfText(line) !== null || NOTE_LINE_SECTION_MARK.test(line)) return;
+    let matched = false;
+    if (NOTE_LINE_RE_A.test(line)) {
+      matched = true;
+    } else if ((line.indexOf('学期时间') >= 0 || /学期[：:]/.test(line)) && NOTE_LINE_RE_DATE_RANGE.test(line)) {
+      matched = true;
+    } else if (NOTE_LINE_RE_TOTAL_WEEKS.test(line)) {
+      matched = true;
+    }
+    if (!matched) return;
+    if (seen.indexOf(line) >= 0) return;
+    seen.push(line);
+    notes.push(line);
+  });
+  return notes.slice(0, NOTE_MAX_COUNT);
+}
+
+/** 页眉页脚：学期、开学日期、总周数、其他课程、课表级备注 */
 export function parsePageMetadata(text: string): Record<string, string | number | string[]> {
   const semesterMatch = text.match(/(\d{4})\s*-\s*(\d{4})\s*年\s*第?\s*([一二1-3])\s*学期/);
   const startMatch = text.match(/本学期\s*(\d{4})\s*[-/年]\s*(\d{1,2})\s*[-/月]\s*(\d{1,2})/)
@@ -719,6 +765,7 @@ export function parsePageMetadata(text: string): Record<string, string | number 
     startDay: startMatch ? Number(startMatch[3]) : 0,
     totalWeeks: weekMatches.length ? Math.max(...weekMatches) : 0,
     otherCourseLines: other ? other.split(/[；;]/).map((item) => item.trim()).filter((item) => item.length > 0) : [],
+    notes: extractNotesFromText(text),
   };
 }
 
@@ -921,6 +968,7 @@ export function parseCourseTableText(rawText: string, rows: string[][] | null = 
     timeTables,
     campusAliases: aliases,
     warnings,
+    notes: (metadata.notes as string[]) ?? [],
   };
 }
 
