@@ -31,7 +31,11 @@
   "description": "XClass 本地课表（微信小程序端）：课表/今日/工具/设置 + 离线导入，不联网",
   "simulatorPluginLibVersion": {},
   "packOptions": {
-    "ignore": [],
+    "ignore": [
+      { "type": "folder", "value": "verify" },
+      { "type": "folder", "value": "tools" },
+      { "type": "file", "value": "run.mjs" }
+    ],
     "include": []
   },
   "editorSetting": {},

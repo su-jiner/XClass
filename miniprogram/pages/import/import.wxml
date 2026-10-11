@@ -23,6 +23,10 @@
     已解析 {{groups.length}} 份课表文本，全部可编辑后再保存
   </view>
 
+  <view class="card" wx:for="{{warnings}}" wx:key="*this" style="background:{{palette.panelAlt}}">
+    <view class="muted">⚠ {{item}}</view>
+  </view>
+
   <view class="card" wx:for="{{groups}}" wx:key="index" style="background:{{palette.panelAlt}}">
     <view class="row">
       <view style="font-size:28rpx;font-weight:700;color:{{palette.textPrimary}}">{{item.name}}</view>
@@ -31,7 +35,6 @@
     <view class="muted" wx:if="{{item.parsed.semester}}">学期：{{item.parsed.semester}}</view>
     <view class="muted" wx:if="{{item.parsed.totalWeeks}}">总周数：{{item.parsed.totalWeeks}}</view>
     <view class="muted" wx:if="{{item.parsed.timeTables.length}}">节次时间表：{{item.parsed.timeTables.length}} 套（已保存并建立校区映射）</view>
-    <view class="muted" wx:for="{{warnings}}" wx:key="*this">⚠ {{item}}</view>
   </view>
 
   <view class="card" wx:for="{{groups}}" wx:for-item="group" wx:for-index="groupIndex" wx:key="index" style="background:{{palette.panel}}">

@@ -1,6 +1,6 @@
 /**
  * 小程序核心逻辑回归：Node 直接跑 utils/*.js（与鸿蒙 verify/run.mjs 同思路）。
- * 运行：node miniprogram/verify/run.mjs
+ * 运行：node tools/miniprogram-verify/run.mjs
  */
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
@@ -9,7 +9,7 @@ import { dirname, join } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
-const core = require(join(here, '..', 'utils', 'core.js'));
+const core = require(join(here, '..', '..', 'miniprogram', 'utils', 'core.js'));
 
 const results = [];
 function test(name, fn) {

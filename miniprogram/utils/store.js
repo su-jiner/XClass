@@ -407,6 +407,8 @@ module.exports = {
   setActiveSemesterStart,
   addManualCourse,
   deleteCourse,
+  updateCourse,
+  deleteCourseInProfile,
   importCourses,
   loadTimeProfiles,
   loadCampusMap,
