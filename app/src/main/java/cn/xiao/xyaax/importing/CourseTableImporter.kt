@@ -78,6 +78,8 @@ object CourseTableImporter {
         val metadata = PageMetadataParser.parse(rawText.ifBlank { blocks.joinToString("\n") { it.text } })
         val totalWeeks = metadata.totalWeeks ?: 20
         val warnings = mutableListOf<String>()
+        // 时间表提前解析，供「时间→节次」映射（规格：节次映射与时间对齐）
+        val timeTables = TimeTableTextParser.parse(rawText.ifBlank { blocks.joinToString("\n") { it.text } })
 
         val gridRows = TableGridBuilder.buildRows(blocks)
         val headerRowIndex = findHeaderRow(gridRows)
@@ -103,7 +105,10 @@ object CourseTableImporter {
                         return@forEachIndexed
                     }
                     entries.forEach { entry ->
-                        val sections = CellEntryParser.sectionsOf(entry.rawText) ?: rowSectionRange
+                        // 节次来源优先级：单元格内数字节次 → 行标签 → 时间区间映射
+                        val sections = CellEntryParser.sectionsOf(entry.rawText)
+                            ?: rowSectionRange
+                            ?: TimeToSectionMapper.map(entry.rawText, timeTables)
                         if (sections == null) {
                             warnings += "「${entry.courseName}」缺少节次信息，已跳过"
                             return@forEachIndexed
@@ -136,8 +141,9 @@ object CourseTableImporter {
                 metadata.otherCourseLines.take(5).joinToString("；")
         }
 
-        val merged = mergeCourses(collected)
-        val timeTables = TimeTableTextParser.parse(rawText.ifBlank { blocks.joinToString("\n") { it.text } })
+        val merged = UniversalMerge.merge(collected)
+        // 冲突标记：同时段多课全部保留并警告（规格：冲突处理）
+        warnings += UniversalMerge.detectConflicts(merged)
         val aliases = merged.flatMap { course -> course.meetings.mapNotNull { it.campusAlias } }.distinct()
 
         return CourseTableParseResult(
@@ -228,25 +234,6 @@ object CourseTableImporter {
         }
         if (result.isEmpty()) warnings += "未识别到课表结构，请确认文件内容或改用粘贴文本导入"
         return result
-    }
-
-    /** 同名同教师的多次上课时间合并为一门课。 */
-    private fun mergeCourses(courses: List<ParsedCourse>): List<ParsedCourse> {
-        val grouped = LinkedHashMap<String, MutableList<ParsedCourse>>()
-        courses.forEach { course ->
-            val key = course.courseName.trim() + "|" + course.teacher.trim()
-            grouped.getOrPut(key) { mutableListOf() }.add(course)
-        }
-        return grouped.values.map { group ->
-            val first = group.first()
-            ParsedCourse(
-                courseName = first.courseName,
-                teacher = first.teacher,
-                semester = first.semester,
-                meetings = group.flatMap { it.meetings }.distinct(),
-                warnings = group.flatMap { it.warnings }.distinct()
-            )
-        }
     }
 }
 

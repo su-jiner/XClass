@@ -849,6 +849,8 @@ export function parseTimeTablesText(text: string): SectionTimeProfile[] {
 export function parseCourseTableText(rawText: string, rows: string[][] | null = null): CourseTableParseResult {
   const metadata = parsePageMetadata(rawText);
   const total = (metadata.totalWeeks as number) > 0 ? (metadata.totalWeeks as number) : DEFAULT_TOTAL_WEEKS;
+  // 时间表提前解析，供「时间→节次」映射（通用算法：节次映射与时间对齐）
+  const timeTables = parseTimeTablesText(rawText);
   const collected: ImportedCourse[] = [];
   const warnings: string[] = [];
 
@@ -874,7 +876,8 @@ export function parseCourseTableText(rawText: string, rows: string[][] | null = 
           if (!cell) return;
           const entries = parseCellEntries(cell, total);
           entries.forEach((entry) => {
-            const sections = sectionsOfText(entry.rawText) ?? rowSection;
+            // 节次来源优先级：单元格内数字节次 → 行标签 → 时间区间映射
+            const sections = sectionsOfText(entry.rawText) ?? rowSection ?? timeToSectionsText(entry.rawText, timeTables);
             if (!sections) { warnings.push(`「${entry.courseName}」缺少节次信息，已跳过`); return; }
             collected.push({
               courseName: entry.courseName,
@@ -922,11 +925,12 @@ export function parseCourseTableText(rawText: string, rows: string[][] | null = 
     if (!collected.length) warnings.push('未识别到课表结构，请确认内容或改用粘贴文本导入');
   }
 
-  // 同名同教师合并
+  // 合并主键：课程名 + 教师 + 地点（通用算法第 7 条）
   const order: string[] = [];
   const grouped: Record<string, ImportedCourse[]> = {};
   collected.forEach((course) => {
-    const key = `${course.courseName.trim()}|${course.teacher.trim()}`;
+    const firstMeeting = course.meetings.length ? course.meetings[0] : ({} as ImportedMeeting);
+    const key = `${course.courseName.trim()}|${course.teacher.trim()}|${(firstMeeting.location ?? '').trim()}`;
     if (!grouped[key]) { grouped[key] = []; order.push(key); }
     grouped[key].push(course);
   });
@@ -944,7 +948,8 @@ export function parseCourseTableText(rawText: string, rows: string[][] | null = 
     };
   });
 
-  const timeTables = parseTimeTablesText(rawText);
+  // 冲突标记：同时段多课全部保留并警告（通用算法：冲突处理）
+  warnings.push(...detectConflictsText(courses));
   const aliases: string[] = [];
   courses.forEach((course) => course.meetings.forEach((meeting) => {
     if (meeting.campusAlias && aliases.indexOf(meeting.campusAlias) < 0) aliases.push(meeting.campusAlias);
@@ -970,6 +975,95 @@ export function parseCourseTableText(rawText: string, rows: string[][] | null = 
     warnings,
     notes: (metadata.notes as string[]) ?? [],
   };
+}
+
+/**
+ * 节次映射与时间对齐（通用算法第 5、6 条）：
+ * 单元格只写时间（如 13:30-15:10）时，用校区时间表把时间区间映射回标准节次。
+ */
+function timeToSectionsText(text: string, timeTables: SectionTimeProfile[]): [number, number] | null {
+  if (!text || !timeTables || !timeTables.length) return null;
+  const match = String(text).match(/(\d{1,2}\s*[:：]\s*\d{2})\s*[-—–~～至]\s*(\d{1,2}\s*[:：]\s*\d{2})/);
+  if (!match) return null;
+  const start = match[1].replace(/[：\s]/g, ':').replace(/\s/g, '');
+  const end = match[2].replace(/[：\s]/g, ':').replace(/\s/g, '');
+  for (const profile of timeTables) {
+    for (const block of profile.blocks) {
+      if (block.startTime === start && block.endTime === end) {
+        return [block.startSection, block.endSection];
+      }
+    }
+  }
+  // 容错：起止时间其中一个匹配
+  for (const profile of timeTables) {
+    for (const block of profile.blocks) {
+      if (block.startTime === start || block.endTime === end) {
+        return [block.startSection, block.endSection];
+      }
+    }
+  }
+  return null;
+}
+
+/** 两组周次规则是否有交集（区间重叠 + 奇偶兼容）。 */
+function weekRulesOverlapText(a: WeekRule[], b: WeekRule[]): boolean {
+  for (const ra of a) {
+    for (const rb of b) {
+      if (ra.endWeek < rb.startWeek || rb.endWeek < ra.startWeek) continue;
+      if (ra.parity === PARITY_ALL || rb.parity === PARITY_ALL || ra.parity === rb.parity) return true;
+    }
+  }
+  return false;
+}
+
+/** 冲突检测：同星期、节次重叠、周次相交的不同课程 → 警告（保留全部）。 */
+function detectConflictsText(courses: ImportedCourse[]): string[] {
+  const warnings: string[] = [];
+  const seen: Record<string, boolean> = {};
+  const bySlot: Record<string, ImportedCourse[]> = {};
+  courses.forEach((course) => {
+    course.meetings.forEach((meeting) => {
+      const key = `${meeting.weekday}|${meeting.startSection}-${meeting.endSection}`;
+      if (!bySlot[key]) bySlot[key] = [];
+      bySlot[key].push(course);
+    });
+  });
+  const weekdayNames = ['星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日'];
+  Object.keys(bySlot).forEach((slotKey) => {
+    const distinct: ImportedCourse[] = [];
+    const names: Record<string, boolean> = {};
+    bySlot[slotKey].forEach((course) => {
+      if (!names[course.courseName.trim()]) {
+        names[course.courseName.trim()] = true;
+        distinct.push(course);
+      }
+    });
+    if (distinct.length < 2) return;
+    for (let i = 0; i < distinct.length; i++) {
+      for (let j = i + 1; j < distinct.length; j++) {
+        const a = distinct[i];
+        const b = distinct[j];
+        if (sameSlotMeetingsOverlapText(a, b)) {
+          const parts = slotKey.split('|');
+          const label = (weekdayNames[Number(parts[0]) - 1] || `周${parts[0]}`) + ` ${parts[1]} 节`;
+          const message = `时间冲突：${label} ${a.courseName} 与 ${b.courseName} 同时段，已全部保留，请核对`;
+          if (!seen[message]) { seen[message] = true; warnings.push(message); }
+        }
+      }
+    }
+  });
+  return warnings;
+}
+
+function sameSlotMeetingsOverlapText(a: ImportedCourse, b: ImportedCourse): boolean {
+  for (const ma of a.meetings) {
+    for (const mb of b.meetings) {
+      if (ma.weekday !== mb.weekday) continue;
+      if (ma.startSection > mb.endSection || mb.startSection > ma.endSection) continue;
+      if (weekRulesOverlapText(ma.weekRules, mb.weekRules)) return true;
+    }
+  }
+  return false;
 }
 
 /** 今日/下一节课快照所需的最小信息（与 Android WidgetSnapshotBuilder 规则一致） */

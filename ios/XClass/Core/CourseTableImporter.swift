@@ -329,6 +329,8 @@ enum CourseTableImporter {
         let totalWeeks = metadata.totalWeeks ?? 20
         var warnings: [String] = []
         var collected: [ParsedCourse] = []
+        // 时间表提前解析，供「时间→节次」映射（通用算法：节次映射与时间对齐）
+        let timeTables = parseTimeTables(rawText)
 
         if let rows, !rows.isEmpty {
             if let headerIndex = rows.firstIndex(where: { row in row.filter { weekdayIndex($0) != nil }.count >= 4 }) {
@@ -346,7 +348,8 @@ enum CourseTableImporter {
                         let cell = row[index].trimmingCharacters(in: .whitespaces)
                         guard !cell.isEmpty else { continue }
                         for entry in parseCellEntries(cell, defaultTotalWeeks: totalWeeks) {
-                            let sections = sectionsOf(entry.rawText) ?? rowSection
+                            // 节次来源优先级：单元格内数字节次 → 行标签 → 时间区间映射
+                            let sections = sectionsOf(entry.rawText) ?? rowSection ?? timeToSections(entry.rawText, timeTables: timeTables)
                             guard let sections else {
                                 warnings.append("「\(entry.courseName)」缺少节次信息，已跳过")
                                 continue
@@ -377,11 +380,11 @@ enum CourseTableImporter {
             if collected.isEmpty { warnings.append("未识别到课表结构，请确认内容或改用粘贴文本导入") }
         }
 
-        // 同名同教师合并
+        // 合并主键：课程名 + 教师 + 地点（通用算法第 7 条）
         var order: [String] = []
         var grouped: [String: [ParsedCourse]] = [:]
         for course in collected {
-            let key = "\(course.courseName)|\(course.teacher)"
+            let key = "\(course.courseName)|\(course.teacher)|\(course.meetings.first?.location ?? "")"
             if grouped[key] == nil { grouped[key] = []; order.append(key) }
             grouped[key]?.append(course)
         }
@@ -394,7 +397,8 @@ enum CourseTableImporter {
             )
         }
 
-        let timeTables = parseTimeTables(rawText)
+        // 冲突标记：同时段多课全部保留并警告（通用算法：冲突处理）
+        warnings.append(contentsOf: detectConflicts(courses))
         var aliases: [String] = []
         for course in courses {
             for meeting in course.meetings {
@@ -420,6 +424,86 @@ enum CourseTableImporter {
             warnings: warnings,
             notes: metadata.notes
         )
+    }
+
+    /// 节次映射与时间对齐（通用算法第 5、6 条）：单元格只写时间时用校区时间表映射回标准节次。
+    private static func timeToSections(_ text: String, timeTables: [SectionTimeProfile]) -> (Int, Int)? {
+        guard !text.isEmpty, !timeTables.isEmpty else { return nil }
+        guard let match = firstMatch(#"(\d{1,2}\s*[:：]\s*\d{2})\s*[-—–~～至]\s*(\d{1,2}\s*[:：]\s*\d{2})"#, in: text) else { return nil }
+        let start = match[1].replacingOccurrences(of: "：", with: ":").replacingOccurrences(of: " ", with: "")
+        let end = match[2].replacingOccurrences(of: "：", with: ":").replacingOccurrences(of: " ", with: "")
+        for profile in timeTables {
+            for block in profile.blocks where block.startTime == start && block.endTime == end {
+                return (block.startSection, block.endSection)
+            }
+        }
+        for profile in timeTables {
+            for block in profile.blocks where block.startTime == start || block.endTime == end {
+                return (block.startSection, block.endSection)
+            }
+        }
+        return nil
+    }
+
+    /// 两组周次规则是否有交集（区间重叠 + 奇偶兼容）。
+    private static func weekRulesOverlap(_ a: [WeekRule], _ b: [WeekRule]) -> Bool {
+        for ra in a {
+            for rb in b {
+                if ra.endWeek < rb.startWeek || rb.endWeek < ra.startWeek { continue }
+                if ra.parity == .all || rb.parity == .all || ra.parity == rb.parity { return true }
+            }
+        }
+        return false
+    }
+
+    /// 冲突检测：同星期、节次重叠、周次相交的不同课程 → 警告（保留全部）。
+    private static func detectConflicts(_ courses: [ParsedCourse]) -> [String] {
+        var warnings: [String] = []
+        var seen = Set<String>()
+        var bySlot: [String: [ParsedCourse]] = [:]
+        for course in courses {
+            for meeting in course.meetings {
+                let key = "\(meeting.weekday.rawValue)|\(meeting.startSection)-\(meeting.endSection)"
+                bySlot[key, default: []].append(course)
+            }
+        }
+        let weekdayNames = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"]
+        for (slotKey, slotCourses) in bySlot {
+            var distinct: [ParsedCourse] = []
+            var names = Set<String>()
+            for course in slotCourses where !names.contains(course.courseName.trimmingCharacters(in: .whitespaces)) {
+                names.insert(course.courseName.trimmingCharacters(in: .whitespaces))
+                distinct.append(course)
+            }
+            guard distinct.count >= 2 else { continue }
+            for i in 0..<distinct.count {
+                for j in (i + 1)..<distinct.count {
+                    if sameSlotMeetingsOverlap(distinct[i], distinct[j]) {
+                        let parts = slotKey.split(separator: "|")
+                        let weekdayIndex = Int(parts[0]) ?? 0
+                        let label = (weekdayNames.indices.contains(weekdayIndex - 1) ? weekdayNames[weekdayIndex - 1] : "周\(weekdayIndex)")
+                            + " \(parts[1]) 节"
+                        let message = "时间冲突：\(label) \(distinct[i].courseName) 与 \(distinct[j].courseName) 同时段，已全部保留，请核对"
+                        if !seen.contains(message) {
+                            seen.insert(message)
+                            warnings.append(message)
+                        }
+                    }
+                }
+            }
+        }
+        return warnings
+    }
+
+    private static func sameSlotMeetingsOverlap(_ a: ParsedCourse, _ b: ParsedCourse) -> Bool {
+        for ma in a.meetings {
+            for mb in b.meetings {
+                if ma.weekday != mb.weekday { continue }
+                if ma.startSection > mb.endSection || mb.startSection > ma.endSection { continue }
+                if weekRulesOverlap(ma.weekRules, mb.weekRules) { return true }
+            }
+        }
+        return false
     }
 
     private static let noiseLinePatterns = [

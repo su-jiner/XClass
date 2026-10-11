@@ -51,6 +51,7 @@ object DocumentTextExtractor {
             name.endsWith(".xlsx") -> extractXlsx(context, uri)
             name.endsWith(".csv") || mime == "text/csv" -> extractDelimited(context, uri, ',')
             name.endsWith(".tsv") || mime.contains("tab-separated") -> extractDelimited(context, uri, '\t')
+            name.endsWith(".html") || name.endsWith(".htm") || mime == "text/html" -> extractHtml(context, uri)
             name.endsWith(".doc") || name.endsWith(".xls") -> throw IllegalArgumentException("暂不支持 doc/xls 老格式，请另存为 docx/xlsx 后重试")
 
             else -> extractPlainText(context, uri)
@@ -77,6 +78,19 @@ object DocumentTextExtractor {
             }
         }
         return ExtractedDocument(blocks, text, "表格文件(${rows.size} 行)")
+    }
+
+    // ---------- HTML ----------
+
+    private fun extractHtml(context: Context, uri: Uri): ExtractedDocument {
+        val text = readText(context, uri)
+        val grids = HtmlTableParser.parseTables(text)
+        if (grids.isEmpty()) {
+            // 无 <table>：退回纯文本行解析
+            return ExtractedDocument(PlainTextLayout.toBlocks(text), text, "HTML（无表格，按文本解析）")
+        }
+        val blocks = grids.flatMap { HtmlTableParser.gridToBlocks(it) }
+        return ExtractedDocument(blocks, text, "HTML 表格（${grids.size} 个表）")
     }
 
     // ---------- 图片 OCR ----------

@@ -365,7 +365,7 @@ function resolveProfile(profiles, campusId) {
     || list[0];
 }
 
-function parseTableRows(rows, defaultTotalWeeks) {
+function parseTableRows(rows, defaultTotalWeeks, timeTables) {
   const warnings = [];
   const courses = [];
   let headerIndex = -1;
@@ -395,7 +395,8 @@ function parseTableRows(rows, defaultTotalWeeks) {
         return;
       }
       entries.forEach(function (entry) {
-        const sections = sectionsOf(entry.rawText) || rowSection;
+        // 节次来源优先级：单元格内数字节次 → 行标签 → 时间区间映射（通用算法第 5 条）
+        const sections = sectionsOf(entry.rawText) || rowSection || timeToSections(entry.rawText, timeTables);
         if (!sections) {
           warnings.push('「' + entry.courseName + '」缺少节次信息，已跳过');
           return;
@@ -446,7 +447,7 @@ function splitDelimited(text, delimiter) {
 }
 
 /** 列表式：每行一门课，含星期与节次 */
-function parseListStyle(lines, defaultTotalWeeks) {
+function parseListStyle(lines, defaultTotalWeeks, timeTables) {
   const courses = [];
   const warnings = [];
   String(lines || '').split(/\r?\n/).forEach(function (line) {
@@ -473,11 +474,117 @@ function parseListStyle(lines, defaultTotalWeeks) {
   return { courses: courses, warnings: warnings };
 }
 
+/**
+ * 节次映射与时间对齐（通用算法第 5、6 条）：
+ * 单元格只写时间（如 13:30-15:10）时，用校区时间表把时间区间映射回标准节次。
+ */
+function timeToSections(text, timeTables) {
+  if (!text || !timeTables || !timeTables.length) return null;
+  const match = String(text).match(/(\d{1,2}\s*[:：]\s*\d{2})\s*[-—–~～至]\s*(\d{1,2}\s*[:：]\s*\d{2})/);
+  if (!match) return null;
+  const start = match[1].replace(/[：\s]/g, ':').replace(/\s/g, '');
+  const end = match[2].replace(/[：\s]/g, ':').replace(/\s/g, '');
+  for (let i = 0; i < timeTables.length; i += 1) {
+    const blocks = timeTables[i].blocks || [];
+    for (let j = 0; j < blocks.length; j += 1) {
+      const block = blocks[j];
+      if (block.startTime === start && block.endTime === end) {
+        return { startSection: block.startSection, endSection: block.endSection };
+      }
+    }
+  }
+  // 容错：起止时间其中一个匹配
+  for (let i = 0; i < timeTables.length; i += 1) {
+    const blocks = timeTables[i].blocks || [];
+    for (let j = 0; j < blocks.length; j += 1) {
+      const block = blocks[j];
+      if (block.startTime === start || block.endTime === end) {
+        return { startSection: block.startSection, endSection: block.endSection };
+      }
+    }
+  }
+  return null;
+}
+
+/** 两组周次规则是否有交集（区间重叠 + 奇偶兼容）。 */
+function weekRulesOverlap(a, b) {
+  const listA = a || [];
+  const listB = b || [];
+  for (let i = 0; i < listA.length; i += 1) {
+    for (let j = 0; j < listB.length; j += 1) {
+      const ra = listA[i];
+      const rb = listB[j];
+      if (ra.endWeek < rb.startWeek || rb.endWeek < ra.startWeek) continue;
+      if (ra.parity === PARITY.ALL || rb.parity === PARITY.ALL || ra.parity === rb.parity) return true;
+    }
+  }
+  return false;
+}
+
+/** 冲突检测：同星期、节次重叠、周次相交的不同课程 → 警告（保留全部）。 */
+function detectConflicts(courses) {
+  const warnings = [];
+  const seen = {};
+  const bySlot = {};
+  (courses || []).forEach(function (course) {
+    (course.meetings || []).forEach(function (meeting) {
+      const key = meeting.weekday + '|' + meeting.startSection + '-' + meeting.endSection;
+      if (!bySlot[key]) bySlot[key] = [];
+      bySlot[key].push(course);
+    });
+  });
+  Object.keys(bySlot).forEach(function (slotKey) {
+    const distinct = [];
+    const names = {};
+    bySlot[slotKey].forEach(function (course) {
+      if (!names[course.courseName.trim()]) {
+        names[course.courseName.trim()] = true;
+        distinct.push(course);
+      }
+    });
+    if (distinct.length < 2) return;
+    for (let i = 0; i < distinct.length; i += 1) {
+      for (let j = i + 1; j < distinct.length; j += 1) {
+        const a = distinct[i];
+        const b = distinct[j];
+        if (sameSlotMeetingsOverlap(a, b)) {
+          const parts = slotKey.split('|');
+          const weekdayNames = ['星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日'];
+          const label = (weekdayNames[Number(parts[0]) - 1] || '周' + parts[0]) + ' ' + parts[1] + ' 节';
+          const message = '时间冲突：' + label + ' ' + a.courseName + ' 与 ' + b.courseName + ' 同时段，已全部保留，请核对';
+          if (!seen[message]) {
+            seen[message] = true;
+            warnings.push(message);
+          }
+        }
+      }
+    }
+  });
+  return warnings;
+}
+
+function sameSlotMeetingsOverlap(a, b) {
+  const meetingsA = a.meetings || [];
+  const meetingsB = b.meetings || [];
+  for (let i = 0; i < meetingsA.length; i += 1) {
+    for (let j = 0; j < meetingsB.length; j += 1) {
+      const ma = meetingsA[i];
+      const mb = meetingsB[j];
+      if (ma.weekday !== mb.weekday) continue;
+      if (ma.startSection > mb.endSection || mb.startSection > ma.endSection) continue;
+      if (weekRulesOverlap(ma.weekRules, mb.weekRules)) return true;
+    }
+  }
+  return false;
+}
+
 function mergeCourses(courses) {
   const order = [];
   const grouped = {};
   (courses || []).forEach(function (course) {
-    const key = course.courseName.trim() + '|' + String(course.teacher || '').trim();
+    // 合并主键：课程名 + 教师 + 地点（通用算法第 7 条）
+    const firstMeeting = (course.meetings || [])[0] || {};
+    const key = course.courseName.trim() + '|' + String(course.teacher || '').trim() + '|' + String(firstMeeting.location || '').trim();
     if (!grouped[key]) { grouped[key] = []; order.push(key); }
     grouped[key].push(course);
   });
@@ -499,9 +606,12 @@ function mergeCourses(courses) {
 function parseCourseTable(rawText, rows) {
   const metadata = parsePageMetadata(rawText || '');
   const total = metadata.totalWeeks || DEFAULT_TOTAL_WEEKS;
-  const parsed = rows && rows.length ? parseTableRows(rows, total) : parseListStyle(rawText, total);
-  const courses = mergeCourses(parsed.courses);
+  // 时间表提前解析，供「时间→节次」映射（通用算法：节次映射与时间对齐）
   const timeTables = parseTimeTables(rawText || '');
+  const parsed = rows && rows.length ? parseTableRows(rows, total, timeTables) : parseListStyle(rawText, total, timeTables);
+  const courses = mergeCourses(parsed.courses);
+  // 冲突标记：同时段多课全部保留并警告（通用算法：冲突处理）
+  parsed.warnings = parsed.warnings.concat(detectConflicts(courses));
   const aliases = [];
   courses.forEach(function (course) {
     course.meetings.forEach(function (meeting) {
@@ -597,6 +707,9 @@ module.exports = {
   splitDelimited: splitDelimited,
   parseListStyle: parseListStyle,
   mergeCourses: mergeCourses,
+  detectConflicts: detectConflicts,
+  timeToSections: timeToSections,
+  weekRulesOverlap: weekRulesOverlap,
   parseCourseTable: parseCourseTable,
   encodeShareText: encodeShareText
 };
