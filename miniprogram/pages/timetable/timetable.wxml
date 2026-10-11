@@ -61,6 +61,11 @@
           </view>
         </view>
       </view>
+      <!-- 课表级备注：随课表内容一起滚动，滚动到底部才出现（非悬浮） -->
+      <view class="notes-bar" wx:if="{{notes.length}}" style="background:{{palette.panelAlt}};border:1rpx solid {{palette.gridLeft}}">
+        <view class="notes-title" style="color:{{palette.textPrimary}}">备注</view>
+        <view class="notes-item" wx:for="{{notes}}" wx:key="*this" style="color:{{palette.textSecondary}}">{{item}}</view>
+      </view>
     </scroll-view>
   </view>
 
@@ -68,11 +73,6 @@
     <text bindtap="goPrevWeek" class="week-arrow">‹ 上一周</text>
     <text class="week-current">第 {{week}} / {{totalWeeks}} 周（左右滑动切周）</text>
     <text bindtap="goNextWeek" class="week-arrow">下一周 ›</text>
-  </view>
-
-  <view class="notes-bar" wx:if="{{notes.length}}" style="background:{{palette.panelAlt}};border:1rpx solid {{palette.gridLeft}}">
-    <view class="notes-title" style="color:{{palette.textPrimary}}">备注</view>
-    <view class="notes-item" wx:for="{{notes}}" wx:key="*this" style="color:{{palette.textSecondary}}">{{item}}</view>
   </view>
 
   <view class="manual-mask" wx:if="{{showPaste}}" bindtap="closePaste">

@@ -29,7 +29,8 @@ object TimetableMetrics {
 
         val sectionHeightByWidth = (62f * density * scale).toInt()
         val sectionHeightByHeight = ((screenHeightPx * 0.78f) / 12f).toInt()
-        val sectionHeight = minOf(sectionHeightByWidth, sectionHeightByHeight).coerceAtLeast((44f * density).toInt())
+        // 节高下限 52dp：保证第 12 节等底部节次完整显示课程长条与时间，不被压缩成半截
+        val sectionHeight = minOf(sectionHeightByWidth, sectionHeightByHeight).coerceAtLeast((52f * density).toInt())
 
         return Spec(
             leftColumnWidth = leftWidth,

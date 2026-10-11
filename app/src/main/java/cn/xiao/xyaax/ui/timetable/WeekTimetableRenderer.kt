@@ -44,8 +44,10 @@ class WeekTimetableRenderer(
     fun render(
         headerRow: LinearLayout,
         bodyRow: LinearLayout,
+        notesBar: LinearLayout,
         metrics: TimetableMetrics.Spec,
         items: List<CourseMeetingDisplayRef>,
+        notes: List<String>,
         onCourseClick: (primary: CourseMeetingRef, allItems: List<CourseMeetingRef>) -> Unit,
         weekStart: LocalDate,
         today: LocalDate,
@@ -53,11 +55,13 @@ class WeekTimetableRenderer(
     ) {
         headerRow.removeAllViews()
         bodyRow.removeAllViews()
+        notesBar.removeAllViews()
         headerRow.setPadding(metrics.outerPadding, 0, metrics.outerPadding, 0)
         bodyRow.setPadding(metrics.outerPadding, 0, metrics.outerPadding, 0)
 
         buildHeader(headerRow, metrics, weekStart, today)
         buildBody(bodyRow, metrics, items, onCourseClick, weekStart, today, currentSection)
+        buildNotesBar(notesBar, metrics, notes)
     }
 
     @SuppressLint("SetTextI18n")
@@ -127,17 +131,9 @@ class WeekTimetableRenderer(
             layoutParams = LinearLayout.LayoutParams(m.leftColumnWidth, ViewGroup.LayoutParams.WRAP_CONTENT)
         }
 
-        // 左侧时间列：时间文本跟随课程同步出现——该节次有课程才显示起止时间，无课显示空（格子保留）
-        val occupiedSections = BooleanArray(13) // index 1..12
-        items.forEach { item ->
-            val s = item.meeting.startSection.coerceIn(1, 12)
-            val e = item.meeting.endSection.coerceIn(s, 12)
-            for (sec in s..e) occupiedSections[sec] = true
-        }
-
+        // 左侧时间列：固定编码时间（1-12 节全部显示标准起止时间，不随课程有无变化）
         periodRanges.forEachIndexed { index, time ->
             val section = index + 1
-            val hasCourse = occupiedSections[section]
             val periodCell = LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER
@@ -159,8 +155,8 @@ class WeekTimetableRenderer(
             val startTime = time.substringBefore('-')
             val endTime = time.substringAfter('-')
             val timeLabel = TextView(context).apply {
-                // 无课节次时间为空（跟随课程出现）
-                text = if (hasCourse) startTime else ""
+                // 固定编码时间：每节始终显示起止时间
+                text = startTime
                 textSize = 9f * fontScale
                 gravity = Gravity.CENTER
                 layoutParams = LinearLayout.LayoutParams(
@@ -171,7 +167,7 @@ class WeekTimetableRenderer(
                 setTextColor(palette.textSecondary)
             }
             val timeLabelEnd = TextView(context).apply {
-                text = if (hasCourse) endTime else ""
+                text = endTime
                 textSize = 9f * fontScale
                 gravity = Gravity.CENTER
                 layoutParams = LinearLayout.LayoutParams(
@@ -192,6 +188,63 @@ class WeekTimetableRenderer(
             val date = weekStart.plusDays(index.toLong())
             bodyRow.addView(buildDayColumn(bodyRow, m, weekday, items, onCourseClick, !allWeeksMode && date == today, currentSection))
         }
+    }
+
+    /** 课表底部备注栏（随课表滚动内容，非悬浮）：与课表一致的方框 + 左侧「备注」标签。 */
+    private fun buildNotesBar(notesBar: LinearLayout, m: TimetableMetrics.Spec, notes: List<String>) {
+        val context = notesBar.context
+        if (notes.isEmpty()) {
+            notesBar.visibility = View.GONE
+            return
+        }
+        val density = context.resources.displayMetrics.density
+        val strokeColor = android.graphics.Color.argb(
+            (0.18f * 255).toInt(),
+            android.graphics.Color.red(palette.textSecondary),
+            android.graphics.Color.green(palette.textSecondary),
+            android.graphics.Color.blue(palette.textSecondary)
+        )
+        val box = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            background = GradientDrawable().apply {
+                cornerRadius = 12f * density
+                setColor(palette.panelAltBackground)
+                setStroke((1f * density).toInt(), strokeColor)
+            }
+            setPadding(
+                (12 * density).toInt(), (10 * density).toInt(),
+                (12 * density).toInt(), (10 * density).toInt()
+            )
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = m.cellGap }
+        }
+        box.addView(TextView(context).apply {
+            text = "备注"
+            setTextColor(palette.textPrimary)
+            setTypeface(typeface, Typeface.BOLD)
+            textSize = 13f * fontScale
+            includeFontPadding = false
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = (6 * density).toInt() }
+        })
+        notes.forEachIndexed { index, note ->
+            box.addView(TextView(context).apply {
+                text = note
+                setTextColor(palette.textSecondary)
+                textSize = 11.5f * fontScale
+                setLineSpacing(0f, 1.15f)
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                ).apply { topMargin = if (index == 0) 0 else (3 * density).toInt() }
+            })
+        }
+        notesBar.addView(box)
+        notesBar.visibility = View.VISIBLE
     }
 
     private fun buildDayColumn(

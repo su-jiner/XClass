@@ -164,25 +164,16 @@ Page({
       });
     });
 
-    // 左侧时间列（跟随「当前显示时间表」+ 跟随课程）：该节次有课程才显示起止时间，无课显示空
+    // 左侧时间列（跟随「当前显示时间表」）：固定编码时间，1-12 节始终显示起止时间
     const displayId = wx.getStorageSync('xclass.defaultTimeProfile') || null;
     const displayProfile = core.resolveProfile(this.profiles, displayId);
-    const occupied = Array(13).fill(false);
-    columns.forEach((column) => {
-      column.courses.forEach((course) => {
-        for (let s = course.startSection; s <= Math.min(12, course.startSection + Math.floor((course.height + 4) / rowHeight) - 1); s += 1) {
-          occupied[s] = true;
-        }
-      });
-    });
     const sections = [];
     for (let i = 0; i < 12; i += 1) {
       const range = core.timeRangeOf(displayProfile, i + 1, i + 1);
-      const hasCourse = occupied[i + 1];
       sections.push({
         section: i + 1,
-        startTime: hasCourse && range ? range.startTime : '',
-        endTime: hasCourse && range ? range.endTime : '',
+        startTime: range ? range.startTime : '',
+        endTime: range ? range.endTime : '',
       });
     }
 

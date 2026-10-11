@@ -34,7 +34,6 @@ struct TimetablePage: View {
                     header
                     // 网格常显：时间列时间跟随课程（无课节次时间为空，空课表显示空时间列而非整页空白）
                     weekPager
-                    if !notes.isEmpty { notesBar }
                 }
             }
             .background(palette.pageBackground)
@@ -121,6 +120,7 @@ struct TimetablePage: View {
                     currentSection: currentSection,
                     showDates: true,
                     sectionRanges: sectionRanges,
+                    notes: notes,
                     onTap: { courseIndex, course, meeting in
                         detailItem = CourseDetailItem(courseIndex: courseIndex, course: course, meeting: meeting)
                     }
@@ -168,6 +168,7 @@ struct TimetablePage: View {
                 )
         )
         .padding(.horizontal, 12)
+        .padding(.top, 6)
         .padding(.bottom, 4)
     }
 
@@ -199,6 +200,7 @@ struct WeekGridView: View {
     let currentSection: Int?
     var showDates: Bool = true
     var sectionRanges: [String] = SectionTimes.ranges
+    var notes: [String] = []
     let onTap: (Int, CourseSchedule, MeetingTime) -> Void
 
     private let leftColumnWidth: CGFloat = 44
@@ -207,22 +209,19 @@ struct WeekGridView: View {
     private var sectionCount: Int { max(sectionRanges.count, 1) }
 
     var body: some View {
-        GeometryReader { geo in
-            let dayWidth = max((geo.size.width - leftColumnWidth - 16) / 7, 38)
-            HStack(spacing: 0) {
-                VStack(spacing: 0) {
-                    Text("\(weekStart.month)月")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(palette.textPrimary)
-                        .frame(height: 34)
-                    ForEach(1...sectionCount, id: \.self) { section in
-                        // 时间跟随课程：该节次有课程才显示起止时间，无课显示空
-                        let hasCourse = items.contains { item in
-                            section >= item.meeting.startSection && section <= item.meeting.endSection
-                        }
-                        VStack(spacing: 0) {
-                            Text("\(section)").font(.system(size: 11 * fontScale, weight: .bold))
-                            if hasCourse {
+        ScrollView {
+            GeometryReader { geo in
+                let dayWidth = max((geo.size.width - leftColumnWidth - 16) / 7, 38)
+                HStack(spacing: 0) {
+                    VStack(spacing: 0) {
+                        Text("\(weekStart.month)月")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(palette.textPrimary)
+                            .frame(height: 34)
+                        ForEach(1...sectionCount, id: \.self) { section in
+                            // 固定编码时间：每节始终显示起止时间
+                            VStack(spacing: 0) {
+                                Text("\(section)").font(.system(size: 11 * fontScale, weight: .bold))
                                 let parts = sectionRanges.indices.contains(section - 1)
                                     ? sectionRanges[section - 1].components(separatedBy: "-") : []
                                 if parts.count == 2 {
@@ -230,19 +229,47 @@ struct WeekGridView: View {
                                     Text(parts[1]).font(.system(size: 8 * fontScale))
                                 }
                             }
+                            .foregroundColor(palette.textSecondary)
+                            .frame(width: leftColumnWidth - 6, height: rowHeight)
                         }
-                        .foregroundColor(palette.textSecondary)
-                        .frame(width: leftColumnWidth - 6, height: rowHeight)
                     }
-                }
-                .background(palette.gridLeftColumn)
+                    .background(palette.gridLeftColumn)
 
-                HStack(spacing: 2) {
-                    ForEach(0..<7, id: \.self) { index in
-                        dayColumn(dayIndex: index, width: dayWidth)
+                    HStack(spacing: 2) {
+                        ForEach(0..<7, id: \.self) { index in
+                            dayColumn(dayIndex: index, width: dayWidth)
+                        }
+                    }
+                    .padding(.horizontal, 4)
+                }
+            }
+            .frame(height: 34 + CGFloat(sectionCount) * rowHeight + 24)
+            if !notes.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("备注")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(palette.textPrimary)
+                    ForEach(notes, id: \.self) { note in
+                        Text(note)
+                            .font(.system(size: 10))
+                            .lineSpacing(2)
+                            .foregroundColor(palette.textSecondary)
                     }
                 }
-                .padding(.horizontal, 4)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 9)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(palette.panelAlt)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(palette.gridLeft, lineWidth: 1)
+                        )
+                )
+                .padding(.horizontal, 12)
+                .padding(.top, 6)
+                .padding(.bottom, 16)
             }
         }
     }

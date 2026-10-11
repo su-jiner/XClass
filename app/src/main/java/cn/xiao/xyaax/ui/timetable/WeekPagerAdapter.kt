@@ -26,6 +26,7 @@ class WeekPagerAdapter(
     private val fontScale: Float,
     private val palette: ThemePalette,
     private val hasCustomBackground: Boolean,
+    private val notes: List<String>,
     private val onCourseClick: (primary: CourseMeetingRef, allItems: List<CourseMeetingRef>) -> Unit
 ) : RecyclerView.Adapter<WeekPagerAdapter.WeekViewHolder>() {
 
@@ -45,13 +46,14 @@ class WeekPagerAdapter(
     inner class WeekViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val headerRow: LinearLayout = itemView.findViewById(R.id.headerRow)
         private val bodyRow: LinearLayout = itemView.findViewById(R.id.bodyRow)
+        private val notesBar: LinearLayout = itemView.findViewById(R.id.notesBar)
 
         private val renderer = WeekTimetableRenderer(periodRanges, weekdayLabels, fontScale, palette, hasCustomBackground)
 
         fun bind(week: Int, weekStart: LocalDate) {
             val metrics = TimetableMetrics.create(itemView.context)
             val weekItems = WeekScheduleCalculator.meetingsForDisplayWeek(courses, week, baseWeek, showNonCurrent)
-            renderer.render(headerRow, bodyRow, metrics, weekItems, onCourseClick, weekStart, today, currentSection)
+            renderer.render(headerRow, bodyRow, notesBar, metrics, weekItems, notes, onCourseClick, weekStart, today, currentSection)
         }
     }
 

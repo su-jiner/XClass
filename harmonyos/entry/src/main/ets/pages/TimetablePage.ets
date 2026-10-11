@@ -199,74 +199,75 @@ export struct TimetablePage {
       .width('100%')
       .padding({ left: 12, right: 12, bottom: 4 })
 
-      // 周网格（网格常显：时间列时间跟随课程——该节有课程才显示起止时间，无课显示空）
+      // 周网格 + 底部备注（备注随课表内容一起滚动，非悬浮）
       Scroll() {
-        Row() {
-          // 左列：节次（时间跟随课程）
-          Column() {
-            Text(`${this.weekStart().month}月`)
-              .fontSize(10).fontWeight(FontWeight.Bold)
-              .fontColor(this.palette().textPrimary)
-              .height(HEADER_HEIGHT)
-              .width('100%')
-              .textAlign(TextAlign.Center)
-            ForEach(this.sectionRanges, (range: string, index: number) => {
-              Column() {
-                Text(`${index + 1}`).fontSize(11).fontWeight(FontWeight.Bold)
-                if (this.hasCourseInSection(index + 1)) {
+        Column() {
+          Row() {
+            // 左列：节次（固定编码时间）
+            Column() {
+              Text(`${this.weekStart().month}月`)
+                .fontSize(10).fontWeight(FontWeight.Bold)
+                .fontColor(this.palette().textPrimary)
+                .height(HEADER_HEIGHT)
+                .width('100%')
+                .textAlign(TextAlign.Center)
+              ForEach(this.sectionRanges, (range: string, index: number) => {
+                Column() {
+                  Text(`${index + 1}`).fontSize(11).fontWeight(FontWeight.Bold)
+                  // 固定编码时间：每节始终显示起止时间
                   Text(range.split('-')[0]).fontSize(8)
                   Text(range.split('-')[1]).fontSize(8)
                 }
-              }
-              .fontColor(this.palette().textSecondary)
-              .width(LEFT_COLUMN_WIDTH - 6)
-              .height(ROW_HEIGHT)
-              .textAlign(TextAlign.Center)
-            }, (range: string) => range)
-          }
-          .backgroundColor(this.palette().gridLeft)
+                .fontColor(this.palette().textSecondary)
+                .width(LEFT_COLUMN_WIDTH - 6)
+                .height(ROW_HEIGHT)
+                .textAlign(TextAlign.Center)
+              }, (range: string) => range)
+            }
+            .backgroundColor(this.palette().gridLeft)
 
-          Row({ space: 2 }) {
-            ForEach([0, 1, 2, 3, 4, 5, 6], (dayIndex: number) => {
-              this.DayColumn(dayIndex)
-            }, (dayIndex: number) => dayIndex.toString())
+            Row({ space: 2 }) {
+              ForEach([0, 1, 2, 3, 4, 5, 6], (dayIndex: number) => {
+                this.DayColumn(dayIndex)
+              }, (dayIndex: number) => dayIndex.toString())
+            }
+            .padding({ left: 4, right: 4 })
           }
-          .padding({ left: 4, right: 4 })
+          .alignItems(VerticalAlign.Top)
+
+          // 课表级备注栏（随课表滚动，非空才显示：方框 + 左侧「备注」标签）
+          if (this.notes.length > 0) {
+            Column() {
+              Text('备注')
+                .fontSize(12).fontWeight(FontWeight.Bold)
+                .fontColor(this.palette().textPrimary)
+                .width('100%')
+                .margin({ bottom: 4 })
+              ForEach(this.notes, (note: string) => {
+                Text(note)
+                  .fontSize(11)
+                  .fontColor(this.palette().textSecondary)
+                  .maxLines(2)
+                  .textAlign(TextAlign.Start)
+                  .width('100%')
+                  .margin({ bottom: 2 })
+              }, (note: string) => note)
+            }
+            .alignItems(HorizontalAlign.Start)
+            .width('100%')
+            .padding({ left: 12, right: 12, top: 9, bottom: 9 })
+            .margin({ left: 12, right: 12, top: 8, bottom: 16 })
+            .backgroundColor(this.palette().panelAlt)
+            .border({ width: 1, color: this.palette().gridLeft })
+            .borderRadius(12)
+          }
         }
-        .alignItems(VerticalAlign.Top)
+        .alignItems(HorizontalAlign.Start)
       }
       .layoutWeight(1)
       .align(Alignment.Top)
       .scrollable(ScrollDirection.Vertical)
-
-      // 底部课表级备注栏（非空才显示：小字、次级色、圆角卡片）
-      if (this.notes.length > 0) {
-        Column() {
-          // 备注标签（与课表一致的方框 + 左侧「备注」）
-          Text('备注')
-            .fontSize(12).fontWeight(FontWeight.Bold)
-            .fontColor(this.palette().textPrimary)
-            .width('100%')
-            .margin({ bottom: 4 })
-          ForEach(this.notes, (note: string) => {
-            Text(note)
-              .fontSize(11)
-              .fontColor(this.palette().textSecondary)
-              .maxLines(2)
-              .textAlign(TextAlign.Start)
-              .width('100%')
-              .margin({ bottom: 2 })
-          }, (note: string) => note)
-        }
-        .alignItems(HorizontalAlign.Start)
-        .width('100%')
-        .padding({ left: 12, right: 12, top: 9, bottom: 9 })
-        .margin({ left: 12, right: 12, bottom: 8 })
-        .backgroundColor(this.palette().panelAlt)
-        .border({ width: 1, color: this.palette().gridLeft })
-        .borderRadius(12)
-      }
-      }
+      .width('100%')
     }
     .width('100%')
     .height('100%')
