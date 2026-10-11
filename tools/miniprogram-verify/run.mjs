@@ -302,6 +302,49 @@ test('share text round-trips back into courses', () => {
   assert.equal(study.meetings[0].location, '');
 });
 
+// ---------------- 课表级 notes 提取（规则 a/b/c） ----------------
+test('extracts schedule-level notes by rules a/b/c', () => {
+  const text = [
+    '2026-2027年第1学期 云计算261课表',
+    '其他课程：军训技能张爽(共19周)/1-19周； 入学教育张爽(共19周)/1-19周；',
+    '军事技能（张爽）1-19周',
+    '入学教育（张爽）1-19周',
+    '学期时间：2026-08-31至2027-01-22，共21周',
+  ].join('\n');
+  const meta = core.parsePageMetadata(text);
+  assert.ok(meta.notes.includes('军事技能（张爽）1-19周'), '规则a：教师括号+周次范围');
+  assert.ok(meta.notes.includes('入学教育（张爽）1-19周'), '规则a 第二条');
+  assert.ok(meta.notes.includes('学期时间：2026-08-31至2027-01-22，共21周'), '规则b：学期时间+日期范围');
+  assert.ok(!meta.notes.some((n) => n.indexOf('其他课程') >= 0), '其他课程汇总行不得入 notes（仍进 warnings）');
+});
+
+test('notes default to empty array without note lines', () => {
+  const meta = core.parsePageMetadata('星期一 第1-2节 高等数学/A101/张三\n星期三 第5-6节 大学物理/B202/李四');
+  assert.deepEqual(meta.notes, []);
+  const parsed = core.parseCourseTable('星期一 体育（一）/(1-2节)7-19周/体育场1/殷乐');
+  assert.deepEqual(parsed.notes, []);
+});
+
+test('deduplicates notes and caps at 10', () => {
+  const lines = ['军事技能（张爽）1-19周', '军事技能（张爽）1-19周'];
+  for (let i = 0; i < 12; i++) lines.push('公共事项' + i + '（张老师）' + (i + 1) + '-' + (i + 5) + '周');
+  const meta = core.parsePageMetadata(lines.join('\n'));
+  assert.equal(meta.notes.filter((n) => n.indexOf('军事技能') >= 0).length, 1, '按原样字符串去重');
+  assert.equal(meta.notes.length, 10, '最多 10 条');
+});
+
+test('backup v2 carries notes and tolerates missing notes', () => {
+  const profile = { name: '主课表', semesterStartDate: '2026-08-31', courses: courses, notes: ['军事技能（张爽）1-19周'] };
+  const json = core.encodeBackup([profile], [], {}, null);
+  const decoded = core.decodeBackup(json);
+  assert.deepEqual(decoded.profiles[0].notes, ['军事技能（张爽）1-19周']);
+  // 旧备份无 notes 字段：按空数组处理、不报错
+  const oldShape = JSON.parse(json);
+  oldShape.profiles.forEach((p) => delete p.notes);
+  const decodedOld = core.decodeBackup(JSON.stringify(oldShape));
+  assert.deepEqual(decodedOld.profiles[0].notes, []);
+});
+
 for (const [status, name] of results) {
   console.log(status.padEnd(4), name);
 }

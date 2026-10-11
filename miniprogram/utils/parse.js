@@ -208,6 +208,34 @@ function sectionRangeFromLabel(text) {
   return null;
 }
 
+/** 课表级公共备注（非课程）提取：不含星期/节次标记、非「其他课程」汇总行，命中以下任一模式即入 notes。 */
+const NOTE_TEACHER_WEEK_RE = /\S+[（(][^）)]{1,6}[）)]\s*\d{1,2}\s*[-—–~～至]\s*\d{1,2}\s*周/;
+const NOTE_DATE_RANGE_RE = /\d{4}\s*[-/年]\s*\d{1,2}\s*[-/月]\s*\d{1,2}\s*[-—–~～至]\s*\d{4}\s*[-/年]\s*\d{1,2}\s*[-/月]\s*\d{1,2}/;
+const NOTE_SECTION_MARK_RE = /\d{1,2}\s*[-—–~～至]\s*\d{1,2}\s*节|第\s*\d{1,2}\s*节/;
+const NOTE_TOTAL_WEEKS_RE = /共\s*\d{1,2}\s*周/;
+const MAX_NOTES = 10;
+
+function extractNotes(source) {
+  const notes = [];
+  const seen = {};
+  String(source || '').split(/\r?\n/).forEach(function (line) {
+    const trimmed = line.trim();
+    if (!trimmed) return;
+    if (/^其他课程[：:]/.test(trimmed)) return;
+    if (weekdayIndex(trimmed) != null) return;
+    if (NOTE_SECTION_MARK_RE.test(trimmed)) return;
+    let hit = false;
+    if (NOTE_TEACHER_WEEK_RE.test(trimmed)) hit = true;
+    if ((trimmed.indexOf('学期时间') >= 0 || /学期[：:]/.test(trimmed)) && NOTE_DATE_RANGE_RE.test(trimmed)) hit = true;
+    if (NOTE_TOTAL_WEEKS_RE.test(trimmed)) hit = true;
+    if (!hit) return;
+    if (seen[trimmed]) return;
+    seen[trimmed] = true;
+    notes.push(trimmed);
+  });
+  return notes.slice(0, MAX_NOTES);
+}
+
 function parsePageMetadata(text) {
   const source = String(text || '');
   const semesterMatch = source.match(/(\d{4})\s*-\s*(\d{4})\s*年\s*第?\s*([一二1-3])\s*学期/);
@@ -224,7 +252,8 @@ function parsePageMetadata(text) {
     startMonth: startMatch ? Number(startMatch[2]) : null,
     startDay: startMatch ? Number(startMatch[3]) : null,
     totalWeeks: weekMatches.length ? Math.max.apply(null, weekMatches) : null,
-    otherCourseLines: other ? other.split(/[；;]/).map(function (item) { return item.trim(); }).filter(Boolean) : []
+    otherCourseLines: other ? other.split(/[；;]/).map(function (item) { return item.trim(); }).filter(Boolean) : [],
+    notes: extractNotes(source)
   };
 }
 
@@ -493,17 +522,23 @@ function parseCourseTable(rawText, rows) {
     totalWeeks: metadata.totalWeeks,
     timeTables: timeTables,
     campusAliases: aliases,
+    notes: metadata.notes || [],
     warnings: parsed.warnings
   };
 }
 
 /** XClass 专属课表分享文本 v1（与 Android/iOS/鸿蒙一致）：导出后可被任意端粘贴导入。 */
-function encodeShareText(courses, profileName, semester, semesterStart, totalWeeks, campusIdToAlias) {
+function encodeShareText(courses, profileName, semester, semesterStart, totalWeeks, campusIdToAlias, notes) {
   const lines = ['# XClass 课表分享 v1'];
   if (profileName && String(profileName).trim()) lines.push('# 课表：' + profileName);
   if (semester && String(semester).trim()) lines.push('# 学期：' + semester);
   if (semesterStart && String(semesterStart).trim()) lines.push('# 学期开始：' + semesterStart);
   if (totalWeeks && totalWeeks >= 1 && totalWeeks <= 60) lines.push('# 总周数：' + totalWeeks);
+  // 课表级公共备注：原样写出，再导入时由 notes 提取规则还原（非课程行，不会被解析为课程）
+  (notes || []).forEach(function (note) {
+    const trimmed = String(note || '').trim();
+    if (trimmed) lines.push(trimmed);
+  });
 
   const rows = [];
   (courses || []).forEach(function (course) {

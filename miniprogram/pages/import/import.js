@@ -18,6 +18,7 @@ Page({
     mode: 'paste',
     text: '',
     groups: [],
+    pendingFiles: [],
     warnings: [],
     saving: false,
     // 编辑弹窗
@@ -56,28 +57,62 @@ Page({
   /** 弹窗内容区点击占位：阻止冒泡到遮罩层，避免误关弹窗。 */
   noop() {},
   chooseFile() {
-    // 多选：一个文件 = 一个课表（课程时间）
+    // 只收集待识别文件列表（一个文件 = 一个课表），不立即解析；支持多次选择累加，按路径/文件名+大小去重
     wx.chooseMessageFile({
-      count: 5,
+      count: 9,
       type: 'file',
       extension: ['txt', 'md', 'csv', 'json', 'tsv'],
       success: (result) => {
         const files = result.tempFiles || [];
         if (!files.length) return;
+        const pending = this.data.pendingFiles.slice();
         let added = 0;
         files.forEach((file) => {
-          try {
-            const content = store.readFileText(file.path);
-            this.parse(content, file.name);
-            added += 1;
-          } catch (error) {
-            wx.showToast({ title: `「${file.name}」读取失败`, icon: 'none' });
-          }
+          const sizeKey = `${file.name}|${file.size || 0}`;
+          const duplicated = pending.some((item) => item.path === file.path || item.sizeKey === sizeKey);
+          if (duplicated) return;
+          pending.push({ name: file.name, path: file.path, size: file.size || 0, sizeKey: sizeKey });
+          added += 1;
         });
-        if (added) wx.showToast({ title: `已解析 ${added} 个文件，可逐个编辑后保存`, icon: 'none' });
+        this.setData({ pendingFiles: pending });
+        wx.showToast({
+          title: added ? `已加入 ${added} 个待识别文件，点「识别全部」` : '所选文件已在列表中',
+          icon: 'none',
+        });
       },
       fail: () => wx.showToast({ title: '未选择文件', icon: 'none' }),
     });
+  },
+  removePendingFile(event) {
+    const index = Number(event.currentTarget.dataset.index);
+    const pending = this.data.pendingFiles.slice();
+    pending.splice(index, 1);
+    this.setData({ pendingFiles: pending });
+  },
+  /** 识别全部：统一遍历待识别列表逐文件解析进入预览，复用现有解析管线 */
+  recognizeAll() {
+    const pending = this.data.pendingFiles;
+    if (!pending.length) {
+      wx.showToast({ title: '请先从聊天记录选择文件', icon: 'none' });
+      return;
+    }
+    let ok = 0;
+    const failed = [];
+    pending.forEach((file) => {
+      try {
+        const content = store.readFileText(file.path);
+        this.parse(content, file.name);
+        ok += 1;
+      } catch (error) {
+        failed.push(file.name);
+      }
+    });
+    this.setData({ pendingFiles: [] });
+    if (failed.length) {
+      wx.showToast({ title: `部分文件读取失败：${failed.slice(0, 3).join('、')}`, icon: 'none' });
+    } else {
+      wx.showToast({ title: `已识别 ${ok} 个文件，可预览编辑后保存`, icon: 'none' });
+    }
   },
   parseText() {
     if (!this.data.text.trim()) {
@@ -198,6 +233,20 @@ Page({
     this.setData({ groups: groups, editGroupIndex: -1, editCourseIndex: -1 });
     wx.showToast({ title: '已更新，保存后生效', icon: 'none' });
   },
+  saveGroup(group, mode, newName, campusMap) {
+    // 解析出校区时间表时，自动把首个校区时间表设为当前显示时间表（timetable.js 已动态跟随）
+    if (group.parsed.timeTables && group.parsed.timeTables.length) {
+      wx.setStorageSync('xclass.defaultTimeProfile', group.parsed.timeTables[0].id);
+    }
+    return store.importCourses(
+      group.parsed.courses,
+      mode,
+      newName,
+      group.parsed.semesterStartDate,
+      campusMap,
+      group.parsed.notes || []
+    );
+  },
   save() {
     const groups = this.data.groups;
     const total = groups.reduce((sum, group) => sum + (group.parsed.courses.length || 0), 0);
@@ -219,11 +268,10 @@ Page({
         success: (result) => {
           const group = groups[0];
           const campusMap = store.saveParsedTimeTables(group.parsed);
-          const name = store.importCourses(
-            group.parsed.courses,
+          const name = this.saveGroup(
+            group,
             result.tapIndex === 0 ? 'overwrite' : 'new',
             group.parsed.semester ? `${group.parsed.semester} 导入` : null,
-            group.parsed.semesterStartDate,
             campusMap
           );
           wx.showToast({ title: `已导入到「${name}」`, icon: 'none' });
@@ -237,7 +285,7 @@ Page({
     groups.forEach((group, index) => {
       const campusMap = store.saveParsedTimeTables(group.parsed);
       const baseName = (group.parsed.semester ? `${group.parsed.semester} ` : '') + (group.sourceName || `课表${index + 1}`).replace(/\.(txt|md|csv|json|tsv)$/i, '');
-      store.importCourses(group.parsed.courses, 'new', baseName, group.parsed.semesterStartDate, campusMap);
+      this.saveGroup(group, 'new', baseName, campusMap);
     });
     finish();
   },
@@ -263,7 +311,8 @@ Page({
       semester,
       store.getActiveSemesterStart(),
       totalWeeks,
-      idToAlias
+      idToAlias,
+      store.loadProfileNotes()
     );
     wx.setClipboardData({
       data: text,

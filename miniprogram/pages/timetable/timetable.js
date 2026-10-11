@@ -50,6 +50,7 @@ Page({
     isAllMode: false,
     manualTitle: '手动添加课程',
     allModeHeader: '',
+    notes: [],
   },
   onShow() {
     if (this.getTabBar && this.getTabBar()) this.getTabBar().setData({ selected: 0 });
@@ -66,6 +67,7 @@ Page({
     this.courses = store.loadCourses();
     this.semesterStart = store.getActiveSemesterStart();
     this.profiles = store.loadTimeProfiles();
+    this.notes = store.loadProfileNotes();
     this.dark = dark;
     const totalWeeks = core.totalWeeks(this.courses);
     const currentWeek = core.guessCurrentWeek(this.semesterStart, store.todayIso(), totalWeeks);
@@ -77,6 +79,7 @@ Page({
       week: keepWeek,
       profileName: store.activeProfile().name,
       isAllMode: false,
+      notes: this.notes,
     });
     this.computeRowHeight();
     const scaleMap = { small: 0.9, normal: 1, large: 1.15 };
@@ -342,7 +345,8 @@ Page({
       semester,
       store.getActiveSemesterStart(),
       totalWeeks,
-      idToAlias
+      idToAlias,
+      store.loadProfileNotes()
     );
     wx.setClipboardData({
       data: text,

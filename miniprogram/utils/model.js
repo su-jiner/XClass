@@ -187,6 +187,7 @@ function encodeBackup(profiles, timeProfiles, campusMap, defaultProfileId, expor
       return {
         name: profile.name,
         semesterStartDate: profile.semesterStartDate || null,
+        notes: Array.isArray(profile.notes) ? profile.notes : [],
         courses: (profile.courses || []).map(function (course) {
           return {
             courseName: course.courseName,
@@ -225,6 +226,7 @@ function decodeBackup(content) {
         return {
           name: profile.name || '课表',
           semesterStartDate: profile.semesterStartDate || null,
+          notes: Array.isArray(profile.notes) ? profile.notes : [],
           courses: (profile.courses || []).map(function (course) {
             return {
               courseName: course.courseName,

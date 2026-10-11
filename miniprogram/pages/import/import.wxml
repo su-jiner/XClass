@@ -2,7 +2,7 @@
   <view class="page-header">
     <view>
       <view class="page-title">导入课表</view>
-      <view class="page-subtitle">纯本地解析：粘贴文本或从聊天记录选 txt/md/csv/tsv 文件（不支持图片/PDF）。可多选文件，一个文件 = 一个课表</view>
+      <view class="page-subtitle">纯本地解析：粘贴文本或从聊天记录选 txt/md/csv/tsv 文件（不支持图片/PDF）。一个文件 = 一个课表，选完点识别全部，可预览编辑后再保存</view>
     </view>
   </view>
 
@@ -15,12 +15,21 @@
       bindinput="onTextInput"
     />
     <view class="button" bindtap="parseText" style="background:{{palette.panelAlt}};color:{{palette.icon}}">解析粘贴文本</view>
-    <view class="button secondary" bindtap="chooseFile" style="background:{{palette.panelAlt}};color:{{palette.text}}">从聊天记录选择文件（可多选）</view>
+    <view class="button secondary" bindtap="chooseFile" style="background:{{palette.panelAlt}};color:{{palette.text}}">从聊天记录添加文件（可多次累加）</view>
     <view class="button secondary" bindtap="exportShareText" style="background:{{palette.panelAlt}};color:{{palette.text}}">导出课表分享文本（复制给朋友）</view>
   </view>
 
+  <view class="card" wx:if="{{pendingFiles.length}}" style="background:{{palette.panel}}">
+    <view style="font-size:28rpx;font-weight:700;color:{{palette.textPrimary}}">待识别文件（{{pendingFiles.length}}）</view>
+    <view class="row" wx:for="{{pendingFiles}}" wx:key="sizeKey" style="padding:8rpx 0">
+      <view class="muted" style="flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">{{item.name}}</view>
+      <view class="muted" style="margin-left:16rpx" data-index="{{index}}" bindtap="removePendingFile">移除</view>
+    </view>
+    <view class="button" bindtap="recognizeAll" style="background:{{palette.buttonBackground}};color:{{palette.buttonText}}">识别全部（{{pendingFiles.length}} 个文件 → 预览）</view>
+  </view>
+
   <view wx:if="{{groups.length}}" class="groups-summary" style="color:{{palette.textSecondary}}">
-    已解析 {{groups.length}} 份课表文本，全部可编辑后再保存
+    已识别 {{groups.length}} 份课表，全部可编辑后再保存
   </view>
 
   <view class="card" wx:for="{{warnings}}" wx:key="*this" style="background:{{palette.panelAlt}}">
@@ -34,7 +43,10 @@
     </view>
     <view class="muted" wx:if="{{item.parsed.semester}}">学期：{{item.parsed.semester}}</view>
     <view class="muted" wx:if="{{item.parsed.totalWeeks}}">总周数：{{item.parsed.totalWeeks}}</view>
-    <view class="muted" wx:if="{{item.parsed.timeTables.length}}">节次时间表：{{item.parsed.timeTables.length}} 套（已保存并建立校区映射）</view>
+    <view class="muted" wx:if="{{item.parsed.timeTables.length}}">节次时间表：{{item.parsed.timeTables.length}} 套（已自动设为当前显示并建立校区映射）</view>
+    <view class="notes-card" wx:if="{{item.parsed.notes.length}}" style="background:{{palette.panel}};margin-top:12rpx;border-radius:12rpx;padding:12rpx 16rpx">
+      <view class="muted" wx:for="{{item.parsed.notes}}" wx:for-item="note" wx:key="*this" style="font-size:22rpx;line-height:1.6">· {{note}}</view>
+    </view>
   </view>
 
   <view class="card" wx:for="{{groups}}" wx:for-item="group" wx:for-index="groupIndex" wx:key="index" style="background:{{palette.panel}}">

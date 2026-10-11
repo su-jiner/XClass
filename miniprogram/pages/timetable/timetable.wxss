@@ -197,6 +197,20 @@
   opacity: 0.85;
 }
 
+.notes-bar {
+  flex: 0 0 auto;
+  margin: 8rpx 8rpx 0;
+  border-radius: 12rpx;
+  padding: 12rpx 20rpx;
+  max-height: 200rpx;
+  overflow-y: auto;
+}
+
+.notes-item {
+  font-size: 22rpx;
+  line-height: 1.6;
+}
+
 .manual-mask {
   position: fixed;
   top: 0;

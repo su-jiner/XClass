@@ -25,6 +25,7 @@ Page({
     rowHeight: 96,
     scale: 1,
     showManual: false,
+    notes: [],
     weekdayNames: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
     manualForm: {
       name: '',
@@ -54,9 +55,11 @@ Page({
     this.dark = dark;
     this.courses = store.loadCourses(this.profileId || null);
     this.profiles = store.loadTimeProfiles();
+    this.notes = store.loadProfileNotes(this.profileId || null);
     this.setData({
       palette: palette,
       titleText: this.profileName ? ('完整课表 · ' + this.profileName) : '完整课表',
+      notes: this.notes,
     });
     this.computeRowHeight();
     const scaleMap = { small: 0.9, normal: 1, large: 1.15 };

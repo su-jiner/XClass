@@ -123,6 +123,7 @@ function createProfile(name) {
     coursesFile: `courses_${id}.json`,
     updatedAt: Date.now(),
     semesterStartDate: defaultSemesterStart(),
+    notes: [],
   };
   writeJson(`${ROOT}/${profile.coursesFile}`, []);
   meta.profiles.push(profile);
@@ -248,8 +249,8 @@ function deleteCourseInProfile(index, profileId) {
   return true;
 }
 
-/** 导入入库：覆盖当前课表或新建课表 */
-function importCourses(parsedCourses, mode, newName, semesterStartDate, campusMap) {
+/** 导入入库：覆盖当前课表或新建课表（notes 为课表级公共备注数组，旧数据缺省按空数组） */
+function importCourses(parsedCourses, mode, newName, semesterStartDate, campusMap, notes) {
   const resolved = (parsedCourses || []).map((course) => ({
     courseName: course.courseName,
     teacher: course.teacher || '',
@@ -267,21 +268,35 @@ function importCourses(parsedCourses, mode, newName, semesterStartDate, campusMa
         campusId: meeting.campusAlias && campusMap ? (campusMap[meeting.campusAlias] || null) : (meeting.campusId || null),
       })),
   }));
+  const resolvedNotes = Array.isArray(notes) ? notes : [];
 
   if (mode === 'new') {
     const profile = createProfile(newName);
     saveCourses(resolved, profile.id);
-    if (semesterStartDate) {
-      const meta = loadMeta();
-      const target = meta.profiles.find((item) => item.id === profile.id);
-      target.semesterStartDate = semesterStartDate;
-      saveMeta(meta);
-    }
+    const meta = loadMeta();
+    const target = meta.profiles.find((item) => item.id === profile.id);
+    if (semesterStartDate) target.semesterStartDate = semesterStartDate;
+    target.notes = resolvedNotes;
+    saveMeta(meta);
     return profile.name;
   }
   saveCourses(resolved);
+  const meta = loadMeta();
+  const target = meta.profiles.find((item) => item.id === meta.activeId) || meta.profiles[0];
+  target.notes = resolvedNotes;
+  saveMeta(meta);
   if (semesterStartDate) setActiveSemesterStart(semesterStartDate);
-  return activeProfile().name;
+  return target.name;
+}
+
+/** 读取指定课表的公共备注（缺省空数组，旧数据无 notes 字段时不报错）。 */
+function loadProfileNotes(profileId) {
+  const meta = loadMeta();
+  const profile = profileId
+    ? meta.profiles.find((item) => item.id === profileId)
+    : (meta.profiles.find((item) => item.id === meta.activeId) || meta.profiles[0]);
+  if (!profile) return [];
+  return Array.isArray(profile.notes) ? profile.notes.slice() : [];
 }
 
 // ---------------------------------------------------------------- 节次时间表
@@ -355,6 +370,7 @@ function exportBackup() {
   const profiles = meta.profiles.map((profile) => ({
     name: profile.name,
     semesterStartDate: profile.semesterStartDate || null,
+    notes: Array.isArray(profile.notes) ? profile.notes : [],
     courses: readJson(`${ROOT}/${profile.coursesFile}`, []),
   }));
   const json = core.encodeBackup(profiles, loadTimeProfiles(), loadCampusMap(), null);
@@ -377,6 +393,7 @@ function importBackup(content) {
       coursesFile: file,
       updatedAt: Date.now(),
       semesterStartDate: profile.semesterStartDate || defaultSemesterStart(),
+      notes: Array.isArray(profile.notes) ? profile.notes : [],
     });
   });
   meta.activeId = meta.profiles[0].id;
@@ -410,6 +427,7 @@ module.exports = {
   updateCourse,
   deleteCourseInProfile,
   importCourses,
+  loadProfileNotes,
   loadTimeProfiles,
   loadCampusMap,
   saveTimeProfiles,

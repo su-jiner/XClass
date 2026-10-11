@@ -61,6 +61,10 @@
     </scroll-view>
   </view>
 
+  <view class="notes-bar" wx:if="{{notes.length}}" style="background:{{palette.panel}}">
+    <view class="notes-item" wx:for="{{notes}}" wx:key="*this" style="color:{{palette.textSecondary}}">{{item}}</view>
+  </view>
+
   <view class="empty-tip" wx:if="{{empty}}" style="color:{{palette.textSecondary}}">这个课表还没有课程</view>
 
   <view class="manual-mask" wx:if="{{showManual}}" bindtap="closeManual">
