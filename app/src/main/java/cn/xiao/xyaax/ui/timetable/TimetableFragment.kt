@@ -130,11 +130,12 @@ class TimetableFragment : Fragment() {
         currentUiData = data
         val ctx = requireContext()
 
-        // 空课表：没有课表内容就没有对应时间——直接隐藏左侧时间列与网格
+        // 空课表：没有课表内容就没有对应时间——隐藏表格区域，但头部周次/日期正常显示
         val hasCourses = data.courses.isNotEmpty()
         weekPager.visibility = if (hasCourses) View.VISIBLE else View.GONE
         if (!hasCourses) {
             view?.findViewById<LinearLayout>(R.id.notesBar)?.visibility = View.GONE
+            updateHeader(currentWeekIndex)
             return
         }
 
