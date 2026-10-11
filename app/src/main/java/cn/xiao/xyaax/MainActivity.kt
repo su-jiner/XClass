@@ -8,11 +8,18 @@ import android.provider.MediaStore
 import android.widget.FrameLayout
 import android.widget.ImageView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.GridView
+import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.ui.res.stringResource
 import androidx.fragment.app.Fragment
 import androidx.core.view.WindowInsetsControllerCompat
 import cn.xiao.xyaax.data.AppPreferences
 import cn.xiao.xyaax.data.ScheduleRepository
 import cn.xiao.xyaax.ui.compose.LiquidBottomTabs
+import cn.xiao.xyaax.ui.compose.LiquidTabItem
 import cn.xiao.xyaax.ui.settings.SettingsFragment
 import cn.xiao.xyaax.ui.timetable.TimetableFragment
 import cn.xiao.xyaax.ui.theme.ThemePaletteProvider
@@ -29,6 +36,7 @@ class MainActivity : AppCompatActivity() {
     private val navOrder = listOf(R.id.nav_today, R.id.nav_timetable, R.id.nav_tools, R.id.nav_settings)
 
     private var cachedFragments = mutableMapOf<Int, Fragment>()
+    private var switching = false
 
     private fun fragmentFor(navId: Int): Fragment = cachedFragments.getOrPut(navId) {
         when (navId) {
@@ -40,11 +48,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun switchTo(navId: Int) {
-        if (navId == currentNavId) return
+        if (navId == currentNavId || switching) return
+        // 防抖：切页动画期间忽略连点，避免多个 Fragment 动画叠加导致重叠
+        switching = true
+        rootContainer.postDelayed({ switching = false }, 240L)
         val fromIndex = navOrder.indexOf(currentNavId)
         val toIndex = navOrder.indexOf(navId)
         val forward = fromIndex < 0 || toIndex >= fromIndex
         val transaction = supportFragmentManager.beginTransaction()
+            .setReorderingAllowed(true)
             .setCustomAnimations(
                 if (forward) R.anim.nav_enter_right else R.anim.nav_enter_left,
                 if (forward) R.anim.nav_exit_left else R.anim.nav_exit_right
@@ -54,6 +66,7 @@ class MainActivity : AppCompatActivity() {
         if (target.isAdded) transaction.show(target) else transaction.add(R.id.mainContainer, target, navId.toString())
         transaction.commit()
         currentNavId = navId
+        bindComposeBar()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -93,6 +106,12 @@ class MainActivity : AppCompatActivity() {
         val composeView = composeBar ?: return
         composeView.setContent {
             LiquidBottomTabs(
+                items = listOf(
+                    LiquidTabItem(R.id.nav_today, Icons.Outlined.Schedule, stringResource(R.string.nav_today)),
+                    LiquidTabItem(R.id.nav_timetable, Icons.Outlined.CalendarMonth, stringResource(R.string.nav_timetable)),
+                    LiquidTabItem(R.id.nav_tools, Icons.Outlined.GridView, stringResource(R.string.nav_tools)),
+                    LiquidTabItem(R.id.nav_settings, Icons.Outlined.Settings, stringResource(R.string.nav_settings)),
+                ),
                 selectedNavId = currentNavId,
                 onSelect = { navId ->
                     if (navId != currentNavId) {
