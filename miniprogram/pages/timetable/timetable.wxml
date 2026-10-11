@@ -9,8 +9,7 @@
     </view>
   </view>
 
-  <view class="grid" wx:if="{{!empty}}" bindtouchstart="onTouchStart" bindtouchend="onTouchEnd">
-    <view class="grid-head">
+  <view class="grid" wx:if="{{!empty}}" bindtouchstart="onTouchStart" bindtouchend="onTouchEnd">    <view class="grid-head">
       <view class="head-time" style="background:{{palette.gridHeader}};color:{{palette.textPrimary}}">{{monthLabel}}</view>
       <view
         class="head-day"
@@ -65,14 +64,7 @@
     </scroll-view>
   </view>
 
-  <view class="empty-state" wx:else style="background:{{palette.page}};color:{{palette.textSecondary}}">
-    <view class="empty-icon" style="color:{{palette.textSecondary}}">📅</view>
-    <view class="empty-title" style="color:{{palette.textPrimary}}">暂无课程</view>
-    <view class="empty-desc">还没有课表内容，点击右上角 ＋ 手动添加课程，或到「设置 → 导入课表」导入课表</view>
-    <view class="empty-btn" style="background:{{palette.buttonBackground}};color:{{palette.buttonText}}" bindtap="onAddTap">去添加课程</view>
-  </view>
-
-  <view class="week-hint" wx:if="{{!isAllMode}}" style="color:{{palette.textSecondary}}">
+  <view class="week-hint" wx:if="{{!isAllMode && !empty}}" style="color:{{palette.textSecondary}}">
     <text bindtap="goPrevWeek" class="week-arrow">‹ 上一周</text>
     <text class="week-current">第 {{week}} / {{totalWeeks}} 周（左右滑动切周）</text>
     <text bindtap="goNextWeek" class="week-arrow">下一周 ›</text>

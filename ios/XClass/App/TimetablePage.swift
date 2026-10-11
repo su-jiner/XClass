@@ -32,9 +32,8 @@ struct TimetablePage: View {
                 }
                 VStack(spacing: 0) {
                     header
-                    if courses.isEmpty {
-                        emptyState
-                    } else {
+                    // 空课表：没有课表内容就没有对应时间——不渲染时间列与网格
+                    if !courses.isEmpty {
                         weekPager
                     }
                     if !notes.isEmpty { notesBar }
@@ -108,29 +107,6 @@ struct TimetablePage: View {
     private var headerWeekText: String {
         let weekdayLabel = Weekday(rawValue: SimpleDate.today().weekdayMonBased)?.shortLabel ?? "一"
         return selectedWeek == currentWeek ? "第\(selectedWeek)周 周\(weekdayLabel)" : "第\(selectedWeek)周（非本周）"
-    }
-
-    private var emptyState: some View {
-        VStack(spacing: 12) {
-            Text("📅").font(.system(size: 44))
-            Text("暂无课程")
-                .font(.system(size: 17, weight: .bold))
-                .foregroundColor(palette.textPrimary)
-            Text("还没有课表内容，点击右上角 ＋ 手动添加课程，或到「设置 → 导入课表」导入课表")
-                .font(.system(size: 13))
-                .foregroundColor(palette.textSecondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
-            Button { showAddChooser = true } label: {
-                Text("去添加课程")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(palette.buttonText)
-                    .padding(.horizontal, 28)
-                    .padding(.vertical, 10)
-                    .background(Capsule().fill(palette.buttonBackground))
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var weekPager: some View {

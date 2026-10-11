@@ -57,7 +57,6 @@ class TimetableFragment : Fragment() {
     private lateinit var dateText: TextView
     private lateinit var weekPager: ViewPager2
     private lateinit var addCourseButton: ImageButton
-    private lateinit var emptyState: LinearLayout
     private var currentWeekIndex: Int = 1
     private var pageChangeCallback: ViewPager2.OnPageChangeCallback? = null
     private var pageChangeRegistered: Boolean = false
@@ -83,12 +82,9 @@ class TimetableFragment : Fragment() {
         dateText = view.findViewById(R.id.currentDateText)
         weekPager = view.findViewById(R.id.weekPager)
         addCourseButton = view.findViewById(R.id.addCourseButton)
-        emptyState = view.findViewById(R.id.emptyState)
 
         val palette = ThemePaletteProvider.fromContext(requireContext())
         addCourseButton.imageTintList = ColorStateList.valueOf(palette.iconTint)
-
-        view.findViewById<TextView>(R.id.emptyAddButton).setOnClickListener { showAddChooser() }
 
         observeTimetable()
 
@@ -134,10 +130,9 @@ class TimetableFragment : Fragment() {
         currentUiData = data
         val ctx = requireContext()
 
-        // 空课表：隐藏左侧时间列与网格，显示空态引导
+        // 空课表：没有课表内容就没有对应时间——直接隐藏左侧时间列与网格
         val hasCourses = data.courses.isNotEmpty()
         weekPager.visibility = if (hasCourses) View.VISIBLE else View.GONE
-        emptyState.visibility = if (hasCourses) View.GONE else View.VISIBLE
         if (!hasCourses) {
             view?.findViewById<LinearLayout>(R.id.notesBar)?.visibility = View.GONE
             return

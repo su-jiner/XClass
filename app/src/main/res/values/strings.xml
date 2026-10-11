@@ -151,9 +151,6 @@
     <string name="course_detail_delete_failed">课程已变化，请重新打开详情后再试</string>
     <string name="action_save">保存</string>
     <string name="timetable_add_course">手动添加课程</string>
-    <string name="timetable_empty_title">暂无课程</string>
-    <string name="timetable_empty_desc">还没有课表内容，点击右上角 ＋ 手动添加课程，或到「设置 → 导入课表」导入课表</string>
-    <string name="timetable_empty_action">去添加课程</string>
     <string name="profile_current">当前</string>
     <string name="profile_more_actions">更多操作</string>
     <string name="widget_today_title">今日课程</string>

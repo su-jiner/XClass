@@ -6,40 +6,6 @@
   padding: 0 12rpx calc(112rpx + env(safe-area-inset-bottom));
 }
 
-.empty-state {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 0 60rpx;
-  text-align: center;
-}
-
-.empty-icon {
-  font-size: 88rpx;
-  margin-bottom: 24rpx;
-}
-
-.empty-title {
-  font-size: 34rpx;
-  font-weight: 700;
-  margin-bottom: 16rpx;
-}
-
-.empty-desc {
-  font-size: 24rpx;
-  line-height: 1.6;
-  margin-bottom: 40rpx;
-}
-
-.empty-btn {
-  padding: 20rpx 56rpx;
-  border-radius: 44rpx;
-  font-size: 28rpx;
-  font-weight: 600;
-}
-
 .header {
   display: flex;
   align-items: center;

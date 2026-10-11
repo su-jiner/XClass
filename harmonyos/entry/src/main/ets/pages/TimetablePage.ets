@@ -199,7 +199,7 @@ export struct TimetablePage {
       .width('100%')
       .padding({ left: 12, right: 12, bottom: 4 })
 
-      // 周网格 / 空态
+      // 周网格（空课表：没有课表内容就没有对应时间——不渲染时间列与网格）
       if (this.courses.length > 0) {
         Scroll() {
           Row() {
@@ -237,35 +237,6 @@ export struct TimetablePage {
         .layoutWeight(1)
         .align(Alignment.Top)
         .scrollable(ScrollDirection.Vertical)
-      } else {
-        // 空课表：隐藏左侧时间列与网格，显示空态引导
-        Column() {
-          Text('📅').fontSize(44)
-          Text('暂无课程')
-            .fontSize(17).fontWeight(FontWeight.Bold)
-            .fontColor(this.palette().textPrimary)
-            .margin({ top: 12 })
-          Text('还没有课表内容，点击右上角 ＋ 手动添加课程，或到「设置 → 导入课表」导入课表')
-            .fontSize(13)
-            .fontColor(this.palette().textSecondary)
-            .textAlign(TextAlign.Center)
-            .margin({ top: 6, left: 40, right: 40 })
-          Button('去添加课程')
-            .fontSize(14).fontWeight(FontWeight.Bold)
-            .fontColor(this.palette().buttonText)
-            .backgroundColor(this.palette().buttonBackground)
-            .height(40)
-            .padding({ left: 28, right: 28 })
-            .borderRadius(999)
-            .margin({ top: 20 })
-            .onClick(() => {
-              this.showAddChooser();
-            })
-        }
-        .layoutWeight(1)
-        .width('100%')
-        .justifyContent(FlexAlign.Center)
-        .alignItems(HorizontalAlign.Center)
       }
 
       // 底部课表级备注栏（非空才显示：小字、次级色、圆角卡片）
