@@ -127,7 +127,17 @@ class WeekTimetableRenderer(
             layoutParams = LinearLayout.LayoutParams(m.leftColumnWidth, ViewGroup.LayoutParams.WRAP_CONTENT)
         }
 
+        // 左侧时间列：时间文本跟随课程同步出现——该节次有课程才显示起止时间，无课显示空（格子保留）
+        val occupiedSections = BooleanArray(13) // index 1..12
+        items.forEach { item ->
+            val s = item.meeting.startSection.coerceIn(1, 12)
+            val e = item.meeting.endSection.coerceIn(s, 12)
+            for (sec in s..e) occupiedSections[sec] = true
+        }
+
         periodRanges.forEachIndexed { index, time ->
+            val section = index + 1
+            val hasCourse = occupiedSections[section]
             val periodCell = LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER
@@ -135,7 +145,7 @@ class WeekTimetableRenderer(
                 background = roundedBackground(withAlpha(palette.gridLeftColumn, panelAlpha), radius = 8f)
             }
             val label = TextView(context).apply {
-                text = String.format(Locale.getDefault(), "%d", index + 1)
+                text = String.format(Locale.getDefault(), "%d", section)
                 textSize = 12f * fontScale
                 gravity = Gravity.CENTER
                 layoutParams = LinearLayout.LayoutParams(
@@ -149,7 +159,8 @@ class WeekTimetableRenderer(
             val startTime = time.substringBefore('-')
             val endTime = time.substringAfter('-')
             val timeLabel = TextView(context).apply {
-                text = startTime
+                // 无课节次时间为空（跟随课程出现）
+                text = if (hasCourse) startTime else ""
                 textSize = 9f * fontScale
                 gravity = Gravity.CENTER
                 layoutParams = LinearLayout.LayoutParams(
@@ -160,7 +171,7 @@ class WeekTimetableRenderer(
                 setTextColor(palette.textSecondary)
             }
             val timeLabelEnd = TextView(context).apply {
-                text = endTime
+                text = if (hasCourse) endTime else ""
                 textSize = 9f * fontScale
                 gravity = Gravity.CENTER
                 layoutParams = LinearLayout.LayoutParams(

@@ -32,10 +32,8 @@ struct TimetablePage: View {
                 }
                 VStack(spacing: 0) {
                     header
-                    // 空课表：没有课表内容就没有对应时间——不渲染时间列与网格
-                    if !courses.isEmpty {
-                        weekPager
-                    }
+                    // 网格常显：时间列时间跟随课程（无课节次时间为空，空课表显示空时间列而非整页空白）
+                    weekPager
                     if !notes.isEmpty { notesBar }
                 }
             }
@@ -207,16 +205,19 @@ struct WeekGridView: View {
                         .foregroundColor(palette.textPrimary)
                         .frame(height: 34)
                     ForEach(1...sectionCount, id: \.self) { section in
+                        // 时间跟随课程：该节次有课程才显示起止时间，无课显示空
+                        let hasCourse = items.contains { item in
+                            section >= item.meeting.startSection && section <= item.meeting.endSection
+                        }
                         VStack(spacing: 0) {
                             Text("\(section)").font(.system(size: 11 * fontScale, weight: .bold))
-                            let parts = sectionRanges.indices.contains(section - 1)
-                                ? sectionRanges[section - 1].components(separatedBy: "-") : []
-                            if parts.count == 2 {
-                                Text(parts[0]).font(.system(size: 8 * fontScale))
-                                Text(parts[1]).font(.system(size: 8 * fontScale))
-                            } else {
-                                Text("--:--").font(.system(size: 8 * fontScale))
-                                Text("--:--").font(.system(size: 8 * fontScale))
+                            if hasCourse {
+                                let parts = sectionRanges.indices.contains(section - 1)
+                                    ? sectionRanges[section - 1].components(separatedBy: "-") : []
+                                if parts.count == 2 {
+                                    Text(parts[0]).font(.system(size: 8 * fontScale))
+                                    Text(parts[1]).font(.system(size: 8 * fontScale))
+                                }
                             }
                         }
                         .foregroundColor(palette.textSecondary)

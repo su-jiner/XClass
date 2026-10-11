@@ -199,45 +199,45 @@ export struct TimetablePage {
       .width('100%')
       .padding({ left: 12, right: 12, bottom: 4 })
 
-      // 周网格（空课表：没有课表内容就没有对应时间——不渲染时间列与网格）
-      if (this.courses.length > 0) {
-        Scroll() {
-          Row() {
-            // 左列：节次
-            Column() {
-              Text(`${this.weekStart().month}月`)
-                .fontSize(10).fontWeight(FontWeight.Bold)
-                .fontColor(this.palette().textPrimary)
-                .height(HEADER_HEIGHT)
-                .width('100%')
-                .textAlign(TextAlign.Center)
-              ForEach(this.sectionRanges, (range: string, index: number) => {
-                Column() {
-                  Text(`${index + 1}`).fontSize(11).fontWeight(FontWeight.Bold)
+      // 周网格（网格常显：时间列时间跟随课程——该节有课程才显示起止时间，无课显示空）
+      Scroll() {
+        Row() {
+          // 左列：节次（时间跟随课程）
+          Column() {
+            Text(`${this.weekStart().month}月`)
+              .fontSize(10).fontWeight(FontWeight.Bold)
+              .fontColor(this.palette().textPrimary)
+              .height(HEADER_HEIGHT)
+              .width('100%')
+              .textAlign(TextAlign.Center)
+            ForEach(this.sectionRanges, (range: string, index: number) => {
+              Column() {
+                Text(`${index + 1}`).fontSize(11).fontWeight(FontWeight.Bold)
+                if (this.hasCourseInSection(index + 1)) {
                   Text(range.split('-')[0]).fontSize(8)
                   Text(range.split('-')[1]).fontSize(8)
                 }
-                .fontColor(this.palette().textSecondary)
-                .width(LEFT_COLUMN_WIDTH - 6)
-                .height(ROW_HEIGHT)
-                .textAlign(TextAlign.Center)
-              }, (range: string) => range)
-            }
-            .backgroundColor(this.palette().gridLeft)
-
-            Row({ space: 2 }) {
-              ForEach([0, 1, 2, 3, 4, 5, 6], (dayIndex: number) => {
-                this.DayColumn(dayIndex)
-              }, (dayIndex: number) => dayIndex.toString())
-            }
-            .padding({ left: 4, right: 4 })
+              }
+              .fontColor(this.palette().textSecondary)
+              .width(LEFT_COLUMN_WIDTH - 6)
+              .height(ROW_HEIGHT)
+              .textAlign(TextAlign.Center)
+            }, (range: string) => range)
           }
-          .alignItems(VerticalAlign.Top)
+          .backgroundColor(this.palette().gridLeft)
+
+          Row({ space: 2 }) {
+            ForEach([0, 1, 2, 3, 4, 5, 6], (dayIndex: number) => {
+              this.DayColumn(dayIndex)
+            }, (dayIndex: number) => dayIndex.toString())
+          }
+          .padding({ left: 4, right: 4 })
         }
-        .layoutWeight(1)
-        .align(Alignment.Top)
-        .scrollable(ScrollDirection.Vertical)
+        .alignItems(VerticalAlign.Top)
       }
+      .layoutWeight(1)
+      .align(Alignment.Top)
+      .scrollable(ScrollDirection.Vertical)
 
       // 底部课表级备注栏（非空才显示：小字、次级色、圆角卡片）
       if (this.notes.length > 0) {
@@ -276,6 +276,17 @@ export struct TimetablePage {
       return `第${this.selectedWeek}周 周${weekdayLabel}`;
     }
     return `第${this.selectedWeek}周（非本周）`;
+  }
+
+  /** 该节次在本周是否有课程（时间列时间跟随课程显示） */
+  hasCourseInSection(section: number): boolean {
+    const items = displayMeetings(this.courses, this.selectedWeek, false);
+    for (const item of items) {
+      if (section >= item.meeting.startSection && section <= item.meeting.endSection) {
+        return true;
+      }
+    }
+    return false;
   }
 
   @Builder

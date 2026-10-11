@@ -9,7 +9,7 @@
     </view>
   </view>
 
-  <view class="grid" wx:if="{{!empty}}" bindtouchstart="onTouchStart" bindtouchend="onTouchEnd">    <view class="grid-head">
+  <view class="grid" bindtouchstart="onTouchStart" bindtouchend="onTouchEnd">    <view class="grid-head">
       <view class="head-time" style="background:{{palette.gridHeader}};color:{{palette.textPrimary}}">{{monthLabel}}</view>
       <view
         class="head-day"
@@ -32,8 +32,8 @@
             style="height:{{rowHeight}}rpx;background:{{palette.gridLeft}}"
           >
             <view class="section-no" style="color:{{palette.textPrimary}};font-size:{{24 * scale}}rpx">{{item.section}}</view>
-            <view class="section-time" style="color:{{palette.textSecondary}};font-size:{{18 * scale}}rpx">{{item.startTime}}</view>
-            <view class="section-time" style="color:{{palette.textSecondary}};font-size:{{18 * scale}}rpx">{{item.endTime}}</view>
+            <view class="section-time" wx:if="{{item.startTime}}" style="color:{{palette.textSecondary}};font-size:{{18 * scale}}rpx">{{item.startTime}}</view>
+            <view class="section-time" wx:if="{{item.endTime}}" style="color:{{palette.textSecondary}};font-size:{{18 * scale}}rpx">{{item.endTime}}</view>
           </view>
         </view>
         <view
@@ -64,7 +64,7 @@
     </scroll-view>
   </view>
 
-  <view class="week-hint" wx:if="{{!isAllMode && !empty}}" style="color:{{palette.textSecondary}}">
+  <view class="week-hint" wx:if="{{!isAllMode}}" style="color:{{palette.textSecondary}}">
     <text bindtap="goPrevWeek" class="week-arrow">‹ 上一周</text>
     <text class="week-current">第 {{week}} / {{totalWeeks}} 周（左右滑动切周）</text>
     <text bindtap="goNextWeek" class="week-arrow">下一周 ›</text>

@@ -130,14 +130,8 @@ class TimetableFragment : Fragment() {
         currentUiData = data
         val ctx = requireContext()
 
-        // 空课表：没有课表内容就没有对应时间——隐藏表格区域，但头部周次/日期正常显示
-        val hasCourses = data.courses.isNotEmpty()
-        weekPager.visibility = if (hasCourses) View.VISIBLE else View.GONE
-        if (!hasCourses) {
-            view?.findViewById<LinearLayout>(R.id.notesBar)?.visibility = View.GONE
-            updateHeader(currentWeekIndex)
-            return
-        }
+        // 网格始终渲染（时间列时间跟随课程：无课节次时间为空，空课表只显示空时间列而非整页空白）
+        weekPager.visibility = View.VISIBLE
 
         pageChangeCallback?.let { callback ->
             if (pageChangeRegistered) {
