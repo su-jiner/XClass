@@ -134,10 +134,12 @@ class WeekTimetableRenderer(
         // 左侧时间列：固定编码时间（1-12 节全部显示标准起止时间，不随课程有无变化）
         periodRanges.forEachIndexed { index, time ->
             val section = index + 1
+            val isLast = index == periodRanges.size - 1
+            val cellHeight = m.sectionHeight + if (isLast) m.lastSectionExtra else 0
             val periodCell = LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER
-                layoutParams = LinearLayout.LayoutParams(m.leftColumnWidth, m.sectionHeight)
+                layoutParams = LinearLayout.LayoutParams(m.leftColumnWidth, cellHeight)
                 background = roundedBackground(withAlpha(palette.gridLeftColumn, panelAlpha), radius = 8f)
             }
             val label = TextView(context).apply {
@@ -218,7 +220,7 @@ class WeekTimetableRenderer(
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = m.cellGap }
+            ).apply { topMargin = (22 * density).toInt() }
         }
         box.addView(TextView(context).apply {
             text = "备注"
@@ -257,7 +259,8 @@ class WeekTimetableRenderer(
         currentSection: Int?
     ): FrameLayout {
         val context = parent.context
-        val columnHeight = m.sectionHeight * periodRanges.size
+        val totalSections = periodRanges.size
+        val columnHeight = m.sectionHeight * totalSections + m.lastSectionExtra
         val dayColumn = FrameLayout(context).apply {
             layoutParams = LinearLayout.LayoutParams(m.dayColumnWidth, columnHeight).apply {
                 marginStart = m.cellGap
@@ -276,7 +279,9 @@ class WeekTimetableRenderer(
             val end = item.meeting.endSection.coerceIn(start, 12)
             val isCurrentCourse = item.isCurrentWeek && isToday && currentSection != null && currentSection in start..end
             val top = (start - 1) * m.sectionHeight + 2
-            val cardHeight = (end - start + 1) * m.sectionHeight - 4
+            // 课程卡底部若触及最后一节（第 12 节），把卡片加长到该节加长后的底边，避免文字溢出/截半
+            val cardHeight = (end - start + 1) * m.sectionHeight - 4 +
+                if (end >= totalSections) m.lastSectionExtra else 0
             val cardWidth = m.dayColumnWidth - m.cellGap
 
             // 1. 底层微阴影
@@ -389,7 +394,8 @@ class WeekTimetableRenderer(
             // 封面课程比同组其他课程短时，仍要显示剩余节次的实际课程。
             slot.uncoveredSegments().forEach { segment ->
                 val segmentTop = (segment.startSection - 1) * m.sectionHeight + 2
-                val segmentHeight = (segment.endSection - segment.startSection + 1) * m.sectionHeight - 4
+                val segmentHeight = (segment.endSection - segment.startSection + 1) * m.sectionHeight - 4 +
+                    if (segment.endSection >= periodRanges.size) m.lastSectionExtra else 0
                 val continuation = LinearLayout(context).apply {
                     layoutParams = FrameLayout.LayoutParams(cardWidth, segmentHeight.coerceAtLeast(36)).apply {
                         topMargin = segmentTop

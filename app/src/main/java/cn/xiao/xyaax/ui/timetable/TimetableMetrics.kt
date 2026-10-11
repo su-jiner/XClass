@@ -8,6 +8,7 @@ object TimetableMetrics {
         val dayColumnWidth: Int,
         val headerCellHeight: Int,
         val sectionHeight: Int,
+        val lastSectionExtra: Int,
         val cellGap: Int,
         val cardPadding: Int,
         val outerPadding: Int
@@ -31,12 +32,15 @@ object TimetableMetrics {
         val sectionHeightByHeight = ((screenHeightPx * 0.78f) / 12f).toInt()
         // 节高下限 52dp：保证第 12 节等底部节次完整显示课程长条与时间，不被压缩成半截
         val sectionHeight = minOf(sectionHeightByWidth, sectionHeightByHeight).coerceAtLeast((52f * density).toInt())
+        // 最后一节（第 12 节）额外加长：让「教室待定」等多行课程内容完整显示在格内，而不是靠间距留白
+        val lastSectionExtra = (24f * density).toInt()
 
         return Spec(
             leftColumnWidth = leftWidth,
             dayColumnWidth = dayWidth,
             headerCellHeight = (42f * density * scale).toInt(),
             sectionHeight = sectionHeight,
+            lastSectionExtra = lastSectionExtra,
             cellGap = gap,
             cardPadding = (4f * density * scale).toInt().coerceAtLeast((2f * density).toInt()),
             outerPadding = outerPadding
